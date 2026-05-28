@@ -11,6 +11,8 @@ Source of truth: historical
 
 Decision: Project-wide documentation must live in root `docs/` or a dedicated docs repo.
 
+In a dedicated docs repo, `/docs` is still required as the canonical documentation root.
+
 Backend and frontend may have thin pointer files only for project-wide agent instructions.
 
 Backend may own backend-specific implementation documentation only.

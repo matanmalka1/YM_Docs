@@ -18,4 +18,5 @@ Source of truth: mandatory
 - Product/domain behavior belongs in product/domain docs, not architecture docs.
 - Temporary TODOs must not be mixed into permanent architecture rules.
 - ADRs own accepted historical decisions and their rationale.
+- When in doubt, prefer code and tests, then update docs to match the verified behavior.
 - If docs and code disagree, verify the code, report the drift, and update the relevant source-of-truth doc as part of the change when in scope.

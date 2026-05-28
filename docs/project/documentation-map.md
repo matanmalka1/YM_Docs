@@ -11,6 +11,8 @@ Source of truth: reference
 
 # Documentation Map
 
+Paths in this file are relative to the root of the project docs repo or monorepo.
+
 Project-wide agent rules:
 
 - `docs/agent/entry-point.md`

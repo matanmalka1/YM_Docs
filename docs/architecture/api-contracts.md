@@ -20,5 +20,7 @@ Source of truth: mandatory
 - Filtering and sorting must happen before pagination, preferably in backend SQL/ORM queries.
 - Sorting fields must be allowlisted.
 - Standard list responses return `items`, `total`, `page`, and `page_size`.
+- Error responses must use the standard error envelope for application errors.
+- Validation errors must be shaped consistently so frontend code can display field and form-level errors without endpoint-specific parsing.
 - API contracts use `snake_case` fields to match the Python backend.
 - Frontend request/response types must match backend contracts instead of remapping silently.
