@@ -11,14 +11,15 @@ Source of truth: mandatory
 
 - Run the most relevant tests for the files changed by default.
 - Run the full suite when the change is broad, shared, risky, or explicitly requested.
+- Do not claim tests passed unless they were run in the current task.
 - Backend tests are run from `backend/` with the repo virtualenv:
 
 ```bash
 JWT_SECRET=test-secret ./.venv/bin/python -m pytest -q tests/<path>
 ```
 
-- Backend service tests are preferred for business logic.
-- HTTP integration tests are appropriate for routing, auth, request/response contracts, and middleware behavior.
+- Backend business logic changes must include service-layer tests or a final explanation of why service-layer tests were not added.
+- HTTP integration tests must cover routing, auth, request/response contracts, or middleware behavior when the changed surface is not already covered by existing tests.
 - Do not mock the database for repository behavior that depends on ORM queries.
 - Frontend tests are run from `frontend/`:
 

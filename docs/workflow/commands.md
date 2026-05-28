@@ -9,7 +9,9 @@ Source of truth: mandatory
 
 # Commands
 
-Backend commands are run from `backend/` and must use the repo virtualenv.
+- Run backend commands from `backend/`.
+- Backend Python commands must use `./.venv/bin/python` or `./.venv/bin/pip`.
+- Do not use global `python`, `python3`, or `pip` for backend work.
 
 Run backend:
 
@@ -29,7 +31,7 @@ Run backend tests:
 JWT_SECRET=test-secret ./.venv/bin/python -m pytest -q tests/<path>
 ```
 
-Frontend commands are run from `frontend/`:
+Run frontend commands from `frontend/`:
 
 ```bash
 npm run dev

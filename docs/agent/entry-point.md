@@ -6,13 +6,13 @@ This file owns only:
 
 This file must not contain:
 - Full backend, frontend, API, database, workflow, or product/domain documentation.
-- Temporary TODOs or module-specific implementation notes.
+- Temporary task lists or module-specific implementation notes.
 
 Source of truth: mandatory
 
 # Agent Entry Point
 
-Before changing code or documentation, read:
+Before changing code or documentation, read in this order:
 
 1. `docs/agent/behavior.md`
 2. `docs/agent/decision-making.md`
@@ -28,13 +28,10 @@ Before changing code or documentation, read:
 
 Non-negotiable rules:
 
-- No legacy compatibility unless explicitly requested.
-- No aliases, wrappers, or compatibility layers just to preserve old code.
-- No hidden fallback behavior.
-- Keep backend flow: Router -> Service -> Repository -> DB.
-- Routers stay thin.
-- Services own business logic, orchestration, authorization details, derived state, and DTO mapping.
-- Repositories own database access only.
-- Do not change domain behavior without updating the relevant product/domain docs.
-- Use the repo virtualenv for backend Python commands: `./.venv/bin/python` and `./.venv/bin/pip`.
-- Do not use global `python` or `python3` for backend work.
+- You must follow the source-of-truth file for the area you touch.
+- You must not add legacy compatibility unless explicitly requested.
+- You must not add aliases, wrappers, or compatibility layers just to preserve old code.
+- You must not add hidden fallback behavior.
+- You must not change domain behavior unless the relevant domain docs are updated in the same task.
+- You must stop and report conflicts between the user request, code, and docs before editing affected files.
+- You must run or report the relevant verification from `docs/workflow/verification.md` before finishing.

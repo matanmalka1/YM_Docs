@@ -10,13 +10,13 @@ Source of truth: mandatory
 
 # Decision-Making
 
-- Prefer simple, maintainable architecture.
-- Prefer the current codebase's established patterns over new abstractions.
-- Add abstractions only when they remove real duplication or clarify ownership.
+- Choose the simplest maintainable design that fits the existing architecture.
+- Use existing local patterns unless they conflict with mandatory docs.
+- Add an abstraction only when it removes real duplication or clarifies ownership.
 - Do not preserve legacy behavior unless explicitly requested.
 - Do not add aliases, wrappers, compatibility shims, or alternate names to avoid updating callers.
 - Do not create hidden fallback behavior.
-- Avoid duplicated logic across backend, frontend, and docs.
-- Be willing to say when existing structure is wrong.
-- Modern backend/frontend practices are preferred, but local architecture rules win.
-- This project is in development unless explicitly stated otherwise; do not assume production users or production data.
+- Remove duplicated logic instead of adding another copy.
+- Say when existing structure is wrong and explain the operational impact.
+- Local mandatory architecture rules override generic best practices.
+- Treat the system as in development unless the user explicitly says production users or data are involved.

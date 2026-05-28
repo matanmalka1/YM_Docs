@@ -10,17 +10,19 @@ Source of truth: mandatory
 
 # API Contracts
 
-- Authenticated application APIs use `/api/v1/*`.
-- Resource URLs use stable, plural, kebab-case resource names.
+- Authenticated application APIs must use `/api/v1/*`.
+- Resource URLs must use stable, plural, kebab-case resource names.
 - Business action endpoints may use verbs only for real domain commands or transitions.
-- Never use `GET` for state-changing operations.
+- `GET` endpoints must not change state.
 - Standard list endpoints must support `page`, `page_size`, `sort_by`, and `order`.
-- Do not introduce list aliases such as `limit`, `offset`, `per_page`, `sort_dir`, or `order_by`.
-- Filters are query parameters and use stable `snake_case` names.
-- Filtering and sorting must happen before pagination, preferably in backend SQL/ORM queries.
+- New list endpoints must not introduce aliases such as `limit`, `offset`, `per_page`, `sort_dir`, or `order_by`.
+- Filters must be query parameters with stable `snake_case` names.
+- Filtering and sorting must happen before pagination.
 - Sorting fields must be allowlisted.
-- Standard list responses return `items`, `total`, `page`, and `page_size`.
-- Error responses must use the standard error envelope for application errors.
-- Validation errors must be shaped consistently so frontend code can display field and form-level errors without endpoint-specific parsing.
-- API contracts use `snake_case` fields to match the Python backend.
-- Frontend request/response types must match backend contracts instead of remapping silently.
+- Standard list responses must return `items`, `total`, `page`, and `page_size`.
+- Application error responses must use the standard error envelope.
+- Standard application error responses must include `error.code`, `error.message`, and optional `error.details`.
+- Validation errors must expose enough field/form detail for frontend display without endpoint-specific parsing.
+- API contracts must use `snake_case` fields to match the Python backend.
+- Frontend request/response types must match backend contracts.
+- Frontend code must not silently remap API contracts to different field names.

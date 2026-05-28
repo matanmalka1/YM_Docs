@@ -19,4 +19,5 @@ APP_ENV=development ENV_FILE=.env.development ./.venv/bin/python -m app.main
 - Inspect `http://localhost:8000/docs` or the generated OpenAPI JSON.
 - Confirm route paths, methods, status codes, request schemas, response schemas, and auth requirements.
 - If frontend contracts exist for the changed endpoint, update or verify them in the same task when in scope.
+- If OpenAPI output does not match code, report the mismatch before changing frontend contracts.
 - Do not treat OpenAPI as a replacement for tests.

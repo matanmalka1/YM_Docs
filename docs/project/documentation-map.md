@@ -1,6 +1,6 @@
 ## Scope
 This file owns only:
-- The map of documentation areas and where agents should look.
+- The map of documentation areas and where agents look.
 - References to existing domain docs without normalizing them.
 
 This file must not contain:
@@ -12,6 +12,11 @@ Source of truth: reference
 # Documentation Map
 
 Paths in this file are relative to the root of the project docs repo or monorepo.
+
+Start here:
+
+- `AGENTS.md`
+- `docs/agent/entry-point.md`
 
 Project-wide agent rules:
 
