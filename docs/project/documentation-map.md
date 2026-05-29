@@ -30,6 +30,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/documentation-map.md` — this index/navigation map.
 - `docs/project/backend-module-map.md` — where backend modules live.
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
+- `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
 
 ## Architecture (technical source of truth)
 
@@ -37,6 +38,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/architecture/frontend.md` ★ — frontend architecture rules.
 - `docs/architecture/api-contracts.md` ★ — binding public API contract rules.
 - `docs/architecture/api-contract-standard.md` — worked API examples (non-normative; defers to `api-contracts.md`).
+- `docs/architecture/error-codes.md` — registry of `DOMAIN.REASON` error-code namespaces + status mapping (non-normative).
 - `docs/architecture/database.md` ★ — database modeling rules.
 - `docs/architecture/migrations.md` ★ — schema migration rules.
 - `docs/architecture/security.md` ★ — auth, token, and security rules.
