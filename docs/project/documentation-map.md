@@ -11,49 +11,66 @@ Source of truth: reference
 
 # Documentation Map
 
-Paths in this file are relative to the root of the project docs repo or monorepo.
+Official docs index and navigation map. Paths are relative to the root of the project docs repo. **★ = source of truth** (mandatory/binding).
 
-Start here:
+## Precedence
 
-- `AGENTS.md`
-- `docs/agent/entry-point.md`
+- ADRs override all other docs when relevant.
+- Architecture docs override workflow and project docs for technical rules.
+- Archive docs are historical only and are not source of truth.
 
-Project-wide agent rules:
+## Start here
 
-- `docs/agent/entry-point.md`
-- `docs/agent/behavior.md`
-- `docs/agent/decision-making.md`
-- `docs/agent/source-of-truth.md`
+- `AGENTS.md` — top-level entry pointer for agents.
+- `docs/agent/entry-point.md` ★ — canonical project-wide agent instructions; read first.
 
-Project reference:
+## Project
 
-- `docs/project/overview.md`
-- `docs/project/backend-module-map.md`
-- `docs/project/documentation-map.md`
-- `docs/project/domain-docs-inventory.md`
+- `docs/project/overview.md` — what the product is and its high-level shape.
+- `docs/project/documentation-map.md` — this index/navigation map.
+- `docs/project/backend-module-map.md` — where backend modules live.
+- `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 
-Architecture rules:
+## Architecture (technical source of truth)
 
-- `docs/architecture/backend.md`
-- `docs/architecture/frontend.md`
-- `docs/architecture/api-contracts.md`
-- `docs/architecture/database.md`
-- `docs/architecture/migrations.md`
-- `docs/architecture/security.md`
-- `docs/architecture/observability.md`
-- `docs/architecture/api-contract-standard.md`
+- `docs/architecture/backend.md` ★ — backend layering and structure rules.
+- `docs/architecture/frontend.md` ★ — frontend architecture rules.
+- `docs/architecture/api-contracts.md` ★ — binding public API contract rules.
+- `docs/architecture/api-contract-standard.md` — worked API examples (non-normative; defers to `api-contracts.md`).
+- `docs/architecture/database.md` ★ — database modeling rules.
+- `docs/architecture/migrations.md` ★ — schema migration rules.
+- `docs/architecture/security.md` ★ — auth, token, and security rules.
+- `docs/architecture/observability.md` ★ — logging and observability rules.
 
-Workflow rules:
+## Workflow
 
-- `docs/workflow/commands.md`
-- `docs/workflow/local-env.md`
-- `docs/workflow/testing.md`
-- `docs/workflow/verification.md`
-- `docs/workflow/openapi-checks.md`
-- `docs/workflow/local-mobile-testing.md`
-- `docs/workflow/git.md`
+- `docs/workflow/commands.md` ★ — standard project commands.
+- `docs/workflow/local-env.md` ★ — local environment setup.
+- `docs/workflow/testing.md` ★ — testing rules.
+- `docs/workflow/verification.md` ★ — change verification rules.
+- `docs/workflow/git.md` ★ — git workflow rules.
+- `docs/workflow/openapi-checks.md` — OpenAPI check usage.
+- `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
 
-Existing domain docs not normalized in this phase:
+## Agent
+
+- `docs/agent/entry-point.md` ★ — canonical agent instructions.
+- `docs/agent/behavior.md` ★ — required agent behavior.
+- `docs/agent/decision-making.md` ★ — how agents make decisions.
+- `docs/agent/source-of-truth.md` ★ — how to resolve doc precedence.
+
+## ADR (override all docs when relevant)
+
+- `docs/adr/0001-no-legacy-compatibility.md` — no legacy compatibility by default.
+- `docs/adr/0002-router-service-repository.md` — router/service/repository layering.
+- `docs/adr/0003-no-hidden-fallbacks.md` — no hidden fallbacks.
+- `docs/adr/0004-project-docs-ownership.md` — project docs ownership model.
+
+## Archive (historical only, not source of truth)
+
+- `docs/archive/README.md` — index of retired/historical docs.
+
+## Domain docs (not normalized in this phase)
 
 - `backend/docs/backend/domains/annual_reports/`
 - `backend/docs/backend/domains/vat_report/`

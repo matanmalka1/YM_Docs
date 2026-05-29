@@ -16,9 +16,9 @@ Canonical rules:
 
 # API Contract Standard
 
-This document gives worked examples for the public API contract. The binding rules live in `docs/architecture/api-contracts.md`; where this file and the canonical rules disagree, the canonical rules win.
+This file is non-normative. Canonical API rules live in `docs/architecture/api-contracts.md`. If there is conflict, `api-contracts.md` wins.
 
-Internal implementation may differ by domain, but externally visible request and response contracts must be consistent.
+This document gives worked examples for the public API contract. Internal implementation may differ by domain, but externally visible request and response contracts must be consistent.
 
 ## Applicability
 
@@ -36,7 +36,7 @@ It does not need to apply to:
 
 ## URL Naming
 
-Use plural resource names and clear nested resources.
+URL naming rules (plural/kebab-case resources, verbs only for real domain commands) live in `docs/architecture/api-contracts.md`. Examples:
 
 Good:
 
@@ -57,9 +57,9 @@ Do not use RPC-style or mixed-case paths:
 /send_notification
 ```
 
-Resources are nouns, usually plural. Business actions may use verbs only when they represent a real domain transition or command.
-
 ## HTTP Methods
+
+Method semantics and the rule that `GET` must not change state are defined in `docs/architecture/api-contracts.md`. Quick reference:
 
 | Method | Use |
 |--------|-----|
@@ -68,8 +68,6 @@ Resources are nouns, usually plural. Business actions may use verbs only when th
 | `PATCH` | partial update |
 | `PUT` | full replacement, rarely needed |
 | `DELETE` | delete or soft delete |
-
-Never use `GET` for state-changing operations.
 
 Bad:
 
@@ -85,21 +83,15 @@ POST /binders/{binder_id}/complete
 
 ## List Request Contract
 
-Every standard list endpoint accepts `page`, `page_size`, `sort_by`, and `order`.
-
-Example:
+The canonical list-parameter rules, defaults, bounds, and prohibited aliases (`limit`/`offset`, `per_page`, `sort_dir`, `order_by`, etc.) are defined in `docs/architecture/api-contracts.md`. A standard list request using `page`, `page_size`, `sort_by`, and `order` looks like:
 
 ```txt
 GET /api/v1/annual-reports?page=1&page_size=25&sort_by=created_at&order=desc
 ```
 
-The canonical list-parameter rules, defaults, bounds, and prohibited aliases (`limit`/`offset`, `per_page`, `sort_dir`, `order_by`, etc.) are defined in `docs/architecture/api-contracts.md`.
-
 ## Filtering
 
-Filters are query parameters with stable snake_case names.
-
-Preferred names:
+Filter rules (query params, stable snake_case names, filter before pagination) live in `docs/architecture/api-contracts.md`. Preferred names in this system:
 
 ```txt
 client_record_id
@@ -121,22 +113,17 @@ customer_id
 
 In this system, when the identifier points to `ClientRecord`, the API field is `client_record_id`.
 
-Filtering for table/list endpoints must happen before pagination and preferably in SQL/backend code.
-The frontend must not fetch a broad page and then filter that page in memory for primary resource screens.
-
 ## Sorting
 
-Use:
+Sorting fields must be allowlisted (see `docs/architecture/api-contracts.md`). Map `sort_by` through an allowlist in the service/repository layer rather than passing free-form column names to SQL. Example:
 
 ```txt
 sort_by=created_at&order=desc
 ```
 
-Do not expose free-form column names directly to SQL. Map `sort_by` through an allowlist in the service/repository layer.
-
 ## List Response Contract
 
-Every standard list endpoint returns:
+The required base fields (`items`, `total`, `page`, `page_size`) and the rule that extra aggregate fields may be added but base fields not renamed live in `docs/architecture/api-contracts.md`. Example:
 
 ```json
 {
@@ -147,9 +134,7 @@ Every standard list endpoint returns:
 }
 ```
 
-`total` is the number of records after filters and before pagination.
-
-Domains may add extra fields, such as:
+Here `total` is the number of records after filters and before pagination. Example with an added aggregate:
 
 ```json
 {
@@ -160,8 +145,6 @@ Domains may add extra fields, such as:
   "counters": {}
 }
 ```
-
-but they must not rename the base fields.
 
 ## Single Response Contract
 
@@ -220,8 +203,6 @@ Errors use the project envelope. The envelope shape, error codes, and status map
 }
 ```
 
-Clients must match on `error.code`, not on Hebrew message text.
-
 ## Status Codes (quick reference)
 
 Canonical status rules live in `docs/architecture/api-contracts.md`. Common cases:
@@ -235,11 +216,9 @@ Canonical status rules live in `docs/architecture/api-contracts.md`. Common case
 | `422` | request validation failed |
 | `500` | unexpected server error only |
 
-Do not return `500` for business validation or domain conflicts.
-
 ## DTO Boundaries
 
-Routers must return Pydantic response schemas, not raw ORM objects as an implicit contract.
+The `response_model=` requirement is defined in `docs/architecture/api-contracts.md`. In practice, routers return Pydantic response schemas, not raw ORM objects.
 
 Good:
 

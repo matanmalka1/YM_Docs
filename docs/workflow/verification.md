@@ -9,13 +9,35 @@ Source of truth: mandatory
 
 # Verification
 
-Before finishing, verify the smallest meaningful scope that proves the change.
+Required checklist before finishing any change. Verify the smallest meaningful scope that proves the change. Report any check you could not run and why.
 
-- Backend code changes must run relevant pytest targets with `./.venv/bin/python`, or report why they were not run.
-- Backend persistence model or database schema changes must include generated and reviewed Alembic migrations when the database schema changes.
-- API contract changes must verify OpenAPI and frontend contract impact.
-- Frontend code changes must run the relevant frontend checks: typecheck, lint, build, tests, or architecture checks.
-- Structural frontend changes must run `npm run arch:check`; cross-feature import or barrel changes must run `npm run arch:check:strict`.
-- Visible UI changes must be verified in a browser, or the final response must explain why browser verification was not run.
-- Docs-only changes must manually verify file structure, links, paths, and scope boundaries.
-- Report any checks that could not be run.
+How to run tests and checks: `docs/workflow/testing.md`. How to check API/OpenAPI: `docs/workflow/openapi-checks.md`.
+
+## Checklist
+
+- [ ] Code compiles / typechecks.
+- [ ] Relevant tests pass (see `docs/workflow/testing.md`).
+- [ ] API contract checked when an endpoint or schema changed (see `docs/workflow/openapi-checks.md`).
+- [ ] Migration generated and reviewed when the DB schema changed.
+- [ ] Frontend flow checked in a browser when UI changed, or final response explains why not.
+- [ ] Docs updated when behavior, rules, API, or DB changed (see below).
+- [ ] No unrelated changes included.
+- [ ] No hidden fallback or legacy-compatibility behavior added.
+
+## When docs must be updated
+
+- Behavior changed.
+- API contract changed.
+- DB / schema changed.
+- Permission / security rule changed.
+- Domain / business rule changed.
+- Workflow / run command changed.
+
+## When OpenAPI must be checked
+
+See `docs/workflow/openapi-checks.md`. Required when:
+
+- Request / response schema changed.
+- Endpoint added, removed, or renamed.
+- Status codes or error shape changed.
+- Auth / permission behavior changed.
