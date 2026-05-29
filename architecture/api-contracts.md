@@ -27,10 +27,12 @@ Source of truth: mandatory
 - Existing list endpoints that still use aliases such as `sort_dir` or `sort_order` should migrate callers to `order` and then remove the old names.
 - Filters must be query parameters with stable `snake_case` names.
 - List filters should be scalar query parameters unless the endpoint explicitly needs repeated query parameters, such as exclusion lists.
+- Search, filter, sort, and pagination parameters must be stable and URL-addressable so a frontend can restore state on refresh, navigation, and shared links without extra in-memory translation.
 - Filtering and sorting must happen before pagination.
 - Sorting fields must be allowlisted.
 - Standard list responses must return `items`, `total`, `page`, and `page_size`.
 - List responses may include additional aggregate fields such as counters when the owning endpoint contract defines them.
+- Endpoints that back KPI cards or filtered dashboards must expose the aggregate fields the UI needs, such as totals, counts, or sums, instead of requiring the frontend to infer them from paginated `items`.
 - Every response-bearing endpoint must declare `response_model=`.
 - Endpoints with no response body must use HTTP 204.
 - Application error responses must use the standard error envelope.
@@ -42,6 +44,7 @@ Source of truth: mandatory
 - Validation errors must expose enough field/form detail for frontend display without endpoint-specific parsing.
 - Validation error details must identify request fields without transport-specific prefixes such as `body.`.
 - `AppError` subclasses map to their configured HTTP status, including 404 for not found, 409 for conflict, and 403 for forbidden.
+- Permission-denied responses must use a consistent 403 contract so frontend access-control handling can be shared instead of endpoint-specific.
 - Request validation errors return 422.
 - Database errors and unhandled exceptions return 500 without exposing internals.
 - Hebrew `ValueError` messages that are safe for user display return 400.
