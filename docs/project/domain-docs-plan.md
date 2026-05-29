@@ -39,7 +39,7 @@ Status legend: `todo` / `in-progress` / `done`.
 | dashboard          | dashboard          | read         | done   |
 | search             | search             | cross-cut    | done   |
 | reports            | reports            | read         | done   |
-| health             | health             | infra        | todo   |
+| health             | health             | infra        | done   |
 
 ## Claude — client / operations
 
@@ -56,7 +56,7 @@ Status legend: `todo` / `in-progress` / `done`.
 | authority-contact   | authority_contact   | core      | done   |
 | timeline            | timeline            | read      | done   |
 | audit               | audit               | cross-cut | done   |
-| users               | users               | core      | todo   |
+| users               | users               | core      | done   |
 
 ## Final batch (human / single owner, after parallel runs)
 

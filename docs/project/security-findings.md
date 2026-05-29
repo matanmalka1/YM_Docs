@@ -58,6 +58,7 @@ Status legend: `open` / `in-progress` / `fixed`.
 | F-038 | Low / design | reports | `VatComplianceReportItemResponse` exposes `reporting_frequency` always set to the same value as `period_type` — redundant field, inflates payload, misleads consumers. | `app/reports/services/vat_compliance_report.py:55-56`, `app/reports/schemas.py:15-16` | open |
 | F-039 | Low (doc/code divergence) | timeline | README claims `notification_sent` events are excluded as noisy, but service emits both `notification_sent` and `notification_failed`. Either drop or update the claim. | `app/timeline/services/timeline_service.py:129-141` vs `app/timeline/README.md:113` | open |
 | F-040 | Low (temporal accuracy) | timeline | `decline_reason` is read from the live `SignatureRequest` row rather than the audit-event snapshot — later mutation of the row rewrites historical timeline. Comment in code already acknowledges this. | `app/timeline/services/timeline_client_builders.py:70-73` | open |
+| F-041 | Low | users | `GET /api/v1/users/audit-logs` accepts `from`/`to` without validating `from <= to` — reversed range silently returns empty results. | `app/users/repositories/user_audit_log_repository.py:103-106` | open |
 
 ## Notes
 
