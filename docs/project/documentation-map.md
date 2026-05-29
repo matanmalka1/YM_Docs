@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - The map of documentation areas and where agents look.
 - References to existing domain docs without normalizing them.
 
 This file must not contain:
+
 - Full rules copied from other docs.
 - Domain documentation rewrites or migrations.
 
@@ -31,6 +34,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/backend-module-map.md` — where backend modules live.
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
+- `docs/project/domain-docs-plan.md` — ownership split + status tracker for the canonical per-domain docs migration.
 
 ## Architecture (technical source of truth)
 
@@ -50,6 +54,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/workflow/local-env.md` ★ — local environment setup.
 - `docs/workflow/testing.md` ★ — testing rules.
 - `docs/workflow/verification.md` ★ — change verification rules.
+- `docs/workflow/domain-docs-authoring.md` ★ — reusable template + parallel rules for writing canonical per-domain docs.
 - `docs/workflow/git.md` ★ — git workflow rules.
 - `docs/workflow/openapi-checks.md` — OpenAPI check usage.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
