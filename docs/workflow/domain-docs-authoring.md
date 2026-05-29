@@ -109,6 +109,10 @@ Bullet the rules actually enforced in services. Cite `services/...`. Mark anythi
 
 The `DOMAIN.REASON` codes this domain raises. Registry: `docs/architecture/error-codes.md`.
 
+## Known issues
+
+Current code discrepancies found during authoring (bugs to fix in code, not intended behavior). Each item: what is wrong, `path:line`, the rule/invariant it violates, and a suggested fix. Omit the section if none found. Docs-only — never fix the code here; report it.
+
 ## Decisions (preserved)
 
 Still-true domain decisions carried over from legacy specs, with rationale. Drop anything code contradicts.

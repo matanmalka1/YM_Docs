@@ -28,7 +28,7 @@ Status legend: `todo` / `in-progress` / `done`.
 
 | {DOMAIN}           | {MODULE}           | type         | status |
 | ------------------ | ------------------ | ------------ | ------ |
-| advance-payments   | advance_payments   | core (pilot) | todo   |
+| advance-payments   | advance_payments   | core (pilot) | done   |
 | annual-reports     | annual_reports     | core         | todo   |
 | vat-reports        | vat_reports        | core         | todo   |
 | tax-calendar       | tax_calendar       | core         | todo   |
