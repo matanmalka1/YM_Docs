@@ -25,10 +25,22 @@ Install backend dependencies:
 ./.venv/bin/pip install -r requirements.txt
 ```
 
-Run backend tests:
+Run backend tests (scoped, preferred):
 
 ```bash
 JWT_SECRET=test-secret ./.venv/bin/python -m pytest -q tests/<path>
+```
+
+Run the full backend test suite:
+
+```bash
+JWT_SECRET=test-secret ./.venv/bin/python -m pytest -q
+```
+
+Seed backend development data:
+
+```bash
+APP_ENV=development ENV_FILE=.env.development ./.venv/bin/python scripts/seed_fake_data.py --reset
 ```
 
 Run frontend commands from `frontend/`:

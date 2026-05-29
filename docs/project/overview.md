@@ -12,7 +12,15 @@ Source of truth: reference
 
 YM Tax CRM is an internal staff CRM for clients, binders, billing, charges, tax workflows, VAT reports, annual reports, reminders, notifications, signing, correspondence, and operational work tracking.
 
-The backend is FastAPI, SQLAlchemy ORM, Alembic, and Pydantic v2.
+The staff-facing roles are `ADVISOR` for full access and `SECRETARY` for operational access with limited write permissions.
+
+The backend is Python 3.12+, FastAPI, Uvicorn, SQLAlchemy 2.0 ORM, Alembic, and Pydantic v2.
+
+Backend authentication uses JWT HS256, bcrypt password hashing, and `token_version` invalidation.
+
+Backend storage is local filesystem in development and test, and Cloudflare R2 in staging and production.
+
+Deployment is on Render through `render.yaml`.
 
 The frontend is React, TypeScript, Vite, Tailwind CSS, React Query, Zustand for auth/session state, react-hook-form, Zod, Axios, and React Router.
 

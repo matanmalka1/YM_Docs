@@ -25,6 +25,13 @@ Project-wide agent rules:
 - `docs/agent/decision-making.md`
 - `docs/agent/source-of-truth.md`
 
+Project reference:
+
+- `docs/project/overview.md`
+- `docs/project/backend-module-map.md`
+- `docs/project/documentation-map.md`
+- `docs/project/domain-docs-inventory.md`
+
 Architecture rules:
 
 - `docs/architecture/backend.md`
