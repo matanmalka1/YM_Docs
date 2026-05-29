@@ -78,14 +78,51 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 - `docs/archive/README.md` — index of retired/historical docs.
 
-## Domain docs (not normalized in this phase)
+## Domains (canonical)
 
-- `backend/docs/backend/domains/annual_reports/`
-- `backend/docs/backend/domains/vat_report/`
-- `backend/docs/backend/domains/work-queue.md`
-- `backend/docs/backend/domains/advance_payments_spec.md`
-- `backend/docs/backend/domains/binder_lifecycle_refactor_spec.md`
-- `backend/docs/frontend_screen_spec.md`
-- `backend/app/*/README.md`
+Per-domain canonical docs, one file each. Authoring rules: `docs/workflow/domain-docs-authoring.md`.
 
-Do not migrate, rewrite, split, or normalize domain-specific docs in the generic documentation phase.
+- `docs/domains/README.md` ★ — index of all 24 domain docs.
+
+Tax chain:
+
+- `docs/domains/advance-payments.md` ★
+- `docs/domains/annual-reports.md` ★
+- `docs/domains/vat-reports.md` ★
+- `docs/domains/tax-calendar.md` ★
+- `docs/domains/charge.md` ★
+
+Client lifecycle & operations:
+
+- `docs/domains/clients.md` ★
+- `docs/domains/businesses.md` ★
+- `docs/domains/binders.md` ★
+- `docs/domains/correspondence.md` ★
+- `docs/domains/notes.md` ★
+- `docs/domains/permanent-documents.md` ★
+- `docs/domains/authority-contact.md` ★
+- `docs/domains/signature-requests.md` ★
+
+Work & messaging:
+
+- `docs/domains/tasks.md` ★
+- `docs/domains/reminders.md` ★
+- `docs/domains/notifications.md` ★
+
+Aggregation & read:
+
+- `docs/domains/work-queue.md` ★
+- `docs/domains/timeline.md` ★
+- `docs/domains/dashboard.md` ★
+- `docs/domains/reports.md` ★
+- `docs/domains/search.md` ★
+
+Cross-cutting & infra:
+
+- `docs/domains/audit.md` ★
+- `docs/domains/users.md` ★
+- `docs/domains/health.md` ★
+
+## Legacy backend domain docs (pointers only)
+
+These files under `backend/docs/**` and `backend/app/*/README.md` have been replaced with pointers to the canonical docs above; historical content lives in `docs/archive/`. Do not edit them as sources of truth.
