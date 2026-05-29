@@ -11,7 +11,7 @@ Source of truth: historical
 # מקדמות מס הכנסה — אפיון מלא (Archived)
 
 > Original specification document. Not the current API/model contract.
-> Canonical domain doc: `docs/docs/domains/advance-payments.md`
+> Canonical domain doc: `docs/domains/advance-payments.md`
 
 **What was dropped and why:**
 - `payment_status` field name → renamed to `status` in implementation.

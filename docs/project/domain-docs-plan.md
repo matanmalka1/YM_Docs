@@ -12,7 +12,7 @@ Source of truth: reference
 
 # Domain Docs Plan
 
-Tracks the migration to canonical `docs/docs/domains/<DOMAIN>.md`. Authoring rules + template: `docs/workflow/domain-docs-authoring.md`.
+Tracks the migration to canonical `docs/domains/<DOMAIN>.md`. Authoring rules + template: `docs/workflow/domain-docs-authoring.md`.
 
 Two agents (Codex, Claude Code) work in parallel, each on a different domain. Each touches only its own files (see parallel rules in the authoring doc). Index/map registration is batched at the end.
 
@@ -29,8 +29,8 @@ Status legend: `todo` / `in-progress` / `done`.
 | {DOMAIN}           | {MODULE}           | type         | status |
 | ------------------ | ------------------ | ------------ | ------ |
 | advance-payments   | advance_payments   | core (pilot) | done   |
-| annual-reports     | annual_reports     | core         | todo   |
-| vat-reports        | vat_reports        | core         | todo   |
+| annual-reports     | annual_reports     | core         | done   |
+| vat-reports        | vat_reports        | core         | done   |
 | tax-calendar       | tax_calendar       | core         | todo   |
 | charge             | charge             | core         | todo   |
 | work-queue         | work_queue         | read         | todo   |
@@ -45,8 +45,8 @@ Status legend: `todo` / `in-progress` / `done`.
 
 | {DOMAIN}            | {MODULE}            | type      | status |
 | ------------------- | ------------------- | --------- | ------ |
-| clients             | clients             | core      | todo   |
-| businesses          | businesses          | core      | todo   |
+| clients             | clients             | core      | done   |
+| businesses          | businesses          | core      | done   |
 | binders             | binders             | core      | todo   |
 | tasks               | tasks               | core      | todo   |
 | reminders           | reminders           | core      | todo   |
@@ -62,5 +62,5 @@ Status legend: `todo` / `in-progress` / `done`.
 
 Collect every run's Registration block and update once:
 
-- `docs/docs/domains/README.md` (create index)
-- `docs/docs/project/documentation-map.md` (add Domains section)
+- `docs/domains/README.md` (create index)
+- `docs/project/documentation-map.md` (add Domains section)

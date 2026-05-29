@@ -1,6 +1,6 @@
 ## Scope
 This file owns only:
-- The reusable workflow + prompt template for authoring one canonical domain doc under `docs/docs/domains/`.
+- The reusable workflow + prompt template for authoring one canonical domain doc under `docs/domains/`.
 - Parallel-safety rules so two agents (Codex, Claude Code) can each take a different domain without conflicts.
 
 This file must not contain:
@@ -11,7 +11,7 @@ Source of truth: mandatory
 
 # Domain Docs Authoring
 
-Goal: produce one canonical, code-accurate doc per backend domain at `docs/docs/domains/<DOMAIN>.md`, cleaning legacy/stale/incorrect material from the old `backend/docs` files into an archive.
+Goal: produce one canonical, code-accurate doc per backend domain at `docs/domains/<DOMAIN>.md`, cleaning legacy/stale/incorrect material from the old `backend/docs` files into an archive.
 
 Two agents run this in parallel, each on a **different** domain. The template below is parameterized; fill the variables, then follow the procedure exactly.
 
@@ -25,13 +25,13 @@ Two agents run this in parallel, each on a **different** domain. The template be
 
 1. **Claim one domain.** Before starting, state which `{DOMAIN}` you are taking. Do not touch any other domain's files.
 2. **Touch only your own files:**
-   - `docs/docs/domains/{DOMAIN}.md` (create)
-   - `docs/docs/archive/{DOMAIN}-legacy.md` (create, only if there is legacy material worth keeping)
+   - `docs/domains/{DOMAIN}.md` (create)
+   - `docs/archive/{DOMAIN}-legacy.md` (create, only if there is legacy material worth keeping)
    - Your `{LEGACY_PATHS}` under `backend/docs` (replace body with a pointer — see Archiving)
 3. **Do NOT edit shared/index files.** Specifically do not edit:
-   - `docs/docs/domains/README.md`
-   - `docs/docs/project/documentation-map.md`
-   - `docs/docs/archive/README.md`
+   - `docs/domains/README.md`
+   - `docs/project/documentation-map.md`
+   - `docs/archive/README.md`
    - any other domain's doc
 
    Registration into the index/map is batched separately by a human after parallel runs finish, to avoid merge conflicts. Instead, end your run with a **Registration block** (see Output) listing the one-line index/map entries you would have added.
@@ -47,23 +47,27 @@ Two agents run this in parallel, each on a **different** domain. The template be
    - Domain rules/invariants: `{MODULE}/services/`.
    - Error codes: grep `"{DOMAIN_UPPER}\\."` in `{MODULE}`; reference `docs/architecture/error-codes.md`.
 2. **Preserve domain decisions (hybrid).** From `{LEGACY_PATHS}` and `backend/docs/domain_decisions_v3.md`, keep decisions/rationale that are still true. Drop anything contradicted by code. Mark anything not yet implemented as `Future / planned`.
-3. **Verify every claim.** For each non-obvious fact, confirm against a `path:line`. Endpoints must exist in `backend/openapi.json`. Do not invent behavior.
-4. **Write** `docs/docs/domains/{DOMAIN}.md` using the skeleton below.
+3. **Verify every claim.** For each non-obvious fact, confirm against a `path:line`. Endpoints must exist in `backend/openapi.json`. Do not invent behavior. Before writing, skim `docs/project/security-findings.md` for patterns already found in other domains and check whether your domain has the same (see Known issues patterns below).
+4. **Write** `docs/domains/{DOMAIN}.md` using the skeleton below.
 5. **Archive legacy.** See Archiving.
 
 ## Conflict / precedence
 
-Follow `docs/docs/project/documentation-map.md`: ADR > architecture > workflow > project > existing code. The new domain doc is a **project/domain doc** — it must not restate or override architecture rules; link to them instead (e.g. API envelope → `docs/architecture/api-contracts.md`).
+Follow `docs/project/documentation-map.md`: ADR > architecture > workflow > project > existing code. The new domain doc is a **project/domain doc** — it must not restate or override architecture rules; link to them instead (e.g. API envelope → `docs/architecture/api-contracts.md`).
 
 ## Archiving legacy
 
 For each file in `{LEGACY_PATHS}` that has historically useful material:
 
-1. Copy the still-useful historical content to `docs/docs/archive/{DOMAIN}-legacy.md` (add the standard Scope header, `Source of truth: historical`).
+1. Copy the still-useful historical content to `docs/archive/{DOMAIN}-legacy.md` (add the standard Scope header, `Source of truth: historical`).
 2. Replace the body of the original `backend/docs` file with a short pointer:
-   > Historical. Canonical domain doc: `docs/docs/domains/{DOMAIN}.md`. Archived original: `docs/docs/archive/{DOMAIN}-legacy.md`.
+   > Historical. Canonical domain doc: `docs/domains/{DOMAIN}.md`. Archived original: `docs/archive/{DOMAIN}-legacy.md`.
 
 If a legacy file has nothing worth keeping, just replace its body with the pointer (no archive copy).
+
+## Link convention
+
+All cross-doc links use a **single** `docs/` prefix (relative to the docs repo root), e.g. `docs/architecture/error-codes.md`, `docs/archive/{DOMAIN}-legacy.md`. Never write `docs/docs/...` — that is the monorepo-root vantage and breaks the project convention used by `documentation-map.md` and every existing doc. The only files that legitimately use `docs/docs/...` are the pointer files outside the docs repo (`backend/docs/**`, root/backend `CLAUDE.md`).
 
 ## Canonical doc skeleton
 
@@ -113,6 +117,16 @@ The `DOMAIN.REASON` codes this domain raises. Registry: `docs/architecture/error
 
 Current code discrepancies found during authoring (bugs to fix in code, not intended behavior). Each item: what is wrong, `path:line`, the rule/invariant it violates, and a suggested fix. Omit the section if none found. Docs-only — never fix the code here; report it.
 
+Actively check for these recurring patterns before concluding "none found":
+
+1. **IDOR / missing ownership re-check on update.** Compare each `update_*`/`delete_*` service path against its `create_*` counterpart. If create validates that a child/related id (line, invoice, activity, document) belongs to the parent/owner, the update/delete path MUST do the same. A path that mutates by child `id` after only checking the parent exists is a finding. (Seen in annual-reports F-001, vat-reports F-008.)
+2. **Enforced invariants that the service skips.** For each invariant in the domain decisions (e.g. "no transition to X without field Y"), grep the service to confirm it is actually enforced. Documented-but-unenforced = finding. (Seen in vat-reports F-007 assigned_to.)
+3. **Computed/derived fields using a legacy/stale source.** When a field has both a legacy column and a newer source-of-truth column, confirm computed values read the new one. (Seen in advance-payments F-005 due_date vs due_date_effective.)
+4. **Error codes off the `DOMAIN.REASON` format.** Grep raised codes; flag any that are not `DOMAIN.REASON`. (Seen in vat-reports F-009.)
+5. **Broken/stale imports & dead references.** Imports of symbols not defined at the target, and module/README references to files that no longer exist. (Seen in businesses F-006.)
+
+Record each finding in this section AND report it so it can be added to `docs/project/security-findings.md`.
+
 ## Decisions (preserved)
 
 Still-true domain decisions carried over from legacy specs, with rationale. Drop anything code contradicts.
@@ -123,7 +137,7 @@ Explicitly not-yet-implemented behavior. Never describe as current.
 
 ## Historical notes
 
-Pointer to `docs/docs/archive/{DOMAIN}-legacy.md` if archived.
+Pointer to `docs/archive/{DOMAIN}-legacy.md` if archived.
 ```
 
 ## Required output / report
@@ -135,4 +149,4 @@ End every run with:
 3. **Stale/legacy removed** — what was dropped and why.
 4. **Future / planned** — what was marked aspirational.
 5. **Could not verify** — any unverifiable claims.
-6. **Registration block** — the exact one-line entries to add later to `docs/docs/domains/README.md` and `docs/docs/project/documentation-map.md` (do not add them yourself).
+6. **Registration block** — the exact one-line entries to add later to `docs/domains/README.md` and `docs/project/documentation-map.md` (do not add them yourself).

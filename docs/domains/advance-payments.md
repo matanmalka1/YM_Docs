@@ -180,6 +180,6 @@ These items are explicitly **not yet implemented**. Do not describe as current b
 
 ## Historical notes
 
-Legacy spec archived at `docs/docs/archive/advance-payments-legacy.md`.
+Legacy spec archived at `docs/archive/advance-payments-legacy.md`.
 
 Original location: `backend/docs/backend/domains/advance_payments_spec.md` (now a pointer).

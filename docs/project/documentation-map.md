@@ -35,6 +35,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
 - `docs/project/domain-docs-plan.md` — ownership split + status tracker for the canonical per-domain docs migration.
+- `docs/project/security-findings.md` — central index of code findings (IDOR, correctness) surfaced during domain-docs authoring.
 
 ## Architecture (technical source of truth)
 
