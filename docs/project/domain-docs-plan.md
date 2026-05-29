@@ -36,9 +36,9 @@ Status legend: `todo` / `in-progress` / `done`.
 | work-queue         | work_queue         | read         | done   |
 | notifications      | notification       | core         | done   |
 | signature-requests | signature_requests | core         | done   |
-| dashboard          | dashboard          | read         | todo   |
-| search             | search             | cross-cut    | todo   |
-| reports            | reports            | read         | todo   |
+| dashboard          | dashboard          | read         | done   |
+| search             | search             | cross-cut    | done   |
+| reports            | reports            | read         | done   |
 | health             | health             | infra        | todo   |
 
 ## Claude — client / operations
@@ -54,8 +54,8 @@ Status legend: `todo` / `in-progress` / `done`.
 | correspondence      | correspondence      | core      | done   |
 | permanent-documents | permanent_documents | core      | done   |
 | authority-contact   | authority_contact   | core      | done   |
-| timeline            | timeline            | read      | todo   |
-| audit               | audit               | cross-cut | todo   |
+| timeline            | timeline            | read      | done   |
+| audit               | audit               | cross-cut | done   |
 | users               | users               | core      | todo   |
 
 ## Final batch (human / single owner, after parallel runs)

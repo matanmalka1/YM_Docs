@@ -49,6 +49,15 @@ Status legend: `open` / `in-progress` / `fixed`.
 | F-029 | Low | signature-requests | `GET /api/v1/signature-requests/{request_id}` raises raw `HTTPException` instead of `NotFoundError("…", "SIGNATURE_REQUEST.NOT_FOUND")` — bypasses the error envelope. | `app/signature_requests/api/routes_advisor.py:81` | open |
 | F-030 | Medium (IDOR) | signature-requests | `cancel_request` fetches by bare `request_id` with no client ownership check — any ADVISOR can cancel any pending request system-wide. | `app/signature_requests/services/admin_actions.py:21-35`, `api/routes_advisor.py:89-103` | open |
 | F-031 | Low (dead artifact) | signature-requests | Orphaned bytecode `services/__pycache__/send_request.cpython-314.pyc` with no source `.py`. | `app/signature_requests/services/__pycache__/` | open |
+| F-032 | Low (doc-only) | search | `app/search/README.md` references non-existent `search_filters.py`, `test_search_filters.py`, and a `DocumentSearchResult.status` field that the schema does not define. | `app/search/README.md:34-37,68-70,129-137` | open |
+| F-033 | Low (doc-only) | dashboard | README references `dashboard_extended_service.py`, `dashboard_extended_builders.py`, and three test files — none exist on disk. | `app/dashboard/README.md` (Implementation references) | open |
+| F-034 | Low | dashboard | `quick_actions` schema field always returns `[]` — `_build_quick_actions` is a stub. Dead schema contract. | `app/dashboard/services/dashboard_overview_service.py:98-99` | open |
+| F-035 | Low | dashboard | `AdvisorTodayService.build` unconditionally returns `{"deadline_items": []}` — feature not implemented. | `app/dashboard/services/advisor_today_service.py:12-13` | open |
+| F-036 | Low (doc-only) | dashboard | `DASHBOARD.LIMIT_EXCEEDED` documented in README; source service does not exist → code unreachable. | `app/dashboard/README.md` (Error Envelope) | open |
+| F-037 | Low | dashboard | `reports_not_started` can go negative when report counts exceed active-business count — no clamp. | `app/dashboard/services/dashboard_tax_service.py:45` | open |
+| F-038 | Low / design | reports | `VatComplianceReportItemResponse` exposes `reporting_frequency` always set to the same value as `period_type` — redundant field, inflates payload, misleads consumers. | `app/reports/services/vat_compliance_report.py:55-56`, `app/reports/schemas.py:15-16` | open |
+| F-039 | Low (doc/code divergence) | timeline | README claims `notification_sent` events are excluded as noisy, but service emits both `notification_sent` and `notification_failed`. Either drop or update the claim. | `app/timeline/services/timeline_service.py:129-141` vs `app/timeline/README.md:113` | open |
+| F-040 | Low (temporal accuracy) | timeline | `decline_reason` is read from the live `SignatureRequest` row rather than the audit-event snapshot — later mutation of the row rewrites historical timeline. Comment in code already acknowledges this. | `app/timeline/services/timeline_client_builders.py:70-73` | open |
 
 ## Notes
 
