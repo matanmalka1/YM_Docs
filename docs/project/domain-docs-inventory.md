@@ -21,6 +21,8 @@ Source of truth: reference
 
 Observed pattern: `backend/app/<domain>/README.md` files are dated ("Last audited: …"), structured, and appear code-accurate. The `backend/docs/<domain>/` folders are mostly pre-implementation Hebrew domain specs or external-URL source maps that appear to have drifted from the code.
 
+**2026-05-29 update:** All 18 `backend/app/<domain>/README.md` files have been converted to pointer-only files (one line: `See docs/docs/domains/<domain>.md`). They are no longer authoritative. Canonical source of truth for all domains is `docs/docs/domains/*.md` per `documentation-map.md:126-129`. Follow-up required: verify each canonical doc fully covers its legacy README before deletion.
+
 ## Inventory Rules
 - This file is reference only.
 - This file does not define domain behavior.
@@ -284,29 +286,30 @@ Notes:
 - Cross-domain notes (work-queue, invoice, actions) appear accurate.
 
 ### Clients
-Status: Clear
+Status: Migrated
 Risk: Low
 
 Existing docs:
-- `backend/app/clients/README.md` — two-layer identity model and API. Dated 2026-04-21.
-- `backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md` — cross-cutting verification of the LegalEntity / ClientRecord / Person identity model.
+- `docs/docs/domains/clients.md` ★ — canonical source of truth. Last verified 2026-05-29.
+- `backend/app/clients/README.md` — legacy pointer only; no longer authoritative.
+- `backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md` — reference; cross-cutting verification of identity model.
 
 Likely source of truth:
-- `backend/app/clients/README.md` — mandatory; domain-model summary is reference.
+- `docs/docs/domains/clients.md` — mandatory.
 
 Duplicates:
-- None.
+- `backend/app/clients/README.md` is a legacy pointer per documentation-map.md:126-129.
 
 Conflicts / drift:
-- None; the two-layer identity model is consistent across docs.
+- `DOMAIN_MODEL_REVIEW_SUMMARY.md` documents two open gaps now recorded in `clients.md` Known Issues: (1) soft-delete has no downstream lifecycle policy; (2) entity_type change does not reconcile existing workflow snapshots.
 
 Missing docs:
 - None.
 
 Recommended future structure:
-- Canonical: `backend/app/clients/README.md`
+- Canonical: `docs/docs/domains/clients.md`
 - Reference: `DOMAIN_MODEL_REVIEW_SUMMARY.md`
-- Archive: —
+- Archive: `backend/app/clients/README.md` (pointer only, delete after full verification)
 
 Notes:
 - —
