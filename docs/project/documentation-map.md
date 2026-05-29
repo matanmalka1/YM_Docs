@@ -123,6 +123,21 @@ Cross-cutting & infra:
 - `docs/domains/users.md` ★
 - `docs/domains/health.md` ★
 
+## Flows (cross-domain)
+
+Cross-domain flow documentation. Each file traces one flow from trigger to side effects, based on actual code.
+
+- `docs/flows/README.md` — index of all flow docs.
+- `docs/flows/01-client-business-creation-cascade.md` — client + business creation, onboarding orchestration.
+- `docs/flows/02-annual-report-status-transition.md` — status machine, signature request lifecycle.
+- `docs/flows/03-client-freeze-close-cascade.md` — cascade effects (⚠️ contains critical bug F-040).
+- `docs/flows/04-binder-material-intake.md` — intake, binder resolution, VAT auto-advance.
+- `docs/flows/05-vat-work-item-creation.md` — work item creation, tax calendar materialization.
+- `docs/flows/06-charge-work-queue.md` — charge-to-work-queue derivation.
+- `docs/flows/07-client-status-card.md` — cross-domain client status aggregation.
+- `docs/flows/08-dashboard-overview.md` — dashboard overview, role-based access.
+- `docs/flows/09-work-queue-assembly.md` — full work queue build, task merging, filters.
+
 ## Legacy backend domain docs (pointers only)
 
 These files under `backend/docs/**` and `backend/app/*/README.md` have been replaced with pointers to the canonical docs above; historical content lives in `docs/archive/`. Do not edit them as sources of truth.
