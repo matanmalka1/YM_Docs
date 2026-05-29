@@ -265,6 +265,10 @@ From `backend/docs/backend/domains/binder_lifecycle_refactor_spec.md` (completed
 - **Available actions from backend.** `get_available_action_keys_for_state` in `BinderLifecycleService` is the source of truth. Frontend renders `available_actions`; backend enforces every transition.
 - **Backend returns values only; no Hebrew labels.** UI labels live in frontend constants.
 - **One binder per client at a time for intake.** All businesses share the same binder; material type is distinguished at `BinderIntakeMaterial` level.
+- **Binder lifecycle is logistics-driven, not a strict reporting-period partition.** `period_start` is derived from the first inserted material and old-period material may still be routed into a newer in-office binder when no suitable older binder exists, with a required intake note.
+- **A binder may span multiple reporting periods.** `period_start`/`period_end` are operational anchors for the physical binder, not a guarantee that all contained material belongs to one single accounting period.
+- **Repeated arrivals stay as separate intake events.** Additional client deliveries create new `BinderIntake` rows rather than merging prior physical arrivals; duplicate material rows for the same type/period/business are acceptable for receipt tracking.
+- **Bulk readiness is a preserved business concept.** Handover readiness can be decided across multiple binders up to a reporting-period cutoff, not only one binder at a time.
 - **Post-handover binder is never reused.** New material after handover always opens a new binder.
 - **`BinderLifecycleLog` replaces any old status log shape.** One row per changed field, not one row per transition event.
 
