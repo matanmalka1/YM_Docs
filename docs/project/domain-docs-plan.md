@@ -33,7 +33,7 @@ Status legend: `todo` / `in-progress` / `done`.
 | vat-reports        | vat_reports        | core         | done   |
 | tax-calendar       | tax_calendar       | core         | done   |
 | charge             | charge             | core         | done   |
-| work-queue         | work_queue         | read         | todo   |
+| work-queue         | work_queue         | read         | done   |
 | notifications      | notification       | core         | todo   |
 | signature-requests | signature_requests | core         | todo   |
 | dashboard          | dashboard          | read         | todo   |
@@ -50,8 +50,8 @@ Status legend: `todo` / `in-progress` / `done`.
 | binders             | binders             | core      | done   |
 | tasks               | tasks               | core      | done   |
 | reminders           | reminders           | core      | done   |
-| notes               | notes               | core      | todo   |
-| correspondence      | correspondence      | core      | todo   |
+| notes               | notes               | core      | done   |
+| correspondence      | correspondence      | core      | done   |
 | permanent-documents | permanent_documents | core      | todo   |
 | authority-contact   | authority_contact   | core      | todo   |
 | timeline            | timeline            | read      | todo   |
