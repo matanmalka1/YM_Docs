@@ -31,8 +31,8 @@ Status legend: `todo` / `in-progress` / `done`.
 | advance-payments   | advance_payments   | core (pilot) | done   |
 | annual-reports     | annual_reports     | core         | done   |
 | vat-reports        | vat_reports        | core         | done   |
-| tax-calendar       | tax_calendar       | core         | todo   |
-| charge             | charge             | core         | todo   |
+| tax-calendar       | tax_calendar       | core         | done   |
+| charge             | charge             | core         | done   |
 | work-queue         | work_queue         | read         | todo   |
 | notifications      | notification       | core         | todo   |
 | signature-requests | signature_requests | core         | todo   |
@@ -47,9 +47,9 @@ Status legend: `todo` / `in-progress` / `done`.
 | ------------------- | ------------------- | --------- | ------ |
 | clients             | clients             | core      | done   |
 | businesses          | businesses          | core      | done   |
-| binders             | binders             | core      | todo   |
-| tasks               | tasks               | core      | todo   |
-| reminders           | reminders           | core      | todo   |
+| binders             | binders             | core      | done   |
+| tasks               | tasks               | core      | done   |
+| reminders           | reminders           | core      | done   |
 | notes               | notes               | core      | todo   |
 | correspondence      | correspondence      | core      | todo   |
 | permanent-documents | permanent_documents | core      | todo   |
