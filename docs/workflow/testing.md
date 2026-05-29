@@ -31,4 +31,5 @@ Source of truth: mandatory
 - Do not mock `Session` or repository methods in service tests that are meant to verify query or orchestration behavior.
 - Backend test files should live under `tests/<domain>/service/` or `tests/<domain>/api/` where practical.
 - Test functions should use `test_<what>_<condition>` names; private setup helpers inside test files should be prefixed with `_`.
+- Backend per-file test coverage should stay at or above 90%; monitor for regressions in CI.
 - If frontend test coverage is missing for an area, report that honestly instead of inventing test results.

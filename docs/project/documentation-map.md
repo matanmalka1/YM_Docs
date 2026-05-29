@@ -41,6 +41,7 @@ Architecture rules:
 - `docs/architecture/migrations.md`
 - `docs/architecture/security.md`
 - `docs/architecture/observability.md`
+- `docs/architecture/api-contract-standard.md`
 
 Workflow rules:
 
@@ -49,15 +50,16 @@ Workflow rules:
 - `docs/workflow/testing.md`
 - `docs/workflow/verification.md`
 - `docs/workflow/openapi-checks.md`
+- `docs/workflow/local-mobile-testing.md`
 - `docs/workflow/git.md`
 
 Existing domain docs not normalized in this phase:
 
-- `backend/docs/annual_reports/`
-- `backend/docs/vat_report/`
+- `backend/docs/backend/domains/annual_reports/`
+- `backend/docs/backend/domains/vat_report/`
 - `backend/docs/backend/domains/work-queue.md`
-- `backend/docs/advance_payments_spec.md`
-- `backend/docs/binder_lifecycle_refactor_spec.md`
+- `backend/docs/backend/domains/advance_payments_spec.md`
+- `backend/docs/backend/domains/binder_lifecycle_refactor_spec.md`
 - `backend/docs/frontend_screen_spec.md`
 - `backend/app/*/README.md`
 
