@@ -39,7 +39,7 @@ All paths below exist in `backend/openapi.json`. The `annual_reports` router is 
 | `POST` | `/api/v1/annual-reports/{report_id}/auto-populate` | Import VAT-derived income and expense lines. |
 | `POST` | `/api/v1/annual-reports` | Create an annual report. |
 | `GET` | `/api/v1/annual-reports` | List annual reports, optionally filtered by tax year. |
-| `GET` | `/api/v1/annual-reports/overdue` | List open reports past filing deadline. |
+| `GET` | `/api/v1/annual-reports/overdue` | List open reports past filing deadline, returned as `AnnualReportListResponse` (`items`, `page`, `page_size`, `total`). |
 | `GET` | `/api/v1/annual-reports/{report_id}` | Get full report detail. |
 | `DELETE` | `/api/v1/annual-reports/{report_id}` | Soft-delete a report. |
 | `POST` | `/api/v1/annual-reports/{report_id}/amend` | Reopen a submitted report for amendment. |

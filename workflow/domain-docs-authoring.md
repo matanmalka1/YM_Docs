@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - The reusable workflow + prompt template for authoring one canonical domain doc under `docs/domains/`.
 - Parallel-safety rules so two agents (Codex, Claude Code) can each take a different domain without conflicts.
 
 This file must not contain:
+
 - The domain docs themselves.
 - Architecture/API rules (those live in `docs/architecture/*`).
 
@@ -35,6 +38,7 @@ Two agents run this in parallel, each on a **different** domain. The template be
    - any other domain's doc
 
    Registration into the index/map is batched separately by a human after parallel runs finish, to avoid merge conflicts. Instead, end your run with a **Registration block** (see Output) listing the one-line index/map entries you would have added.
+
 4. **Docs-only.** Never change code, endpoints, schemas, models, or migrations. If code looks wrong, report it — do not "fix" the doc to hide it.
 5. **No deletes.** Never delete a file. Legacy files are emptied to a pointer; their content moves to the archive copy.
 
@@ -67,7 +71,7 @@ If a legacy file has nothing worth keeping, just replace its body with the point
 
 ## Link convention
 
-All cross-doc links use a **single** `docs/` prefix (relative to the docs repo root), e.g. `docs/architecture/error-codes.md`, `docs/archive/{DOMAIN}-legacy.md`. Never write `docs/docs/...` — that is the monorepo-root vantage and breaks the project convention used by `documentation-map.md` and every existing doc. The only files that legitimately use `docs/docs/...` are the pointer files outside the docs repo (`backend/docs/**`, root/backend `CLAUDE.md`).
+All cross-doc links use a **single** `docs/` prefix (relative to the docs repo root), e.g. `docs/architecture/error-codes.md`, `docs/archive/{DOMAIN}-legacy.md`. Never write `docs/...` — that is the monorepo-root vantage and breaks the project convention used by `documentation-map.md` and every existing doc. The only files that legitimately use `docs/...` are the pointer files outside the docs repo (`backend/docs/**`, root/backend `CLAUDE.md`).
 
 ## Canonical doc skeleton
 
@@ -75,11 +79,14 @@ Use exactly these sections (omit a section only if truly N/A, and say why):
 
 ```markdown
 ## Scope
+
 This file owns only:
+
 - Canonical current-state documentation for the {DOMAIN} domain.
 
 This file must not contain:
-- Architecture/API rules (link to docs/architecture/*).
+
+- Architecture/API rules (link to docs/architecture/\*).
 - Other domains' behavior.
 
 Source of truth: mandatory
@@ -91,9 +98,9 @@ Last verified against code + backend/openapi.json: {YYYY-MM-DD}.
 
 ## Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| ... | /api/v1/... | ... |
+| Method | Path        | Purpose |
+| ------ | ----------- | ------- |
+| ...    | /api/v1/... | ...     |
 
 (All paths must exist in backend/openapi.json.)
 
