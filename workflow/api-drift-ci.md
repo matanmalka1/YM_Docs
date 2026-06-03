@@ -54,14 +54,14 @@ The backend changed a schema that was not updated in the frontend. Steps to fix:
 ```bash
 # 1. Generate openapi.json from local backend
 cd backend
-APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output ../openapi.json
+APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json
 
 # 2. Regenerate generated.ts
-cd ..
-npx openapi-typescript openapi.json -o frontend/src/types/generated.ts
+cd ../frontend
+npx --yes openapi-typescript ../backend/openapi.json -o src/types/generated.ts
 
 # 3. Review what changed
-git diff frontend/src/types/generated.ts
+git diff src/types/generated.ts
 
 # 4. Update the relevant contracts.ts accordingly
 
