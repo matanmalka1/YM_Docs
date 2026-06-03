@@ -58,6 +58,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/workflow/domain-docs-authoring.md` ★ — reusable template + parallel rules for writing canonical per-domain docs.
 - `docs/workflow/git.md` ★ — git workflow rules.
 - `docs/workflow/openapi-checks.md` — OpenAPI check usage.
+- `docs/workflow/api-drift-ci.md` — GitHub Actions drift check for backend OpenAPI vs frontend generated type baseline.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
 
 ## Agent

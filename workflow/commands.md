@@ -43,6 +43,12 @@ Seed backend development data:
 APP_ENV=development ENV_FILE=.env.development ./.venv/bin/python scripts/seed_fake_data.py --reset
 ```
 
+Export backend OpenAPI for contract review:
+
+```bash
+APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output ../openapi.json
+```
+
 Run frontend commands from `frontend/`:
 
 ```bash
@@ -54,3 +60,11 @@ npm run arch:check
 npm run arch:check:strict
 npm run test
 ```
+
+Regenerate the frontend API drift baseline after exporting OpenAPI:
+
+```bash
+npx openapi-typescript ../openapi.json -o src/types/generated.ts
+```
+
+See `docs/workflow/api-drift-ci.md` for how the CI uses this generated file.
