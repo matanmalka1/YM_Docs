@@ -100,7 +100,10 @@ Other VAT enums:
 - Work-item VAT totals are recalculated after invoice create/update/delete. Output VAT includes standard-rate income VAT; input VAT is expense VAT multiplied by `deduction_rate`; `net_vat = output - input`. Cite: `backend/app/vat_reports/services/data_entry_common.py:51-60`, `backend/app/vat_reports/repositories/vat_invoice_aggregation_repository.py:29-87`, `backend/app/vat_reports/repositories/vat_work_item_write_repository.py:151-171`.
 - `ready-for-review` only accepts `data_entry_in_progress`; `send-back` requires a non-empty correction note and transitions back to `data_entry_in_progress`. Cite: `backend/app/vat_reports/services/data_entry_status.py:17-49`, `backend/app/vat_reports/services/data_entry_status.py:52-90`.
 - Filing requires transition to be allowed by `VALID_TRANSITIONS`, permits optional override only with justification, and writes final filing fields plus audit entries. Cite: `backend/app/vat_reports/services/constants.py:7-25`, `backend/app/vat_reports/services/filing.py:46-114`.
+- Filing requires `assigned_to` to be non-null; filing an unassigned item raises `VAT.ASSIGNEE_REQUIRED`. Cite: `backend/app/vat_reports/services/filing.py:66-67`.
+- `is_amendment=True` requires `amends_item_id`; omitting it raises `VAT.AMENDMENT_ID_REQUIRED`. Amendment validation (client match, filed status, cycle detection) runs only when `amends_item_id` is provided. Cite: `backend/app/vat_reports/services/filing.py:69-73`.
 - Amendments can point to an existing filed work item for the same client, and amendment cycles are rejected. Cite: `backend/app/vat_reports/services/filing.py:24-44`.
+- `business_activity_id` on invoice update must belong to the same legal entity as the work item's client record; mismatched or non-existent IDs return `BUSINESS_ACTIVITY.NOT_FOUND` (404, no existence leak). Cite: `backend/app/vat_reports/services/data_entry_invoice_update.py:79-87`.
 - `due_date_original` is immutable after it is first set. If `due_date_effective` differs from `due_date_original`, a non-empty `due_date_override_reason` is required. Cite: `backend/app/vat_reports/models/due_date_snapshot_events.py:9-46`.
 - Audit actions are stored as strings from service constants, not enum values. Cite: `backend/app/vat_reports/models/vat_audit_log.py:3-12`, `backend/app/vat_reports/services/constants.py:27-35`.
 
@@ -127,8 +130,17 @@ The `VAT.REASON` codes this domain raises. Registry: `docs/architecture/error-co
 | `VAT.COUNTERPARTY_ID_REQUIRED` | 400 via `AppError` | Expense tax invoice missing supplier ID |
 | `VAT.OSEK_PATUR_CEILING_EXCEEDED` | 400 via `AppError` | OSEK PATUR annual turnover would exceed configured ceiling |
 | `VAT.JUSTIFICATION_REQUIRED` | 400 via `AppError` | Missing correction note or override justification |
+| `VAT.ASSIGNEE_REQUIRED` | 400 via `AppError` | Filing attempted when `assigned_to` is null |
+| `VAT.AMENDMENT_ID_REQUIRED` | 400 via `AppError` | `is_amendment=True` submitted without `amends_item_id` |
+| `VAT.AMENDED_ITEM_NOT_FOUND` | 404 via `AppError` | `amends_item_id` does not match any work item |
+| `VAT.AMENDED_ITEM_WRONG_CLIENT` | 400 via `AppError` | Amended item belongs to a different client record |
+| `VAT.AMENDED_ITEM_NOT_FILED` | 400 via `AppError` | Amended item is not in `filed` status |
+| `VAT.AMENDMENT_CYCLE` | 400 via `AppError` | Amendment chain would create a cycle |
+| `VAT.MISSING_FINAL_AMOUNT` | 400 via `AppError` | `net_vat` is null and no override amount supplied at filing |
 
-Related code raised from this module but owned by another namespace: `BUSINESS_ACTIVITY.WRONG_CLIENT` when an invoice's business activity does not belong to the work item's client. Cite: `backend/app/vat_reports/services/data_entry_invoices.py:88-94`.
+Related codes raised from this module but owned by another namespace:
+- `BUSINESS_ACTIVITY.WRONG_CLIENT` — invoice create: activity does not belong to the work item's legal entity. Cite: `backend/app/vat_reports/services/data_entry_invoices.py:88-94`.
+- `BUSINESS_ACTIVITY.NOT_FOUND` — invoice update: `business_activity_id` not found or belongs to a different legal entity (404, no existence leak). Cite: `backend/app/vat_reports/services/data_entry_invoice_update.py:79-87`.
 
 ## Known issues
 
