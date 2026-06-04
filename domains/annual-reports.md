@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Annual Reports
 
 The annual reports domain manages Israeli annual income-tax report work items per client record and tax year, including lifecycle status, statutory form/profile metadata, required schedules, annex data, income/expense lines, tax calculation, readiness checks, client approval, PDF export, and client/year season views.
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-05-29. Product decision update for financial-line mutation rules: 2026-06-04.
 
 ## Endpoints
 
@@ -120,8 +120,11 @@ Source: `backend/app/annual_reports/services/constants.py:24`.
 - Financial summary totals income and recognized expenses; `taxable_income = total_income - recognized_expenses`. See `backend/app/annual_reports/services/financial_service.py:321`.
 - Tax calculation is read-only. It uses financial summary, detail deductions/credits, credit-point rows/default resident points, income-tax engine, national-insurance engine, VAT net balance, and paid advances. See `backend/app/annual_reports/services/financial_service.py:338`.
 - Persisting a tax calculation rejects requests with both `tax_due` and `refund_due`. See `backend/app/annual_reports/services/financial_service.py:460`.
-- Adding income or expense checks the client is not closed/frozen; source/category values are validated against enum values; audit entries are written. See `backend/app/annual_reports/services/financial_service.py:132`.
+- Income and expense line create/update/delete are financial mutations. Closed/frozen clients must not create, update, or delete annual-report income/expense lines. Source: approved product decision, 2026-06-04; current implementation only blocks create, so update/delete enforcement remains an implementation task.
+- Income/expense source/category values are validated against enum values; audit entries are written for manual line mutations. See `backend/app/annual_reports/services/financial_service.py:132`.
+- VAT auto-populate is a financial mutation and must follow the same mutation rules as manual income/expense line changes. It must be blocked for closed/frozen clients, including `force=True`; it must write audit records for created income lines, created expense lines, and deleted/replaced lines when `force=True`, with audit metadata clearly marking the source as VAT import. Source: approved product decision, 2026-06-04; current implementation is not yet aligned.
 - VAT auto-populate is allowed only in `not_started`, `collecting_docs`, and `in_preparation`; existing income/expense lines cause `ANNUAL_REPORT.LINES_ALREADY_EXIST` unless `force=True`; import aggregates VAT by `client_record_id` and `tax_year`, maps VAT categories to annual expense categories, and writes lines. See `backend/app/annual_reports/services/vat_import_service.py:37`.
+- VAT auto-populate must not create financial lines for zero totals. Negative totals must not create financial lines automatically and must not be silently ignored; they must be returned as skipped items or warnings for user review. Merged annual-report categories must return a source breakdown showing which VAT categories contributed to each generated annual-report category; prefer storing that breakdown in audit metadata as well. Source: approved product decision, 2026-06-04; response schema/API implementation remains pending.
 - Client freezing/closing integration cancels open annual reports by directly setting non-terminal reports to `canceled`. See `backend/app/annual_reports/repositories/report_repository.py:187`.
 
 Future / planned:
@@ -155,6 +158,7 @@ Source grep: `backend/app/annual_reports/services/*`.
 
 - ~~Transitioning to `pending_client` silently skips signature creation when the client record or a business cannot be found.~~ **Fixed.** Transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Signature creation no longer requires a Business; signer name resolves from the client identity graph. See `backend/app/annual_reports/services/status_signature_helper.py`.
 - Legacy docs say annual-report status transitions sync linked tax-calendar entries and reminders, but current `transition_status` updates status/history/audit/signatures only and has no tax-calendar/reminder call. See `backend/app/annual_reports/services/status_service.py:82`. Suggested fix: implement the sync or remove the stale expectation from remaining non-canonical docs.
+- VAT auto-populate implementation is not yet aligned with approved financial-mutation rules: it does not block closed/frozen clients, does not write audit rows for imported/replaced lines, silently skips non-positive totals, and does not return skipped items or source breakdown. This requires a separate API-contract task because adding `skipped_items` and breakdown fields changes the response schema. See `docs/project/annual-reports-todo.md`.
 - VAT auto-populate aggregates by `client_record_id` and `tax_year`, not by a specific business. See `backend/app/annual_reports/services/vat_import_service.py:119`. This is consistent with current client-scoped report ownership, but it is risky for multi-business clients if users expect business-specific import. Suggested fix: decide whether annual-report VAT import is intentionally client-wide; if not, add an explicit business selector or guard.
 
 ## Decisions (preserved)
@@ -162,6 +166,8 @@ Source grep: `backend/app/annual_reports/services/*`.
 - The domain models full annual returns, not short refund-request form `0135`; primary form selection is controlled by `ClientAnnualFilingType -> PrimaryAnnualReportForm`. This is implemented in `FORM_MAP` and preserved from legacy summary context. See `backend/app/annual_reports/services/constants.py:8`.
 - `6111` is modeled as an annex/schedule rather than a primary return. This is implemented as `form_6111` in `AnnualReportSchedule`. See `backend/app/annual_reports/models/annual_report_enums.py:45`.
 - Annual reports are owned by client record and tax year, not by business. The root model, list queries, and VAT/advance/tax calculations use `client_record_id` and `tax_year`. See `backend/app/annual_reports/models/annual_report_model.py:43` and `backend/app/annual_reports/services/financial_service.py:375`.
+- Annual-report financial line mutations are locked for closed/frozen clients. This includes manual income/expense create, update, delete, and VAT auto-populate, including forced replacement. Approved 2026-06-04; implementation is pending for update/delete and VAT auto-populate.
+- VAT auto-populate is a traceable financial mutation. It must audit created lines and deleted/replaced lines, mark the source as VAT import, skip zero totals without creating lines, return negative totals as skipped items/warnings, and return source VAT-category breakdown for merged annual-report categories. Approved 2026-06-04; response-contract implementation is pending.
 - Annual reports carry a required `tax_calendar_entry_id` FK. Creation ensures an annual tax-calendar entry and links the report to it. This preserves the still-implemented tax-calendar decision from `backend/docs/domain_decisions_v3.md`. See `backend/app/annual_reports/models/annual_report_model.py:88` and `backend/app/annual_reports/services/create_service.py:109`.
 - Report-history list endpoints stay light: `GET /api/v1/clients/{client_record_id}/annual-reports` returns `AnnualReportListResponse`, and there is no current dedicated financial-history endpoint. This preserves the legacy product decision discussion while marking financial history as future/planned.
 - Historical external government/legal sources are archived for reference only. They are not canonical implementation behavior and should not override code or architecture docs.
@@ -170,6 +176,7 @@ Source grep: `backend/app/annual_reports/services/*`.
 
 - Add a dedicated client annual-report financial history endpoint, if the product wants a multi-year financial comparison table. Candidate paths discussed historically: `GET /api/v1/clients/{client_record_id}/annual-reports/history` or `GET /api/v1/annual-reports/{report_id}/client-history`. These do not exist in `backend/openapi.json` as of 2026-05-29.
 - Decide and implement tax-calendar/reminder sync for annual-report filed/unfiled status changes, or explicitly retire the legacy expectation.
+- Implement the approved VAT auto-populate API-contract update: add `skipped_items` and source breakdown to the response schema, write audit metadata, block closed/frozen clients, update OpenAPI/baselines, and add service/API tests.
 - Decide whether VAT auto-populate should remain client-wide or become business-specific for multi-business clients.
 
 ## Historical notes
