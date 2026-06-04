@@ -20,9 +20,9 @@ Last verified against code + backend/openapi.json: 2026-05-29.
 |--------|------|---------|-------|
 | POST | `/api/v1/clients/{client_record_id}/authority-contacts` | Create a new contact for a client | ADVISOR, SECRETARY |
 | GET | `/api/v1/clients/{client_record_id}/authority-contacts` | List contacts for a client (paginated, filterable by type) | ADVISOR, SECRETARY |
-| GET | `/api/v1/clients/authority-contacts/{contact_id}` | Fetch a single contact by ID | ADVISOR, SECRETARY |
-| PATCH | `/api/v1/clients/authority-contacts/{contact_id}` | Partially update a contact | ADVISOR, SECRETARY |
-| DELETE | `/api/v1/clients/authority-contacts/{contact_id}` | Soft-delete a contact | ADVISOR only |
+| GET | `/api/v1/clients/{client_record_id}/authority-contacts/{contact_id}` | Fetch a single contact by ID | ADVISOR, SECRETARY |
+| PATCH | `/api/v1/clients/{client_record_id}/authority-contacts/{contact_id}` | Partially update a contact | ADVISOR, SECRETARY |
+| DELETE | `/api/v1/clients/{client_record_id}/authority-contacts/{contact_id}` | Soft-delete a contact | ADVISOR only |
 
 All paths confirmed in `backend/openapi.json`. Router prefix `/clients` is set in `backend/app/authority_contact/api/authority_contact.py:16`; mounted under `/api/v1` via `router_registry`.
 
@@ -78,32 +78,17 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-001 — IDOR on GET, PATCH, DELETE contact endpoints
+### F-001 — IDOR on GET, PATCH, DELETE contact endpoints — FIXED
 
-**What is wrong:** `get_contact`, `update_contact`, and `delete_contact` resolve the contact by bare `contact_id` with no ownership check against any `client_record_id`. Any authenticated ADVISOR or SECRETARY can read or update any contact system-wide by guessing/enumerating IDs; any ADVISOR can delete any contact.
+**Fixed in:** 2026-06-04.
 
-**Path:line:**
-- `backend/app/authority_contact/services/authority_contact_service.py:45–58` (`update_contact` — no ownership check)
-- `backend/app/authority_contact/services/authority_contact_service.py:84–88` (`get_contact` — no ownership check)
-- `backend/app/authority_contact/services/authority_contact_service.py:78–82` (`delete_contact` — no ownership check)
-- `backend/app/authority_contact/repositories/authority_contact_repository.py:78` (`update` calls `get_by_id` — only filters by `id` + `deleted_at`)
-- `backend/app/common/repositories/base_repository.py:48–49` (`get_by_id` is ID-only)
+GET/PATCH/DELETE endpoints moved to `/{client_record_id}/authority-contacts/{contact_id}`. Service methods `get_contact`, `update_contact`, `delete_contact` now require `client_record_id` and delegate to scoped repo methods (`get_for_client`, `update_for_client`, `delete_for_client`) which filter by both `id` and `client_record_id`. Cross-client access returns `AUTHORITY_CONTACT.NOT_FOUND`.
 
-**Rule violated:** A contact belongs to `client_record_id`. Operations on a contact by ID must verify the contact's `client_record_id` matches the calling context (or that the user has access to that client record).
+### F-002 — `AuthorityContactLink` described in model docstring but not implemented — FIXED
 
-**Suggested fix:** Pass `client_record_id` from the API layer into `get_contact`, `update_contact`, and `delete_contact`; add a `WHERE contact_id = :id AND client_record_id = :client_record_id` check, or fetch and assert `contact.client_record_id == expected_client_record_id`.
+**Fixed in:** 2026-06-04.
 
-This matches the recurring IDOR pattern documented in `docs/project/security-findings.md` (annual-reports F-001, vat-reports F-008).
-
-### F-002 — `AuthorityContactLink` described in model docstring but not implemented
-
-**What is wrong:** The model file docstring (`backend/app/authority_contact/models/authority_contact.py:12–27`) documents an `AuthorityContactLink` many-to-many table with a `UniqueConstraint on (contact_id, client_id, business_id)` and an optional `business_id` column. Neither the `AuthorityContactLink` model nor the `business_id` column exists anywhere in the codebase.
-
-**Path:line:** `backend/app/authority_contact/models/authority_contact.py:12–27`.
-
-**Rule violated:** Docs must not describe unimplemented models as if they exist (pattern 5 — broken/stale references).
-
-**Suggested fix:** Either implement `AuthorityContactLink` and `business_id`, or remove the stale docstring. Until implemented, see Future / planned below.
+Stale docstring block removed from `backend/app/authority_contact/models/authority_contact.py`. Replaced with a short true-state description pointing to the Future / planned section. The planned design remains in Future / planned below.
 
 ## Decisions (preserved)
 

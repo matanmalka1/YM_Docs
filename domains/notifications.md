@@ -12,14 +12,14 @@ Source of truth: mandatory
 
 The notification domain records outbound client-communication attempts, renders preview/send content for supported triggers, applies domain policy before delivery, and stores the resulting audit trail. In the current codebase, manual HTTP flows and the single automatic binder-handover flow both persist rows in `notifications`; real delivery is email-only.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-04.
 
 ## Endpoints
 
-Router prefix is `/notifications` under `/api/v1` (`backend/app/notification/api/notifications.py:28-32`). All four paths below exist in `backend/openapi.json:7905-8267`.
+Router prefix is `/notifications` under `/api/v1` (`backend/app/notification/api/notifications.py:33-37`). All four paths below exist in `backend/openapi.json`.
 
 Auth:
-- Current router-level access allows both `ADVISOR` and `SECRETARY` for all notification endpoints (`backend/app/notification/api/notifications.py:28-32`).
+- Notification endpoints intentionally allow both `ADVISOR` and `SECRETARY` at the router level (`backend/app/notification/api/notifications.py:33-36`).
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -110,8 +110,8 @@ Trigger labels and domain labels used in list responses are defined in `TRIGGER_
 
 ## Domain rules & invariants
 
-- `GET /api/v1/notifications` accepts the filter set `client_record_id`, `business_id`, `status`, `trigger`, `channel`, `triggered_by`, `date_from`, `date_to`, then sorts by `created_at DESC` and paginates with total count from the repository (`backend/app/notification/api/notifications.py:35-73`, `backend/app/notification/repositories/notification_repository.py:103-150`).
-- Runtime `page_size` is intentionally restricted to `25` or `50`. Any other integer raises `NOTIFICATION.INVALID_PAGE_SIZE` even though the query param itself is declared `ge=1, le=50` (`backend/app/notification/api/notifications.py:26,46-53`).
+- `GET /api/v1/notifications` accepts the filter set `client_record_id`, `business_id`, `status`, `trigger`, `channel`, `triggered_by`, `date_from`, `date_to`, then sorts by `created_at DESC` and paginates with total count from the repository (`backend/app/notification/api/notifications.py:40-72`, `backend/app/notification/repositories/notification_repository.py:103-150`).
+- `page_size` is intentionally restricted to `25` or `50`; the query contract publishes those values as an enum (`backend/app/notification/api/notifications.py:28-30,51-52`).
 - Manual preview/send reject the auto-only trigger `binder_ready_for_handover`. Annual-report triggers require `entity_id`; `invoice_issued`, `payment_reminder`, `vat_documents_reminder`, `signature_request_sent`, and `signature_request_reminder` also require `entity_id` (`backend/app/notification/services/notification_send_service.py:20-43,114-124,192-203`).
 - Preview/send first load the `ClientRecord`; missing clients raise `CLIENT.NOT_FOUND` (`backend/app/notification/services/notification_send_service.py:126-128,205-207`).
 - Policy-blocked attempts do not create notification rows. Preview returns `NotificationPreviewResponse(status="blocked")`; send/auto-send return `NotificationResult(status="blocked")` (`backend/app/notification/services/notification_send_service.py:139-153,219-232`, `backend/app/notification/services/notification_auto_send_service.py:138-146`).
@@ -137,7 +137,6 @@ Registry: `docs/architecture/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|
-| `NOTIFICATION.INVALID_PAGE_SIZE` | `GET /api/v1/notifications` receives a `page_size` other than `25` or `50` (`backend/app/notification/api/notifications.py:49-53`) |
 | `NOTIFICATION.MISSING_IDEMPOTENCY_KEY` | Manual send is missing `X-Idempotency-Key`, or auto-send receives a blank idempotency key (`backend/app/notification/api/notifications.py:120-127`, `backend/app/notification/services/notification_auto_send_service.py:110-111`) |
 | `NOTIFICATION.INVALID_IDEMPOTENCY_KEY` | Manual send header is present but not a valid UUID (`backend/app/notification/api/notifications.py:128-135`) |
 | `NOTIFICATION.AUTO_SEND_TRIGGER_NOT_ALLOWED` | Internal auto-send is called with a trigger other than `binder_ready_for_handover` (`backend/app/notification/services/notification_auto_send_service.py:105-109`) |
@@ -152,8 +151,7 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-1. **Manual preview/send are not actually advisor-only.** The router grants both `ADVISOR` and `SECRETARY` at the router level and adds no route-level advisor guard for `POST /preview` or `POST /send` (`backend/app/notification/api/notifications.py:28-32,86-137`). This violates the historical responsibility split preserved in `docs/archive/notifications-legacy.md`, where manual preview/send were described as advisor-only. Suggested fix: add explicit route-level `require_role(UserRole.ADVISOR)` guards to `preview_notification()` and `send_notification()`.
-2. **`page_size` contract is narrower at runtime than in OpenAPI.** Runtime accepts only `25` or `50` (`backend/app/notification/api/notifications.py:26,46-53`), but `backend/openapi.json` advertises any integer `1..50` for `GET /api/v1/notifications` (`backend/openapi.json:8059-8069`). This violates the API contract accuracy requirement. Suggested fix: either change the query schema to enumerate `25` and `50`, or relax runtime validation to accept the full documented range.
+None currently tracked.
 
 ## Decisions (preserved)
 
