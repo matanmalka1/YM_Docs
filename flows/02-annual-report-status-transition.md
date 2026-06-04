@@ -58,7 +58,7 @@ transmitted         → submitted
 2. Validate `new_status` is a known enum value.
 3. Validate transition is allowed via `VALID_TRANSITIONS[current_status]`.
 4. **Only on `→ SUBMITTED`**: run `_assert_filing_readiness()`.
-   - Delegates to `AnnualReportFinancialService.get_readiness_check()`.
+   - Delegates to `AnnualReportReadinessService.get_readiness_check()`.
    - Raises `AppError` listing all blocking issues if not ready.
 5. Build update fields dict:
    - `→ SUBMITTED`: set `submitted_at` (now if not provided), optionally `ita_reference`, `submission_method`. If deadline type is STANDARD and `submission_method` given: recalculate `filing_deadline`.
@@ -116,7 +116,7 @@ All other accessed rows (audit, history, SR) are inserted without explicit lock.
 
 - Report must exist.
 - Transition must be in `VALID_TRANSITIONS[current_status]`.
-- `→ SUBMITTED`: all readiness checks must pass (delegated to `AnnualReportFinancialService`).
+- `→ SUBMITTED`: all readiness checks must pass (delegated to `AnnualReportReadinessService`).
 - `→ PENDING_CLIENT`: client record must exist and must have a resolvable signer name (Person.full_name or LegalEntity.official_name).
 
 ## 11. Blockers / Validation Failures

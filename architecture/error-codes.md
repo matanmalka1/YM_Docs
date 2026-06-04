@@ -45,6 +45,7 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 | `AUTH` | authentication / tokens |
 | `AUTHORITY_CONTACT` | authority contacts |
 | `BINDER` | binders / קלסרים |
+| `BINDER_INTAKE` | binder intake events / אירועי קבלה |
 | `BUSINESS` | businesses / עוסקים |
 | `BUSINESS_ACTIVITY` | business activity records |
 | `CHARGE` | charges |
@@ -67,6 +68,12 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 | `VAT` | VAT reports / מע״מ |
 
 ## Adding codes
+
+### `BINDER_INTAKE` codes (selected)
+
+| Code | HTTP | When raised |
+|------|------|-------------|
+| `BINDER_INTAKE.NOT_FOUND` | 404 | Intake ID does not exist, or `binder_id` path param does not match the intake's owning binder |
 
 ### `ANNUAL_REPORT` codes (selected)
 
