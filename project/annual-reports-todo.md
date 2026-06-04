@@ -92,14 +92,12 @@ These audit items are intentionally not repeated below:
   - Constraint: batch deletion must be reconciled with any future audit/side-effect requirements.
   - Relevant file: `backend/app/annual_reports/services/vat_import_service.py`.
 
-- [ ] **#21, #44: Rename or clarify annual-report repository facade vs root repository.**
-  - Current issue: both `AnnualReportRepository` and `AnnualReportReportRepository` exist, which is confusing.
-  - Suggested direction: document the facade pattern clearly or rename the lower-level report repository during a focused cleanup.
+- [x] **#21, #44: Rename or clarify annual-report repository facade vs root repository.**
+  - Current state: `AnnualReportRepository` remains the domain repository facade, and the low-level root-row repository is now `AnnualReportRootRepository`.
   - Relevant files: `backend/app/annual_reports/repositories/annual_report_repository.py`, `backend/app/annual_reports/repositories/report_repository.py`.
 
-- [ ] **#23, #25: Clean up readiness helper organization.**
-  - Current issue: readiness mixes gate logic with user-facing label construction.
-  - Suggested direction: keep the documented four gates, but move repeated label/issue construction into a small helper if readiness grows.
+- [x] **#23, #25: Clean up readiness helper organization.**
+  - Current state: readiness keeps the documented four gates in `get_readiness_check()` and delegates required-schedule label/issue formatting to private helpers.
   - Relevant file: `backend/app/annual_reports/services/financial_service.py`.
 
 - [x] **#26: Decide whether missing client record in `_assert_client_allows_create()` should fail closed.**
