@@ -28,7 +28,6 @@ These audit items are intentionally not repeated below:
 - #1/#5/#6: financial line repositories now use an explicit report-owned child-resource contract instead of `BaseRepository` plus blocked global CRUD methods.
 - #7/#8: financial line update/delete now load the scoped line once and pass the preloaded entity to repository mutation methods.
 - #11: financial audit scalar normalization now explicitly supports enum, `Decimal`, primitive scalars, and `None`, and rejects unsupported objects.
-
 ## Approved Product Decisions To Implement
 
 - [x] **#18, #20: Treat VAT auto-populate as a financial mutation.**
@@ -103,13 +102,12 @@ These audit items are intentionally not repeated below:
   - Suggested direction: keep the documented four gates, but move repeated label/issue construction into a small helper if readiness grows.
   - Relevant file: `backend/app/annual_reports/services/financial_service.py`.
 
-- [ ] **#26: Decide whether missing client record in `_assert_client_allows_create()` should fail closed.**
-  - Current issue: missing `ClientRecord` silently passes because only closed/frozen statuses raise.
-  - Note: annual reports should not exist without a valid client record, so this is likely a data-integrity guard rather than normal flow behavior.
-  - Relevant file: `backend/app/annual_reports/services/financial_service.py`.
+- [x] **#26: Decide whether missing client record in `_assert_client_allows_create()` should fail closed.**
+  - Current state: missing or soft-deleted `ClientRecord` now raises `CLIENT_RECORD.NOT_FOUND` through the annual-report financial mutation guard.
+  - Relevant file: `backend/app/annual_reports/services/financial_line_helpers.py`.
 
-- [ ] **#29: Use `self.db` consistently in `invalidate_tax_if_open()`.**
-  - Current issue: code constructs `ClientRecordRepository(self.report_repo.db)` instead of `ClientRecordRepository(self.db)`.
+- [x] **#29: Use `self.db` consistently in `invalidate_tax_if_open()`.**
+  - Current state: code now constructs `ClientRecordRepository(self.db)` instead of `ClientRecordRepository(self.report_repo.db)`.
   - Relevant file: `backend/app/annual_reports/services/financial_service.py`.
 
 - [ ] **#33: Consider SQL aggregate for recognized expenses.**
