@@ -34,7 +34,7 @@ All system items are derived from live DB data. No `WorkQueueItem` rows are stor
 **Client-level items** (skipped when `business_id` filter is set):
 - `vat_work_item_items(ctx, client_record_id)` — non-FILED, non-CANCELED VatWorkItems with upcoming/overdue deadlines.
 - `annual_report_items(ctx, client_record_id)` — non-final AnnualReports with deadlines.
-- `advance_payment_items(ctx, client_record_id)` — PENDING/PARTIAL AdvancePayments within `UPCOMING_WINDOW_DAYS` of due_date.
+- `advance_payment_items(ctx, client_record_id)` — PENDING/PARTIAL AdvancePayments within `UPCOMING_WINDOW_DAYS` of `due_date_effective` (falls back to `due_date` when `due_date_effective` is NULL).
 
 **All items** (available with or without business_id filter):
 - `charge_items(ctx, client_record_id, business_id)` — ISSUED charges 30+ days old (always OVERDUE).
@@ -46,7 +46,7 @@ Each system item: `available_actions = source_actions(source_type, source_id)`.
 
 ### Phase 2 — Task merge (`_merge_tasks`)
 
-Skipped if `business_id` filter is set (tasks are not scoped to a specific business).
+Skipped only if `WorkQueueSourceType.TASK` is in `exclude_source_types`. When `business_id` is set, merge still runs but standalone task rows are excluded — only OPEN tasks that merge onto an existing system item (charge row) are attached.
 
 1. Load all tasks via `TaskRepository.list_for_work_queue(include_history)`.
 2. Build `linked_keys`: set of `(source_type, source_id)` pairs from tasks that have a `source_domain`.
@@ -115,7 +115,7 @@ Nothing is stored. All items are computed at query time.
 |-------------|-------------|-----------------|
 | VAT_WORK_ITEM | Non-FILED, non-CANCELED, deadline approaching/past | No — urgency from due_date |
 | ANNUAL_REPORT | Non-final, deadline set | No — urgency from due_date |
-| ADVANCE_PAYMENT | PENDING or PARTIAL, due within UPCOMING_WINDOW_DAYS | No — urgency from due_date |
+| ADVANCE_PAYMENT | PENDING or PARTIAL, due within UPCOMING_WINDOW_DAYS of `due_date_effective` (or `due_date` when NULL) | No — urgency from `due_date_effective` (or `due_date` when NULL) |
 | CHARGE | ISSUED, issued 30+ days ago | Yes — always OVERDUE |
 | BINDER | Stale in-office binders | See binder_items logic |
 | TASK | All open tasks (or history if requested) | No — urgency from task.due_date |
