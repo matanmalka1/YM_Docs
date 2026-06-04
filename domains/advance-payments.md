@@ -117,8 +117,8 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **Schedule generation:** `generate_annual_schedule` skips periods where `entry.due_date < reference_date` (default today) and skips periods that already have an active payment. (`advance_payment_service.py:269-287`)
 
 **Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):
-- `timing_status`: `"overdue"` if `status != paid AND today > due_date`, else `"on_time"`.
-- `paid_late`: `True` if `status == paid AND paid_at.date() > due_date`.
+- `timing_status`: `"overdue"` if `status != paid AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
+- `paid_late`: `True` if `status == paid AND paid_at.date() > due_date_effective`. Falls back to `due_date` when `due_date_effective` is NULL.
 - `delta`: `expected_amount - paid_amount`.
 - `live_turnover`: populated by the router from `TurnoverLookupRepository` when `turnover_amount is None`.
 - `missing_turnover`: `True` when `turnover_amount is None AND live_turnover is None`.
@@ -143,7 +143,7 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/architecture/error
 
 Current code discrepancies found during authoring. These are **bugs to fix in code**, not intended behavior. Docs-only — not fixed here.
 
-- **`timing_status` / `paid_late` use `due_date`, not `due_date_effective`.** `schemas/advance_payment.py:49-51` and `:57-60` compute overdue/late from the legacy `due_date` field. This contradicts INV-05 ("all overdue checks must use `due_date_effective`"). Effect: if a record has an overridden `due_date_effective` that differs from `due_date`, the overdue/late signals are computed from the wrong date. Suggested fix: use `due_date_effective or due_date` in both computed fields.
+*No open issues.*
 
 ## Decisions (preserved)
 

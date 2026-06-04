@@ -151,14 +151,7 @@ See `docs/architecture/api-contracts.md` for envelope spec.
 
 ## Known issues
 
-1. **`constants.py` imports a non-existent `EntityType`.**  
-   File: `backend/app/businesses/constants.py:1`.  
-   `from app.businesses.models.business import EntityType` — but `business.py` defines only `BusinessStatus`; `EntityType` is not present in the model.  
-   This will cause an `ImportError` at runtime whenever `constants.py` is loaded.  
-   The intent (sole-trader type classification) suggests `EntityType` lives on `LegalEntity` (confirmed in `backend/docs/domain_decisions_v3.md` which lists `entity_type: osek_patur | osek_murshe | company_ltd | employee` on `LegalEntity`).  
-   Fix: import `EntityType` from the legal entities model, or remove `constants.py` if unused.
-
-2. **README references files that do not exist.**  
+1. **README references files that do not exist.**  
    `backend/app/businesses/README.md` lists:
    - `app/businesses/repositories/business_repository_read.py` — file absent
    - `app/businesses/services/business_update_service.py` — file absent
