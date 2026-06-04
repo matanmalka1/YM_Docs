@@ -68,6 +68,14 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 
 ## Adding codes
 
+### `ANNUAL_REPORT` codes (selected)
+
+| Code | HTTP | When raised |
+|------|------|-------------|
+| `ANNUAL_REPORT.SIGNER_NAME_MISSING` | 400 | `→ PENDING_CLIENT`: neither `Person.full_name` nor `LegalEntity.official_name` is populated for the client |
+
+---
+
 - Reuse an existing namespace for that domain; do not invent a second prefix for the same concept.
 - Use a consistent reason verb across domains where it fits: `NOT_FOUND`, `CONFLICT`, `INVALID_STATUS`, `FORBIDDEN`.
 - Raise an `AppError` subclass from the service layer so the status maps correctly; do not hardcode `HTTPException` for domain errors (see `docs/architecture/security.md` and `docs/adr/0002-router-service-repository.md`).

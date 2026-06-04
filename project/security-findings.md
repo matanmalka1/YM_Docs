@@ -19,7 +19,7 @@ Status legend: `open` / `in-progress` / `fixed`.
 | ID | Severity | Domain | Issue | Location | Status |
 |----|----------|--------|-------|----------|--------|
 | F-001 | High (IDOR) | annual-reports | Income/expense line update & delete check only that the report exists, not that the line belongs to it. A valid `line_id` from another report can be mutated/deleted via an unrelated `report_id`. | `app/annual_reports/services/financial_service.py:172-183, 268-283` | fixed |
-| F-002 | Medium | annual-reports | Transition to `pending_client` silently skips signature creation when client/business not found, while the status change still succeeds. | `app/annual_reports/services/status_signature_helper.py:42` | open |
+| F-002 | Medium | annual-reports | Transition to `pending_client` silently skips signature creation when client/business not found, while the status change still succeeds. | `app/annual_reports/services/status_signature_helper.py:42` | fixed |
 | F-003 | Low | annual-reports | Legacy docs expect tax-calendar/reminder sync on status transitions; `transition_status` does status/history/audit/signatures only — no sync. | `app/annual_reports/services/status_service.py:82` | open |
 | F-004 | Low / design | annual-reports | VAT auto-populate aggregates by `client_record_id`+`tax_year`, not per business — risky for multi-business clients if business-specific import is expected. | `app/annual_reports/services/vat_import_service.py:119` | open |
 | F-005 | Medium | advance-payments | `timing_status` / `paid_late` compute overdue/late from legacy `due_date`, not `due_date_effective` — contradicts INV-05. Overridden effective dates produce wrong signals. | `app/advance_payments/schemas/advance_payment.py:49-51, 57-60` | open |

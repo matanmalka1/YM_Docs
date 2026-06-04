@@ -71,8 +71,9 @@ transmitted         → submitted
 10. **If entering `PENDING_CLIENT`** (new == PENDING_CLIENT):
     - `_cancel_pending_signature_requests()` — cancel any existing pending SRs first (re-entry case).
     - `_trigger_signature_request()`:
-      - Read `ClientRecord` → get first `Business` via `business_repo.list_by_legal_entity()`.
-      - Create `SignatureRequest` (type: `ANNUAL_REPORT_APPROVAL`, 14-day expiry, linked to report).
+      - Read `ClientRecord` via `ClientRecordRepository.get_by_id()` — raises `CLIENT_RECORD.NOT_FOUND` if missing (blocks transition before DB write).
+      - Resolve `signer_name` via `ClientRecordRepository.get_signer_name_by_legal_entity_id()`: returns `Person.full_name` (OWNER link) or `LegalEntity.official_name`. Raises `ANNUAL_REPORT.SIGNER_NAME_MISSING` if neither exists.
+      - Create `SignatureRequest` (type: `ANNUAL_REPORT_APPROVAL`, `business_id=None`, 14-day expiry, linked to report).
 
 ## 5. Domains Involved
 
@@ -80,8 +81,7 @@ transmitted         → submitted
 |--------|------|
 | `annual_reports` | Updates AnnualReport, creates AnnualReportStatusHistory |
 | `signature_requests` | Creates or cancels SignatureRequest |
-| `clients` | Reads ClientRecord (to find business for SR) |
-| `businesses` | Reads Business list (first business used as SR target) |
+| `clients` | Reads ClientRecord and resolves signer name from LegalEntity/Person |
 | `audit` | Writes AuditLog |
 
 ## 6. Side Effects
@@ -117,6 +117,7 @@ All other accessed rows (audit, history, SR) are inserted without explicit lock.
 - Report must exist.
 - Transition must be in `VALID_TRANSITIONS[current_status]`.
 - `→ SUBMITTED`: all readiness checks must pass (delegated to `AnnualReportFinancialService`).
+- `→ PENDING_CLIENT`: client record must exist and must have a resolvable signer name (Person.full_name or LegalEntity.official_name).
 
 ## 11. Blockers / Validation Failures
 
@@ -126,6 +127,8 @@ All other accessed rows (audit, history, SR) are inserted without explicit lock.
 | Invalid status value | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
 | Transition not in VALID_TRANSITIONS | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
 | `→ SUBMITTED` when not ready | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
+| `→ PENDING_CLIENT` — client record missing | `CLIENT_RECORD.NOT_FOUND` | 404 |
+| `→ PENDING_CLIENT` — no resolvable signer name | `ANNUAL_REPORT.SIGNER_NAME_MISSING` | 400 |
 | Invalid stage name | `ANNUAL_REPORT.INVALID_STAGE` | 409 |
 | Amend on non-SUBMITTED report | `ANNUAL_REPORT.INVALID_STATUS_FOR_AMEND` | 409 |
 
@@ -141,7 +144,7 @@ None. All state changes are written to the DB immediately.
 - `tests/signature_requests/` (covers SR creation/cancellation on status transition)
 - `tests/notification/service/test_notification_policy_annual_report.py`
 
-**GAP**: No test covers the case where `_trigger_signature_request` fails to find a business (report linked to a client with no businesses).
+Tests added covering: `pending_client` with no business succeeds, signer name resolved from Person, missing client record blocks before DB write.
 
 ## 14. Documentation Target
 

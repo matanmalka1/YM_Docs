@@ -114,7 +114,7 @@ Source: `backend/app/annual_reports/services/constants.py:24`.
 - Status transitions lock the report row, validate the target status, enforce `VALID_TRANSITIONS`, append status history, and write an audit status-change record. See `backend/app/annual_reports/services/status_service.py:60`.
 - Transitioning to `submitted` always runs the readiness check first. See `backend/app/annual_reports/services/status_service.py:116`.
 - Readiness has four gates: required schedules complete, total income greater than zero, either `tax_due` or `refund_due` persisted, and `AnnualReportDetail.client_approved_at` set. Completion percent is `passed / 4 * 100`. See `backend/app/annual_reports/services/financial_service.py:414`.
-- Entering `pending_client` cancels existing pending signature requests and tries to create a new annual-report signature request; leaving `pending_client` cancels pending signature requests. See `backend/app/annual_reports/services/status_service.py:162`.
+- Entering `pending_client` first validates the client record exists and that a signer name is resolvable (raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before any DB write), then cancels existing pending signature requests and creates a new annual-report signature request with `business_id=None`; signer name comes from `Person.full_name` (OWNER link) or `LegalEntity.official_name`. Leaving `pending_client` cancels pending signature requests. See `backend/app/annual_reports/services/status_service.py:162` and `status_signature_helper.py`.
 - Updating a deadline recalculates `filing_deadline` for `standard`/`extended`, sets `None` for `custom`, appends a same-status history row, and writes an audit entry. See `backend/app/annual_reports/services/status_service.py:195`.
 - `amend_report` is allowed only from `submitted`, transitions back to `in_preparation`, and stores the amendment reason in detail metadata. See `backend/app/annual_reports/services/status_service.py:265`.
 - Financial summary totals income and recognized expenses; `taxable_income = total_income - recognized_expenses`. See `backend/app/annual_reports/services/financial_service.py:321`.
@@ -147,12 +147,13 @@ The annual reports namespace is registered as `ANNUAL_REPORT` in `docs/architect
 - `ANNUAL_REPORT.TAX_CONFLICT`
 - `ANNUAL_REPORT.INVALID_STATUS_FOR_AUTOPOPULATE`
 - `ANNUAL_REPORT.LINES_ALREADY_EXIST`
+- `ANNUAL_REPORT.SIGNER_NAME_MISSING`
 
 Source grep: `backend/app/annual_reports/services/*`.
 
 ## Known issues
 
-- Transitioning to `pending_client` silently skips signature creation when the client record or a business cannot be found, while the status transition still succeeds. See `backend/app/annual_reports/services/status_signature_helper.py:42`. Suggested fix: either make client-scoped annual-report approval independent of business, or raise an explicit domain error when a signature request is required but cannot be created.
+- ~~Transitioning to `pending_client` silently skips signature creation when the client record or a business cannot be found.~~ **Fixed.** Transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Signature creation no longer requires a Business; signer name resolves from the client identity graph. See `backend/app/annual_reports/services/status_signature_helper.py`.
 - Legacy docs say annual-report status transitions sync linked tax-calendar entries and reminders, but current `transition_status` updates status/history/audit/signatures only and has no tax-calendar/reminder call. See `backend/app/annual_reports/services/status_service.py:82`. Suggested fix: implement the sync or remove the stale expectation from remaining non-canonical docs.
 - VAT auto-populate aggregates by `client_record_id` and `tax_year`, not by a specific business. See `backend/app/annual_reports/services/vat_import_service.py:119`. This is consistent with current client-scoped report ownership, but it is risky for multi-business clients if users expect business-specific import. Suggested fix: decide whether annual-report VAT import is intentionally client-wide; if not, add an explicit business selector or guard.
 
