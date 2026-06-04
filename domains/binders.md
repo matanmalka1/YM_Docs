@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The binders domain manages physical binders that hold client tax documents. Each binder belongs to one `client_record`, receives material intakes over time, transitions through a defined lifecycle, and is eventually handed over to the client. All materials from all of a client's businesses are stored in the same binder; the material type is tracked at the `BinderIntakeMaterial` level, not at binder level.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-04.
 
 ## Endpoints
 
@@ -33,6 +33,7 @@ Last verified against code + backend/openapi.json: 2026-05-29.
 | POST | /api/v1/binders/handover-to-client-bulk | Hand over multiple binders in one grouped event |
 | GET | /api/v1/binders/{binder_id}/history | Lifecycle audit log for binder |
 | GET | /api/v1/binders/{binder_id}/intakes | All material intakes for binder |
+| PATCH | /api/v1/binders/{binder_id}/intakes/{intake_id} | Edit an existing intake (fields + cross-client transfer) |
 | GET | /api/v1/clients/{client_record_id}/binders | All binders for a specific client |
 
 All paths confirmed in `backend/openapi.json`. All endpoints require role `ADVISOR` or `SECRETARY`; `DELETE /binders/{binder_id}` requires `ADVISOR`.
@@ -209,9 +210,7 @@ When a new client is created, `create_initial_binder` opens a bare placeholder b
 ### Intake editing (`BinderIntakeEditService`)
 Cite: `backend/app/binders/services/binder_intake_edit_service.py`
 
-Supports partial edits to `BinderIntake` with field-level audit trail (`BinderIntakeEditLog`). Patchable intake fields: `received_at`, `received_by`, `notes`. Transfer patch (changing `client_record_id` or `binder_id`) validates that all FK-linked entities (`business_id`, `annual_report_id`, `vat_report_id`) belong to the target client/legal entity.
-
-Note: `BinderIntakeEditService.edit_intake` is defined in the service but no corresponding HTTP endpoint appears in `backend/openapi.json`. The capability exists in code but is not exposed via API.
+Exposed via `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}`. Supports partial edits to `BinderIntake` with field-level audit trail (`BinderIntakeEditLog`). Patchable intake fields: `received_at`, `received_by`, `notes`. Transfer patch (changing `client_record_id` or `binder_id`) validates that all FK-linked entities (`business_id`, `annual_report_id`, `vat_report_id`) belong to the target client/legal entity. The `binder_id` path parameter scopes the lookup — intakes belonging to a different binder return 404.
 
 ### Audit logging
 Every lifecycle and capacity transition writes one `BinderLifecycleLog` row per changed field. `notes` carries the reason message. Initial state on creation logs `null → in_office` and `null → open`.
@@ -242,9 +241,8 @@ Registry: `docs/architecture/error-codes.md`.
 
 Checked for all five recurring patterns from the authoring guide.
 
-**F-011 — Intake edit service not exposed via API**
-`BinderIntakeEditService.edit_intake` (`backend/app/binders/services/binder_intake_edit_service.py:57`) is fully implemented with cross-client FK validation and field-level audit, but no HTTP endpoint exists in `backend/openapi.json` (only `GET /api/v1/binders/{binder_id}/intakes` is present; no PATCH). The service exists and is callable in code, but staff cannot use the edit capability via the API. This is a missing-exposure gap, not an IDOR (the service has correct ownership checks), but it means any cross-client transfer logic currently cannot be triggered externally.
-Suggested fix: add `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` router endpoint calling `BinderIntakeEditService.edit_intake`.
+**F-011 — resolved**
+`PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` added in `backend/app/binders/api/binders_history.py`. The endpoint scopes by `binder_id` before delegating to `BinderIntakeEditService.edit_intake`.
 
 No IDOR found on lifecycle transitions: all update/delete paths load the binder by ID with `get_by_id_for_update` before mutating; grouped handover validates `binder.client_record_id == client_record_id` explicitly.
 
@@ -274,8 +272,7 @@ From `backend/docs/backend/domains/binder_lifecycle_refactor_spec.md` (completed
 
 ## Future / planned
 
-- **Intake edit API endpoint not yet exposed.** `BinderIntakeEditService` is implemented but no HTTP route exists (see Known issues F-011). Adding `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` is the intended path.
-- **Cross-client intake transfer UI.** The service supports transferring an intake to a different client's binder (with FK revalidation), but the endpoint is missing so this is currently inaccessible.
+- **Cross-client intake transfer UI.** The service and API endpoint exist; frontend form is not yet built.
 
 ## Historical notes
 

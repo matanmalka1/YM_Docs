@@ -139,7 +139,21 @@ None. All writes are to DB rows.
 
 **GAP**: No dedicated test for the VAT auto-advance path (`material_type == "vat"` + `vat_report_id` linked to a PENDING_MATERIALS item).
 
-## 13. Documentation Target
+## 13. Intake Edit Flow
 
-- `docs/domains/binders.md` — intake flow, period resolution, VAT auto-advance
+`PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}`
+
+Entry point: `backend/app/binders/api/binders_history.py:patch_binder_intake`
+Service: `backend/app/binders/services/binder_intake_edit_service.py:BinderIntakeEditService.edit_intake`
+
+Patchable fields (all optional):
+- `received_at`, `received_by`, `notes` — field-level update with audit log
+- `client_record_id`, `binder_id` — transfer to another binder/client
+- `business_ids`, `annual_report_ids`, `vat_report_ids` — FK replacement with cross-client ownership validation
+
+The `binder_id` path param scopes the lookup; a mismatched intake returns 404. All changes write one `BinderIntakeEditLog` row per mutated field.
+
+## 14. Documentation Target
+
+- `docs/domains/binders.md` — intake flow, period resolution, VAT auto-advance, intake edit
 - `docs/domains/vat-reports.md` — PENDING_MATERIALS → MATERIAL_RECEIVED via binder intake
