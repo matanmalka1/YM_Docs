@@ -72,6 +72,7 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 
 | Code | HTTP | When raised |
 |------|------|-------------|
+| `ANNUAL_REPORT.AUDIT_ACTOR_REQUIRED` | 400 | VAT auto-populate service call omitted the actor id required for financial mutation audit |
 | `ANNUAL_REPORT.SIGNER_NAME_MISSING` | 400 | `→ PENDING_CLIENT`: neither `Person.full_name` nor `LegalEntity.official_name` is populated for the client |
 
 ---

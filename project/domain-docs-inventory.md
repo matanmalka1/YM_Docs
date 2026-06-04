@@ -286,7 +286,7 @@ Recommended future structure:
 
 Notes:
 
-- The README already carries an Open Tasks list with unresolved HIGH items (2026 tax brackets and NI ceilings, multi-business auto-populate). Those are product/tax-law decisions, not documentation cleanup.
+- The README already carries an Open Tasks list with unresolved HIGH items (2026 tax brackets and NI ceilings). Those are product/tax-law decisions, not documentation cleanup. ~~multi-business auto-populate~~ resolved as accepted-design in `docs/domains/annual-reports.md`.
 
 ### Binders
 

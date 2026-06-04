@@ -28,24 +28,24 @@ These audit items are intentionally not repeated below:
 
 ## Approved Product Decisions To Implement
 
-- [ ] **#18, #20: Treat VAT auto-populate as a financial mutation.**
+- [x] **#18, #20: Treat VAT auto-populate as a financial mutation.**
   - Approved rule: `VatImportService.auto_populate()` must follow the same rules as manual income/expense line mutations.
   - Required behavior: write audit records for created income lines, created expense lines, and deleted/replaced lines when `force=True`.
   - Audit metadata must clearly mark the source as VAT import.
   - Relevant files: `backend/app/annual_reports/services/vat_import_service.py`, `backend/app/annual_reports/services/financial_service.py`, `backend/app/audit/services/entity_audit_writer.py`, `docs/domains/annual-reports.md`.
 
-- [ ] **#20, #27: Block all annual-report financial mutations for closed/frozen clients.**
+- [x] **#20, #27: Block all annual-report financial mutations for closed/frozen clients.**
   - Approved rule: closed/frozen clients block manual income/expense create, update, delete, and VAT auto-populate, including `force=True`.
-  - Current state: manual create is blocked; manual update/delete and VAT auto-populate still need enforcement.
+  - Current state: manual create/update/delete and VAT auto-populate are blocked.
   - Relevant file: `backend/app/annual_reports/services/financial_service.py`, `backend/app/annual_reports/services/vat_import_service.py`.
 
-- [ ] **#37, #38: Handle zero/negative VAT totals explicitly.**
+- [x] **#37, #38: Handle zero/negative VAT totals explicitly.**
   - Approved rule: zero totals do not create financial lines.
   - Approved rule: negative totals do not create financial lines automatically and must not be silently ignored.
   - Required behavior: return negative totals as `skipped_items` / warnings so credits, refunds, or corrections are visible for review.
   - Relevant file: `backend/app/annual_reports/services/vat_import_service.py`.
 
-- [ ] **#41, #42: Return source breakdown for merged VAT categories.**
+- [x] **#41, #42: Return source breakdown for merged VAT categories.**
   - Approved rule: when VAT categories merge into one annual-report category, the response must show which source VAT categories contributed to the generated annual-report category.
   - Preferred audit behavior: include the same breakdown in VAT-import audit metadata.
   - Example shape:
@@ -61,7 +61,7 @@ These audit items are intentionally not repeated below:
     ```
   - Relevant file: `backend/app/annual_reports/services/vat_import_service.py`.
 
-- [ ] **API contract task: update VAT auto-populate response contract.**
+- [x] **API contract task: update VAT auto-populate response contract.**
   - Adding `skipped_items` and breakdown fields changes the API response.
   - Required update set: response schema, service tests, API tests, OpenAPI export/baseline, and domain docs.
   - Keep this as a separate implementation task from smaller cleanup fixes.
