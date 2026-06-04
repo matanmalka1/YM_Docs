@@ -25,6 +25,9 @@ These audit items are intentionally not repeated below:
 - #12/#13/#14/#15: income/expense add/update/delete audit payloads now use snapshots; expense snapshots include the important optional fields.
 - #16: VAT force-delete counter now increments only on successful scoped delete.
 - #22/#24: readiness now uses one report lookup and a named `total_checks`.
+- #1/#5/#6: financial line repositories now use an explicit report-owned child-resource contract instead of `BaseRepository` plus blocked global CRUD methods.
+- #7/#8: financial line update/delete now load the scoped line once and pass the preloaded entity to repository mutation methods.
+- #11: financial audit scalar normalization now explicitly supports enum, `Decimal`, primitive scalars, and `None`, and rejects unsupported objects.
 
 ## Approved Product Decisions To Implement
 
@@ -69,18 +72,18 @@ These audit items are intentionally not repeated below:
 
 ## Engineering Follow-Ups
 
-- [ ] **#1, #5, #6: Rework the financial-line repository contract.**
+- [x] **#1, #5, #6: Rework the financial-line repository contract.**
   - Current issue: income/expense line repositories subclass `BaseRepository` but deliberately block global `get_by_id`, `update`, and `delete`.
   - Suggested direction: a dedicated scoped child-resource repository contract, such as annual-report financial-line repositories with only report-scoped read/update/delete methods.
   - Constraint: avoid a broad abstraction unless it materially reduces duplication and clarifies ownership.
   - Relevant files: `backend/app/annual_reports/repositories/income_repository.py`, `backend/app/annual_reports/repositories/expense_repository.py`, `backend/app/common/repositories/base_repository.py`.
 
-- [ ] **#7, #8: Remove double lookup in financial line update/delete.**
+- [x] **#7, #8: Remove double lookup in financial line update/delete.**
   - Current issue: services load the line for snapshot, then repositories load it again for update/delete.
   - Suggested direction: add repository methods that accept a preloaded scoped entity, such as `apply_updates(line, fields)` and `delete_line(line)`.
   - Relevant files: `backend/app/annual_reports/services/financial_service.py`, income/expense repositories.
 
-- [ ] **#11: Make financial audit scalar normalization stricter.**
+- [x] **#11: Make financial audit scalar normalization stricter.**
   - Current issue: `audit_scalar()` stringifies arbitrary objects.
   - Suggested direction: explicitly handle enum, `Decimal`, `str`, `int`, `float`, `bool`, and `None`; reject or preserve structured values intentionally.
   - Relevant file: `backend/app/annual_reports/services/financial_service.py`.
