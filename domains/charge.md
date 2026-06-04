@@ -136,8 +136,8 @@ Cross-domain codes raised through called guards:
 
 ## Known issues
 
-1. **List `stats` do not respect most list filters.** `GET /api/v1/charges` exposes filters for `business_id`, `period`, `issued_after`, and `issued_before`, but `ChargeQueryService.list_charges_paginated()` computes `stats` through `stats_by_status()` with only `client_record_id` and `charge_type`. The returned `items` can therefore describe one filtered slice while `stats` summarize a broader dataset. Locations: `backend/app/charge/api/charge.py:90-112`, `backend/app/charge/services/charge_query_service.py:169-188`, `backend/app/charge/repositories/charge_repository.py:221-244`. This violates the endpoint contract expectation that response stats describe the current filtered list. Suggested fix: thread all effective list filters into `stats_by_status()`.
-2. **OpenAPI advertises `X-Idempotency-Key` as optional on bulk action, but runtime rejects missing keys.** `backend/openapi.json` marks the header `required: false` for `POST /api/v1/charges/bulk-action`, while `require_idempotency_key()` raises `400` when the header is absent. Locations: `backend/openapi.json:6649-6675`, `backend/app/infrastructure/idempotency/dependency.py:90-100`, `backend/app/charge/api/charge.py:125-147`. This violates the rule that endpoint behavior should match the published contract. Suggested fix: make the header required in the route contract / generated OpenAPI.
+1. ~~**List `stats` do not respect most list filters.**~~ Fixed (F-013): `stats_by_status()` now accepts and applies `business_id`, `period`, `issued_after`, and `issued_before` in addition to `client_record_id` and `charge_type`. `list_charges_paginated()` threads all active filters through.
+2. ~~**OpenAPI advertises `X-Idempotency-Key` as optional on bulk action, but runtime rejects missing keys.**~~ Fixed (F-014): `require_idempotency_key` header parameter changed from `str | None` with `default=None` to required `str` (no default). FastAPI now generates `required: true` in OpenAPI and returns 422 for missing header instead of the manual 400.
 
 ## Decisions (preserved)
 

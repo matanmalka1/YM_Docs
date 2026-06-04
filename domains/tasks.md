@@ -111,7 +111,6 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-1. **`GET /api/v1/tasks` exposes enum-backed filters as plain strings.** `assigned_role` and `source_domain` are declared as `str | None` in the route/service/repository chain, so the OpenAPI contract also exposes them as unconstrained strings instead of the real role enum / validated source-domain set. Invalid values therefore bypass request validation and silently behave like empty filters instead of failing fast. Locations: `backend/app/tasks/api/routes.py:31-32`, `backend/app/tasks/services/task_service.py:50-52`, `backend/app/tasks/repositories/task_repository.py:17-19,29-32`, `backend/openapi.json:11749-11777`. This violates the domain rule that roles come from `UserRole` and source links use validated source-domain values. Suggested fix: type `assigned_role` as `UserRole | None` and expose a validated source-domain enum/validator for the list endpoint as well.
 
 ## Decisions (preserved)
 
