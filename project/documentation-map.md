@@ -37,6 +37,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/domain-docs-plan.md` — ownership split + status tracker for the canonical per-domain docs migration.
 - `docs/project/security-findings.md` — central index of code findings (IDOR, correctness) surfaced during domain-docs authoring.
 - `docs/project/annual-reports-todo.md` — reference tracker for unresolved annual-report financial-lines audit follow-ups.
+- `docs/project/test-suite-audit.md` — reference audit of redundant, low-value, over-specified, obsolete, and high-value backend tests.
 
 ## Architecture (technical source of truth)
 
