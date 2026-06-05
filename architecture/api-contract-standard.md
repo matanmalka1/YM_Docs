@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - Detailed public API contract examples and conventions.
 - Worked request/response, URL, DTO, and action-naming illustrations subordinate to the canonical API contract rules.
 
 This file must not contain:
+
 - API rules that override `docs/architecture/api-contracts.md`.
 - Legacy compatibility policy that conflicts with `docs/adr/0001-no-legacy-compatibility.md`.
 - Frontend implementation rules.
@@ -11,6 +14,7 @@ This file must not contain:
 Source of truth: reference
 
 Canonical rules:
+
 - `docs/architecture/api-contracts.md`
 - `docs/workflow/verification.md`
 
@@ -61,13 +65,13 @@ Do not use RPC-style or mixed-case paths:
 
 Method semantics and the rule that `GET` must not change state are defined in `docs/architecture/api-contracts.md`. Quick reference:
 
-| Method | Use |
-|--------|-----|
-| `GET` | read/list only |
-| `POST` | create or business action |
-| `PATCH` | partial update |
-| `PUT` | full replacement, rarely needed |
-| `DELETE` | delete or soft delete |
+| Method   | Use                             |
+| -------- | ------------------------------- |
+| `GET`    | read/list only                  |
+| `POST`   | create or business action       |
+| `PATCH`  | partial update                  |
+| `PUT`    | full replacement, rarely needed |
+| `DELETE` | delete or soft delete           |
 
 Bad:
 
@@ -207,14 +211,14 @@ Errors use the project envelope. The envelope shape, error codes, and status map
 
 Canonical status rules live in `docs/architecture/api-contracts.md`. Common cases:
 
-| Status | Meaning |
-|--------|---------|
-| `401` | user is not authenticated |
-| `403` | user is authenticated but not allowed |
-| `404` | resource does not exist or is intentionally hidden |
-| `409` | business conflict |
-| `422` | request validation failed |
-| `500` | unexpected server error only |
+| Status | Meaning                                            |
+| ------ | -------------------------------------------------- |
+| `401`  | user is not authenticated                          |
+| `403`  | user is authenticated but not allowed              |
+| `404`  | resource does not exist or is intentionally hidden |
+| `409`  | business conflict                                  |
+| `422`  | request validation failed                          |
+| `500`  | unexpected server error only                       |
 
 ## DTO Boundaries
 

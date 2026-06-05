@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - Documentation ownership rules.
 - How agents decide which file is authoritative for a topic.
 
 This file must not contain:
+
 - The actual backend, frontend, API, database, workflow, or product/domain rules.
 
 Source of truth: mandatory
