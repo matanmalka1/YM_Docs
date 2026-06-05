@@ -26,8 +26,8 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/documents` is mou
 | GET | /api/v1/documents/client/{client_record_id}/versions | ADVISOR, SECRETARY | Version history for one `document_type`; required `?document_type=`, optional `?tax_year=` |
 | GET | /api/v1/documents/{document_id}/download-url | ADVISOR, SECRETARY | Presigned download URL (expires 1 hour) |
 | GET | /api/v1/documents/annual-report/{report_id} | ADVISOR, SECRETARY | List documents linked to an annual report |
-| DELETE | /api/v1/documents/{document_id} | ADVISOR | Soft-delete a document |
-| PUT | /api/v1/documents/{document_id}/replace | ADVISOR | Replace file in-place (same record, incremented version) |
+| DELETE | /api/v1/documents/client/{client_record_id}/{document_id} | ADVISOR | Soft-delete a document; ownership verified against `client_record_id` |
+| PUT | /api/v1/documents/client/{client_record_id}/{document_id}/replace | ADVISOR | Replace file in-place (same record, incremented version); ownership verified |
 
 ## Model & fields
 
@@ -99,7 +99,7 @@ Source: `backend/app/permanent_documents/models/permanent_document.py`.
 | `client` | Belongs to person; `business_id` is NULL |
 | `business` | Belongs to specific business; `business_id` required |
 
-**CLIENT_SCOPE_TYPES** (line 68) — defined in model as `{id_copy, power_of_attorney, engagement_agreement}`. These are the document types that always belong to the person. **Note:** this set is not enforced in the service layer; scope is derived solely from whether `business_id` is provided (see F-022 below).
+**CLIENT_SCOPE_TYPES** (line 68) — `{id_copy, power_of_attorney, engagement_agreement}`. These types always belong to the person; uploading any of them with a `business_id` is rejected with `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` (422).
 
 ## Domain rules & invariants
 
@@ -107,7 +107,7 @@ Source: `backend/app/permanent_documents/services/permanent_document_service.py`
 
 - **Client existence required.** `upload_document` calls `get_client_or_raise` before any other logic (`service.py:108`).
 - **Business ownership check.** When `business_id` is provided, `assert_business_belongs_to_legal_entity` verifies the business belongs to the client's legal entity (`service.py:121`). Uses `legal_entity_id` from the client record by default.
-- **Scope derivation.** `scope = BUSINESS` if `business_id is not None`, else `scope = CLIENT` (`service.py:126`). No service-layer enforcement of `CLIENT_SCOPE_TYPES`.
+- **Scope derivation.** `scope = BUSINESS` if `business_id is not None`, else `scope = CLIENT` (`service.py:126`). `CLIENT_SCOPE_TYPES` (`id_copy`, `power_of_attorney`, `engagement_agreement`) are enforced: uploading any of these with a `business_id` raises `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` (422).
 - **File validation.** MIME type must be in `ALLOWED_MIME_TYPES`; size must be ≤ `MAX_FILE_SIZE_BYTES` (`service.py:131-137`). Checked before storage upload.
 - **Versioning is atomic.** DB record flushed first; storage upload second. On storage failure, transaction rolls back (`service.py:177`). `superseded_by` set in the same final commit (`service.py:181`). Concurrent collisions raise `DOCUMENT.VERSION_CONFLICT` (409) (`service.py:186`).
 - **Upload auto-approves.** New uploads are created with `status=APPROVED` and `approved_by=uploaded_by` (`service.py:167-173`). No separate approve/reject HTTP endpoints exist.
@@ -115,8 +115,8 @@ Source: `backend/app/permanent_documents/services/permanent_document_service.py`
   - business-scoped: `businesses/{business_id}/{document_type}/{tax_year_or_permanent}/v{version}_{filename}`
   - client-scoped: `clients/{client_record_id}/{document_type}/{tax_year_or_permanent}/v{version}_{filename}`
   - When `tax_year` is None, the segment is `permanent`.
-- **Soft delete.** `delete_document` sets `is_deleted=True` only; storage object is not removed (`service.py:262`). All list/get queries filter `is_deleted == False`.
-- **Replace in-place.** `replace_document` increments `version`, uploads new file, updates all file metadata, and commits — does not create a new `PermanentDocument` row or update `superseded_by` (`service.py:264-306`).
+- **Soft delete.** `delete_document(client_record_id, document_id)` sets `is_deleted=True` only; storage object is not removed. Fetches via `get_by_id_and_client_record` — raises `PERMANENT_DOCUMENTS.NOT_FOUND` if the document does not exist or does not belong to the given client. All list/get queries filter `is_deleted == False`.
+- **Replace in-place.** `replace_document(client_record_id, document_id, ...)` increments `version`, uploads new file, updates all file metadata, and commits — does not create a new `PermanentDocument` row or update `superseded_by`. Same ownership check as delete.
 - **Default required types for signals.** `_DEFAULT_REQUIRED_TYPES = [id_copy, power_of_attorney, engagement_agreement]` (`service.py:43`). `get_client_operational_signals` returns the subset of these not yet present for the client (`service.py:249-255`).
 - **List endpoints.** By default exclude soft-deleted documents and superseded versions (`superseded_by IS NULL`).
 
@@ -131,7 +131,8 @@ Registry: `docs/architecture/error-codes.md`.
 | Code | HTTP | Raised when |
 |------|------|-------------|
 | `CLIENT_RECORD.NOT_FOUND` | 404 | Client record not found during upload or list |
-| `PERMANENT_DOCUMENTS.CLIENT_NOT_FOUND` | 404 | Business not found during business-scoped upload (see F-022 — code is misnamed) |
+| `PERMANENT_DOCUMENTS.BUSINESS_NOT_FOUND` | 404 | Business not found during business-scoped upload |
+| `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` | 422 | `id_copy`, `power_of_attorney`, or `engagement_agreement` uploaded with a `business_id` |
 | `PERMANENT_DOCUMENTS.CLIENT_RECORD_NOT_FOUND` | 404 | Client record not found when computing missing docs by business |
 | `PERMANENT_DOCUMENTS.NOT_FOUND` | 404 | Document not found or soft-deleted (get-download-url, delete, replace) |
 | `DOCUMENT.INVALID_FILE_TYPE` | 422 | MIME type not in allowed set |
@@ -141,39 +142,23 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-022 — Wrong error code when business not found on upload (Low)
+### F-042 — download-url resolves by bare document_id with no client scope check (Medium / IDOR)
 
-**What:** `upload_document` raises `PERMANENT_DOCUMENTS.CLIENT_NOT_FOUND` when the business is not found (`service.py:118-120`). The code name says "client" but the condition is "business not found."
+**What:** `GET /api/v1/documents/{document_id}/download-url` accepts only a `document_id`. `get_download_url` in the service fetches by `id` with no ownership verification — any ADVISOR or SECRETARY can obtain a presigned URL for any document by guessing the ID.
 
-**Location:** `backend/app/permanent_documents/services/permanent_document_service.py:118`
+**Location:** `backend/app/permanent_documents/api/permanent_documents.py:93-101`, `backend/app/permanent_documents/services/permanent_document_service.py:194-198`
 
-**Rule violated:** Error codes should identify the resource that is actually missing (Pattern 4 — `DOMAIN.REASON` must match the condition).
+**Rule violated:** Same pattern as F-028 (now fixed for mutating paths). Read path not yet scoped.
 
-**Suggested fix:** Rename to `PERMANENT_DOCUMENTS.BUSINESS_NOT_FOUND`.
-
----
-
-### F-023 — CLIENT_SCOPE_TYPES defined but never enforced in service (Low / design)
-
-**What:** `CLIENT_SCOPE_TYPES = {id_copy, power_of_attorney, engagement_agreement}` is defined in the model (`models/permanent_document.py:68`) but is never imported or checked in `PermanentDocumentService`. Scope is derived solely from `business_id is not None`. A caller can upload `id_copy` with a `business_id` and the service will assign `scope=BUSINESS`, contradicting the model's documented intent that these types "always belong to the person."
-
-**Location:** `backend/app/permanent_documents/models/permanent_document.py:68` (defined), `backend/app/permanent_documents/services/permanent_document_service.py:126` (not checked)
-
-**Rule violated:** Pattern 2 — enforced invariant in model not enforced in service.
-
-**Suggested fix:** In `upload_document`, after deriving `scope`, assert that if `document_type` is in `CLIENT_SCOPE_TYPES` then `business_id` must be `None`; raise a 422 otherwise.
+**Suggested fix:** Move to `GET /api/v1/documents/client/{client_record_id}/{document_id}/download-url`; service fetches via `get_by_id_and_client_record` before generating the URL.
 
 ---
 
-### F-024 — delete and replace endpoints have no caller-level ownership check (Low / design)
+### Previously tracked findings resolved:
 
-**What:** `DELETE /api/v1/documents/{document_id}` and `PUT /api/v1/documents/{document_id}/replace` accept only a `document_id`. The service fetches by `id` with `is_deleted=False` (`service.py:258, 272`) but does not verify that the document belongs to the calling user's organization/client. Any ADVISOR who can reach the endpoint can delete or replace any document in the database by guessing `document_id`.
-
-**Location:** `backend/app/permanent_documents/api/permanent_documents.py:104-133`, `backend/app/permanent_documents/services/permanent_document_service.py:257-306`
-
-**Rule violated:** Pattern 1 — IDOR via missing ownership re-check on mutating paths. Compare with `upload_document` which validates `client_record_id` and business ownership.
-
-**Suggested fix:** Pass `client_record_id` (or derive it from the document row) and assert that the document's `client_record_id` belongs to a client the current user is authorized for. At minimum, pass the ADVISOR's `user.id` and check `uploaded_by` or use a cross-table ownership guard consistent with the `businesses` domain.
+- **F-026** (was F-022) — Wrong error code on business-not-found: fixed; now raises `PERMANENT_DOCUMENTS.BUSINESS_NOT_FOUND`. Resolved 2026-06-04.
+- **F-027** (was F-023) — `CLIENT_SCOPE_TYPES` not enforced: fixed; `upload_document` now raises `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` (422) when `id_copy`, `power_of_attorney`, or `engagement_agreement` is submitted with a `business_id`. Resolved 2026-06-04.
+- **F-028** (was F-024) — IDOR on delete/replace: fixed by restructuring routes to `DELETE /api/v1/documents/client/{client_record_id}/{document_id}` and `PUT /api/v1/documents/client/{client_record_id}/{document_id}/replace`; service uses `get_by_id_and_client_record` — document mutation without proving client scope returns 404. Resolved 2026-06-04.
 
 ## Decisions (preserved)
 
@@ -192,7 +177,6 @@ These behaviors are documented in the model or README but are **not implemented*
 
 - **Standalone approve / reject endpoints.** The `DocumentStatus` enum includes `received`, `approved`, `rejected`, and the model has `approved_by / approved_at / rejected_by / rejected_at` fields, but no HTTP endpoints exist to transition status post-upload. Currently every upload is auto-approved at upload time.
 - **Storage cleanup on soft delete.** Model docstring states "service layer handles storage cleanup separately." No such cleanup is implemented.
-- **`CLIENT_SCOPE_TYPES` enforcement.** The constant is defined but not enforced. Future: validate in `upload_document` that `id_copy`, `power_of_attorney`, `engagement_agreement` are always client-scoped.
 - **`is_present` flag semantics.** The field exists and defaults to `true`; `replace_document` resets it to `true`. There is no code path that sets it to `false`. The intended use (tracking physical receipt separately from upload) is not yet implemented.
 
 ## Historical notes
