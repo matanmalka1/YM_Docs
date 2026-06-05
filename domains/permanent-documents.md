@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The permanent-documents domain stores durable client and business files — identity documents, engagement agreements, tax forms, bank approvals, withholding certificates, and similar records. Each document is versioned: uploading a new file for the same `(client_record_id, business_id, document_type, tax_year)` combination supersedes the previous version rather than replacing it. Documents are soft-deleted; the storage object is not removed. Operational signals report missing required document types per client.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-05.
 
 ## Endpoints
 
@@ -24,7 +24,7 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/documents` is mou
 | GET | /api/v1/documents/client/{client_record_id} | ADVISOR, SECRETARY | List active documents for a client; optional `?tax_year=` filter |
 | GET | /api/v1/documents/client/{client_record_id}/signals | ADVISOR, SECRETARY | Advisory: return missing required document types |
 | GET | /api/v1/documents/client/{client_record_id}/versions | ADVISOR, SECRETARY | Version history for one `document_type`; required `?document_type=`, optional `?tax_year=` |
-| GET | /api/v1/documents/{document_id}/download-url | ADVISOR, SECRETARY | Presigned download URL (expires 1 hour) |
+| GET | /api/v1/documents/client/{client_record_id}/{document_id}/download-url | ADVISOR, SECRETARY | Presigned download URL (expires 1 hour); ownership verified against `client_record_id` |
 | GET | /api/v1/documents/annual-report/{report_id} | ADVISOR, SECRETARY | List documents linked to an annual report |
 | DELETE | /api/v1/documents/client/{client_record_id}/{document_id} | ADVISOR | Soft-delete a document; ownership verified against `client_record_id` |
 | PUT | /api/v1/documents/client/{client_record_id}/{document_id}/replace | ADVISOR | Replace file in-place (same record, incremented version); ownership verified |
@@ -142,23 +142,12 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-042 — download-url resolves by bare document_id with no client scope check (Medium / IDOR)
-
-**What:** `GET /api/v1/documents/{document_id}/download-url` accepts only a `document_id`. `get_download_url` in the service fetches by `id` with no ownership verification — any ADVISOR or SECRETARY can obtain a presigned URL for any document by guessing the ID.
-
-**Location:** `backend/app/permanent_documents/api/permanent_documents.py:93-101`, `backend/app/permanent_documents/services/permanent_document_service.py:194-198`
-
-**Rule violated:** Same pattern as F-028 (now fixed for mutating paths). Read path not yet scoped.
-
-**Suggested fix:** Move to `GET /api/v1/documents/client/{client_record_id}/{document_id}/download-url`; service fetches via `get_by_id_and_client_record` before generating the URL.
-
----
-
 ### Previously tracked findings resolved:
 
 - **F-026** (was F-022) — Wrong error code on business-not-found: fixed; now raises `PERMANENT_DOCUMENTS.BUSINESS_NOT_FOUND`. Resolved 2026-06-04.
 - **F-027** (was F-023) — `CLIENT_SCOPE_TYPES` not enforced: fixed; `upload_document` now raises `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` (422) when `id_copy`, `power_of_attorney`, or `engagement_agreement` is submitted with a `business_id`. Resolved 2026-06-04.
 - **F-028** (was F-024) — IDOR on delete/replace: fixed by restructuring routes to `DELETE /api/v1/documents/client/{client_record_id}/{document_id}` and `PUT /api/v1/documents/client/{client_record_id}/{document_id}/replace`; service uses `get_by_id_and_client_record` — document mutation without proving client scope returns 404. Resolved 2026-06-04.
+- **F-042** — IDOR on download-url read path: fixed by moving route to `GET /api/v1/documents/client/{client_record_id}/{document_id}/download-url`; service `get_download_url` now takes `client_record_id` and fetches via `get_by_id_and_client_record` — presigned URL without proving client scope returns 404. Resolved 2026-06-05.
 
 ## Decisions (preserved)
 
