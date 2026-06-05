@@ -184,13 +184,13 @@ All codes follow `DOMAIN.REASON` format. Registry: `docs/architecture/error-code
 
 ## Known issues
 
-No open signature-request findings from the current audit set.
+No open known issues.
 
-Resolved 2026-06-05:
+## Resolved issues
 
-- **F-029:** Detail lookup now raises `SIGNATURE_REQUEST.NOT_FOUND` through `NotFoundError`. The previous raw `HTTPException` still used the global envelope but emitted the generic `not_found` code.
-- **F-030:** Cancellation now uses `POST /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel` and a locked client-and-request-scoped pending lookup. The bare cancellation route and lookup were removed.
-- **F-031:** Closed as stale; the reported orphaned bytecode is absent and `__pycache__/` is ignored.
+- **F-029** (2026-06-05): Detail lookup raised the generic `not_found` code via raw `HTTPException`. Fixed: now raises `SIGNATURE_REQUEST.NOT_FOUND` through `NotFoundError`.
+- **F-030** (2026-06-05): Cancellation route was bare and used an unscoped lookup. Fixed: `POST /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel` with locked client-and-request-scoped pending lookup.
+- **F-031** (2026-06-05): Closed as stale; reported orphaned bytecode absent; `__pycache__/` is ignored.
 
 ## Decisions (preserved)
 

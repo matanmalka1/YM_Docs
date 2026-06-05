@@ -181,11 +181,7 @@ All codes follow the `DOMAIN.REASON` format. Source: `backend/app/users/services
 
 ## Known issues
 
-**F-users-001 — Low / hardening gap: audit-log `from`/`to` accepts reversed range without validation**
-
-`GET /api/v1/users/audit-logs` accepts `from` and `to` query parameters but does not validate that `from <= to`. Passing a reversed range silently returns zero results instead of a 400. The repository applies both filters independently (`>= from_ts`, `<= to_ts`). Source: `backend/app/users/repositories/user_audit_log_repository.py:103-106`. Suggested fix: add a pydantic `model_validator` or a FastAPI dependency that checks `from_ts <= to_ts` and raises a 400 when violated.
-
-*(No IDOR, no stale computed fields, no broken imports found in this domain.)*
+No open known issues.
 
 ## Decisions (preserved)
 
@@ -198,6 +194,10 @@ All codes follow the `DOMAIN.REASON` format. Source: `backend/app/users/services
 - **Forgot-password returns uniform message.** Always returns the same response string regardless of whether the email corresponds to an existing/active user, preventing enumeration attacks.
 
 - **Password reset token hash-only storage.** The raw token is never persisted; only the SHA-256 hash is stored. The raw token travels only in the reset URL sent by email.
+
+## Resolved issues
+
+- **F-041 / F-users-001** (2026-06-05): `GET /api/v1/users/audit-logs` accepted reversed `from`/`to` range and silently returned empty results. Fixed: inline guard in `users_audit.py` raises `AppError("USER.INVALID_DATE_RANGE", 400)` when `from_ts > to_ts`.
 
 ## Future / planned
 

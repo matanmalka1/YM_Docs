@@ -61,7 +61,11 @@ No `SEARCH.*` domain error codes are raised inside `backend/app/search`; `rg -n 
 
 ## Known issues
 
-No open search findings from the current audit set. F-032 was closed as stale on 2026-06-05 because `app/search/README.md` is already a thin pointer to this canonical document.
+No open known issues.
+
+## Resolved issues
+
+- **F-032** (2026-06-05): Closed as stale. `app/search/README.md` is already a thin pointer to this canonical document — no action required.
 
 ## Decisions (preserved)
 

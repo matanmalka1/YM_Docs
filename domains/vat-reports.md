@@ -144,9 +144,11 @@ Related codes raised from this module but owned by another namespace:
 
 ## Known issues
 
-Current code discrepancies found during authoring. These are bugs to fix in code, not intended behavior.
+No open known issues.
 
-_(F-007, F-008, F-009, F-010 were resolved 2026-06-04 — see `docs/project/security-findings.md`.)_
+## Resolved issues
+
+- **F-007, F-008, F-009, F-010** (2026-06-04): Resolved. See `docs/project/security-findings.md`.
 
 ## Decisions (preserved)
 

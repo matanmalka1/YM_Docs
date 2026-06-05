@@ -151,11 +151,11 @@ See `docs/architecture/api-contracts.md` for envelope spec.
 
 ## Known issues
 
-1. **README references files that do not exist.**  
-   `backend/app/businesses/README.md` lists:
-   - `app/businesses/repositories/business_repository_read.py` — file absent
-   - `app/businesses/services/business_update_service.py` — file absent
-   Update logic is in `business_service.py:135` and `business_repository.py:42`. README should be corrected.
+No open known issues.
+
+## Resolved issues
+
+- **Businesses-001** (2026-06-05): `backend/app/businesses/README.md` listed `business_repository_read.py` and `business_update_service.py` as source files, but neither existed. README has since been rewritten as a pointer-only file — stale references are gone.
 
 ## Decisions (preserved)
 

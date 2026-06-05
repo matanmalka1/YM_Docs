@@ -162,6 +162,13 @@ Error envelope format: `docs/architecture/error-codes.md`.
 
 No open known issues.
 
+## Resolved issues
+
+- **F-033/F-034** (2026-06-05): `quick_actions` and `advisor_today` were dead stubs in schema and service. Both fields and the `AdvisorTodayService` class removed. `advisor_today_service.py` deleted.
+- **F-035** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
+- **F-036** (2026-06-05): Stale service file references in README removed. `backend/app/dashboard/README.md` is now a pointer only.
+- **F-037** (2026-06-05): `reports_not_started` can go negative when report counts exceed active-business count. Fixed with `max(0, ...)` clamp in `dashboard_tax_service.py`.
+
 ## Decisions (preserved)
 
 From `backend/app/dashboard/README.md` (2026-03-17 audit):
@@ -173,13 +180,6 @@ From `backend/app/dashboard/README.md` (2026-03-17 audit):
 ## Future / planned
 
 None identified.
-
-## Resolved issues
-
-- **F-033/F-034** (2026-06-05): `quick_actions` and `advisor_today` were dead stubs in schema and service. Both fields and the `AdvisorTodayService` class removed. `advisor_today_service.py` deleted.
-- **F-035** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
-- **F-036** (2026-06-05): Stale service file references in README removed. `backend/app/dashboard/README.md` is now a pointer only.
-- **F-037** (2026-06-05): `reports_not_started` can go negative when report counts exceed active-business count. Fixed with `max(0, ...)` clamp in `dashboard_tax_service.py`.
 
 ## Historical notes
 

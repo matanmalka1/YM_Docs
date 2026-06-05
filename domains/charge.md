@@ -136,8 +136,12 @@ Cross-domain codes raised through called guards:
 
 ## Known issues
 
-1. ~~**List `stats` do not respect most list filters.**~~ Fixed (F-013): `stats_by_status()` now accepts and applies `business_id`, `period`, `issued_after`, and `issued_before` in addition to `client_record_id` and `charge_type`. `list_charges_paginated()` threads all active filters through.
-2. ~~**OpenAPI advertises `X-Idempotency-Key` as optional on bulk action, but runtime rejects missing keys.**~~ Fixed (F-014): `require_idempotency_key` header parameter changed from `str | None` with `default=None` to required `str` (no default). FastAPI now generates `required: true` in OpenAPI and returns 422 for missing header instead of the manual 400.
+No open known issues.
+
+## Resolved issues
+
+- **F-013** (2026-06-05): List `stats` did not respect most list filters. Fixed: `stats_by_status()` now accepts and applies `business_id`, `period`, `issued_after`, and `issued_before` in addition to `client_record_id` and `charge_type`. `list_charges_paginated()` threads all active filters through.
+- **F-014** (2026-06-05): OpenAPI advertised `X-Idempotency-Key` as optional on bulk action, but runtime rejected missing keys. Fixed: `require_idempotency_key` header parameter changed from `str | None` with `default=None` to required `str`. FastAPI now generates `required: true` and returns 422 for missing header.
 
 ## Decisions (preserved)
 

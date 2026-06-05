@@ -130,7 +130,6 @@ Source: `backend/app/annual_reports/services/constants.py:24`.
 Future / planned:
 
 - Dedicated financial-history endpoints for client annual-report comparisons are not implemented. See `docs/archive/annual-reports-legacy.md`.
-- ~~Tax-calendar/reminder sync on annual-report status transitions.~~ **Retired legacy expectation.** `TaxCalendarEntry` carries no status field; the grouped calendar derives annual-report completion from `AnnualReport.status` read live via JOIN. No transition-time sync is needed or planned. See `backend/app/tax_calendar/services/grouped_service.py:214-221` and `backend/app/tax_calendar/repositories/grouped_repository.py:141-166`.
 
 ## Error codes
 
@@ -161,9 +160,13 @@ Source grep: `backend/app/annual_reports/services/*`.
 
 ## Known issues
 
-- ~~Transitioning to `pending_client` silently skips signature creation when the client record or a business cannot be found.~~ **Fixed.** Transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Signature creation no longer requires a Business; signer name resolves from the client identity graph. See `backend/app/annual_reports/services/status_signature_helper.py`.
-- ~~Legacy docs say annual-report status transitions sync linked tax-calendar entries and reminders.~~ **Retired.** `TaxCalendarEntry` has no status field. Grouped calendar reads `AnnualReport.status` live; no sync call is needed. Reminders domain has no coupling to annual-reports. F-003 resolved. See `docs/project/security-findings.md`.
-- ~~VAT auto-populate aggregated by `client_record_id`+`tax_year` only, with no per-business selector. Raised as F-004.~~ **Accepted design.** Annual reports are scoped to `client_record_id`+`tax_year`, not to a business. VAT obligations are also client-scoped. Business is activity grouping only and is not the accounting boundary for annual reports. auto_populate intentionally aggregates all VAT work items for the report's `client_record_id`+`tax_year` across businesses. Adding a `business_id` filter would create an inconsistency: the report is client-level but the import would be business-level. See `backend/app/annual_reports/services/vat_import_service.py:201` and `backend/tests/annual_reports/service/test_vat_import_service.py` (`test_vat_auto_populate_aggregates_all_businesses_for_client_year`). F-004 closed.
+No open known issues.
+
+## Resolved issues
+
+- **F-AR-001** (2026-06-04): Transitioning to `pending_client` silently skipped signature creation when client record or business could not be found. Fixed: transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Source: `backend/app/annual_reports/services/status_signature_helper.py`.
+- **F-003** (2026-06-04): Legacy docs described annual-report status transitions syncing linked tax-calendar entries and reminders. Retired as stale: `TaxCalendarEntry` has no status field; grouped calendar reads `AnnualReport.status` live; reminders domain has no coupling to annual-reports. See `docs/project/security-findings.md`.
+- **F-004** (2026-06-04): VAT auto-populate was flagged for aggregating by `client_record_id`+`tax_year` with no per-business selector. Accepted design: annual reports are client-scoped; Business is activity grouping only. Adding `business_id` filter would create a client-level report with a business-level import boundary — an inconsistency. See `backend/app/annual_reports/services/vat_import_service.py:201`.
 
 ## Decisions (preserved)
 
@@ -180,8 +183,6 @@ Source grep: `backend/app/annual_reports/services/*`.
 ## Future / planned
 
 - Add a dedicated client annual-report financial history endpoint, if the product wants a multi-year financial comparison table. Candidate paths discussed historically: `GET /api/v1/clients/{client_record_id}/annual-reports/history` or `GET /api/v1/annual-reports/{report_id}/client-history`. These do not exist in `backend/openapi.json` as of 2026-05-29.
-- ~~Decide and implement tax-calendar/reminder sync for annual-report filed/unfiled status changes.~~ **Retired.** Legacy expectation was stale; grouped calendar reads live report status. No action required.
-- ~~Decide whether VAT auto-populate should remain client-wide or become business-specific for multi-business clients.~~ **Decided.** Client-wide is the correct design. See Decisions section above.
 
 ## Historical notes
 

@@ -91,11 +91,11 @@ Error envelope format: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-**F-CORR-001 (Low) — README documents non-existent error code `CORRESPONDENCE.FORBIDDEN_BUSINESS`.**
+No open known issues.
 
-`backend/app/correspondence/README.md:129` lists `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. The service never raises this code. Business mismatch is surfaced via `BUSINESS.NOT_FOUND` (raised by `business_guards.assert_business_belongs_to_legal_entity:40-43`). The README error code list is incorrect. Fix: remove `CORRESPONDENCE.FORBIDDEN_BUSINESS` from the README.
+## Resolved issues
 
-No IDOR issues found: `update_entry` and `delete_entry` both call `_get_entry_or_raise(entry_id, client_record_id)` before mutating, matching the create-path ownership checks. Business and contact re-validation on update also matches create. All error codes follow `DOMAIN.REASON` format. No stale imports detected.
+- **F-CORR-001** (2026-06-05): `backend/app/correspondence/README.md` listed `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. Code never raises it; business mismatch surfaces as `BUSINESS.NOT_FOUND`. README has since been rewritten as a pointer-only file — stale error code is gone.
 
 ## Decisions (preserved)
 

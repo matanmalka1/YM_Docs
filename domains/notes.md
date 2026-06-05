@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The notes domain stores free-text notes attached to backend entities through a shared `entity_notes` table. In current code, the module exposes two scopes only: client notes and business notes, both behind advisor/secretary-only HTTP routes.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-05.
 
 ## Endpoints
 
@@ -77,12 +77,17 @@ Registry: `docs/architecture/error-codes.md`.
 |------|-------------|
 | `NOTE.NOT_FOUND` | Requested note id does not exist, is soft-deleted, or does not belong to the requested `entity_type` + `entity_id` scope (`backend/app/notes/services/entity_note_service.py:29-36,81-82`) |
 | `NOTE.FORBIDDEN` | Caller tries to update a note created by another user (`backend/app/notes/services/entity_note_service.py:77-80`) |
-| `BUSINESS.NOT_FOUND` | Business-note routes fail business existence / client existence / client-business ownership validation (`backend/app/notes/services/business_note_service.py:82-89`, `backend/app/businesses/services/business_guards.py:37-43`) |
+| `CLIENT.NOT_FOUND` | Business-note routes: client record does not exist (`backend/app/notes/services/business_note_service.py:88`) |
+| `BUSINESS.NOT_FOUND` | Business-note routes: business does not exist or does not belong to the client (`backend/app/notes/services/business_note_service.py:82-89`, `backend/app/businesses/services/business_guards.py:37-43`) |
 
 ## Known issues
 
-1. **Client-note routes never validate that the client exists before listing, creating, updating, or deleting notes.** `EntityNoteService` only scopes by the literal pair `(entity_type="client", entity_id=client_id)` and never calls a client guard/repository lookup. As a result, `POST /api/v1/clients/{client_id}/notes` can create notes for nonexistent or soft-deleted clients, and `GET` can silently return `200 []` for invalid ids. Locations: `backend/app/notes/api/entity_notes.py:22-58,61-94`, `backend/app/notes/services/entity_note_service.py:29-67`, contrasted with the standard client guard at `backend/app/clients/services/client_service.py:9-12`. This violates the expected invariant that entity-scoped routes attach data only to real parent records. Suggested fix: validate `client_id` with a client guard before every client-note operation, matching the business-note path's parent checks.
-2. **Missing client records in business-note routes raise the wrong error namespace/message.** In `_assert_business_belongs_to_client()`, a missing client record raises `BUSINESS.NOT_FOUND` with the message `עסק {business_id} לא נמצא` instead of a client-specific not-found error. Locations: `backend/app/notes/services/business_note_service.py:86-89`, contrasted with the standard client error in `backend/app/clients/services/client_service.py:9-12`. This is a correctness bug in error reporting and makes the route contract misleading. Suggested fix: raise a client-specific not-found error when `client_id` does not resolve.
+No open known issues.
+
+## Resolved issues
+
+- **Notes-001** (2026-06-05): Client-note routes did not validate client existence. Fixed: `EntityNoteService._assert_client_exists()` now called on all `list_notes` and `add_note` operations for `entity_type="client"`. Source: `backend/app/notes/services/entity_note_service.py:21-23,53,65`.
+- **Notes-002** (2026-06-05): Business-note routes raised `BUSINESS.NOT_FOUND` for a missing client record. Fixed: `business_note_service.py:88` now raises `CLIENT.NOT_FOUND` when the client record does not exist.
 
 ## Decisions (preserved)
 
