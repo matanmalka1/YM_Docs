@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 Manages the full lifecycle of digital signature requests sent to clients for legally-binding approval of documents. Built under Israeli Electronic Signature Law 5761-2001: every request anchors to a `client_record_id`, carries a one-time signing token, captures a content hash for tamper detection, and records every lifecycle transition in an append-only audit trail.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-05.
 
 ## Endpoints
 
@@ -23,7 +23,7 @@ Last verified against code + backend/openapi.json: 2026-05-29.
 | POST | /api/v1/signature-requests | Create and immediately send a signature request |
 | GET | /api/v1/signature-requests/pending | List all `pending_signature` requests (paginated) |
 | GET | /api/v1/signature-requests/{request_id} | Get request details + embedded audit trail |
-| POST | /api/v1/signature-requests/{request_id}/cancel | Cancel a pending request |
+| POST | /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel | Cancel a pending request within its owning client scope |
 | GET | /api/v1/clients/{client_record_id}/signature-requests | List all requests for a client record (paginated, filterable by status) |
 
 ### Public signer routes (no JWT — token-based)
@@ -148,13 +148,13 @@ Source: `backend/app/signature_requests/services/`
 
 6. **Token is unguessable and one-time.** Generated with `secrets.token_urlsafe(32)`. Cleared (`NULL`) immediately upon any terminal transition (signed / declined / canceled / expired). (`create_request.py:109`, `signer_actions.py:77-85`, `admin_actions.py:38-43`)
 
-7. **Row-level lock on state transitions.** `sign_request`, `decline_request`, and `cancel_request` all use `SELECT … FOR UPDATE` via `get_by_token_for_update` / `get_by_id_for_update` to prevent race conditions. (`signature_request_validations.py:29-37`, `47-54`)
+7. **Row-level lock on state transitions.** `sign_request`, `decline_request`, and `cancel_request` all use `SELECT … FOR UPDATE` via token-scoped or client-and-request-scoped repository lookups to prevent race conditions.
 
 8. **Signer actions require `pending_signature` status.** `assert_pending` raises `SIGNATURE_REQUEST.INVALID_STATUS` if not pending. (`signature_request_validations.py:57-67`)
 
 9. **Runtime expiry detection.** If `expires_at` has passed at the time of a signer action, the service atomically transitions to `EXPIRED`, clears the token, appends an `expired` audit event, and raises `SIGNATURE_REQUEST.EXPIRED`. (`signer_actions.py:28-37`)
 
-10. **Cancel only from `pending_signature`.** Raises `SIGNATURE_REQUEST.INVALID_STATUS` if status is anything else. (`admin_actions.py:32-36`)
+10. **Cancel is client-scoped and pending-only.** Cancellation requires both `client_record_id` and `request_id`; the repository resolves only a matching `pending_signature` row under a row lock. A mismatched client, missing request, or terminal request raises `SIGNATURE_REQUEST.NOT_FOUND`.
 
 11. **Batch expiry job.** `expire_overdue_requests()` scans all `pending_signature` rows past `expires_at`, transitions them to `EXPIRED`, and appends audit events. Intended for a periodic scheduler. (`admin_actions.py:59-79`)
 
@@ -174,7 +174,7 @@ Source: `backend/app/signature_requests/services/`, `docs/architecture/error-cod
 |------|------|-------------|
 | `SIGNATURE_REQUEST.NOT_FOUND` | 404 | Request ID not found |
 | `SIGNATURE_REQUEST.INVALID_TYPE` | 400 | `request_type` not in enum |
-| `SIGNATURE_REQUEST.INVALID_STATUS` | 400 | Status check failed (cancel non-pending; signer action on terminal; invalid filter) |
+| `SIGNATURE_REQUEST.INVALID_STATUS` | 400 | Signer action on terminal request or invalid list filter |
 | `SIGNATURE_REQUEST.TOKEN_INVALID` | 400 | Token not found or already cleared |
 | `SIGNATURE_REQUEST.EXPIRED` | 400/410 | Signer action attempted after `expires_at` |
 | `CLIENT_RECORD.NOT_FOUND` | 404 | `client_record_id` not found at create or list |
@@ -184,39 +184,13 @@ All codes follow `DOMAIN.REASON` format. Registry: `docs/architecture/error-code
 
 ## Known issues
 
-### F-021 — Low | `GET /{request_id}` bypasses error envelope
+No open signature-request findings from the current audit set.
 
-**What:** `routes_advisor.py:83` raises `fastapi.HTTPException(status_code=404, detail="בקשת החתימה לא נמצאה")` directly instead of raising `NotFoundError("...", "SIGNATURE_REQUEST.NOT_FOUND")`. This bypasses the global `AppError` handler and returns a raw FastAPI error body instead of the structured `{error: {code, message, ...}}` envelope.
+Resolved 2026-06-05:
 
-**Location:** `backend/app/signature_requests/api/routes_advisor.py:83`
-
-**Rule violated:** All 404s in this domain should be `NotFoundError` with a `DOMAIN.REASON` code (consistent with every other route in this module and the global error-codes contract).
-
-**Suggested fix:** Replace the `if not req: raise HTTPException(...)` block with a call to `signature_request_validations.get_or_raise(repo, request_id)` or simply raise `NotFoundError(…, "SIGNATURE_REQUEST.NOT_FOUND")`.
-
----
-
-### F-022 — Medium (IDOR) | Cancel has no client ownership check
-
-**What:** `POST /api/v1/signature-requests/{request_id}/cancel` accepts any `request_id` without verifying the request belongs to a client record accessible to the calling advisor. The service calls `get_or_raise_for_update(repo, request_id)` which only confirms the row exists — it does not check `client_record_id` ownership. Any authenticated `ADVISOR`/`SECRETARY` can cancel any signature request in the system.
-
-**Location:** `backend/app/signature_requests/services/admin_actions.py:26-35`, `backend/app/signature_requests/api/routes_advisor.py:89-103`
-
-**Rule violated:** Same pattern as F-001 (annual-reports) and F-008 (vat-reports): mutating operations must re-validate that the target belongs to the caller's accessible scope.
-
-**Suggested fix:** Add a `client_record_id` parameter to `cancel_request`, looked up from the route or a preceding authorization check, and assert `req.client_record_id == expected_client_record_id` before transitioning.
-
----
-
-### F-023 — Low (dead artifact) | Stale `send_request.cpython-314.pyc` with no source
-
-**What:** `backend/app/signature_requests/services/__pycache__/send_request.cpython-314.pyc` exists but there is no `send_request.py` source file in the same `services/` directory. This indicates a module that was deleted (or never committed) but whose compiled bytecode was left behind. If any code attempts `from app.signature_requests.services import send_request`, Python may load the stale `.pyc`.
-
-**Location:** `backend/app/signature_requests/services/__pycache__/send_request.cpython-314.pyc`
-
-**Rule violated:** Pattern 5 (broken/stale imports and dead references).
-
-**Suggested fix:** Delete the orphaned `.pyc` file; add `__pycache__` to `.gitignore` if not already present.
+- **F-029:** Detail lookup now raises `SIGNATURE_REQUEST.NOT_FOUND` through `NotFoundError`. The previous raw `HTTPException` still used the global envelope but emitted the generic `not_found` code.
+- **F-030:** Cancellation now uses `POST /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel` and a locked client-and-request-scoped pending lookup. The bare cancellation route and lookup were removed.
+- **F-031:** Closed as stale; the reported orphaned bytecode is absent and `__pycache__/` is ignored.
 
 ## Decisions (preserved)
 

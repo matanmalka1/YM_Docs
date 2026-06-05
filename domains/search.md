@@ -61,7 +61,7 @@ No `SEARCH.*` domain error codes are raised inside `backend/app/search`; `rg -n 
 
 ## Known issues
 
-- `app/search/README.md` is stale: it references a non-existent `app/search/services/search_filters.py`, a non-existent `tests/search/service/test_search_filters.py`, and a `DocumentSearchResult.status` field that the actual schema does not define (`backend/app/search/README.md:34-37,68-70,129-137`; actual schema at `backend/app/search/schemas/search.py:17-28`). This violates the domain-docs rule against documenting files/fields that do not exist. Suggested fix: replace the module README body with a pointer to this canonical doc or update it to match the implemented schema and test set.
+No open search findings from the current audit set. F-032 was closed as stale on 2026-06-05 because `app/search/README.md` is already a thin pointer to this canonical document.
 
 ## Decisions (preserved)
 
