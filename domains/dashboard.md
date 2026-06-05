@@ -48,9 +48,7 @@ Dashboard has **no database tables**. All output is assembled from repositories 
 | `open_charges_count` | int | Advisor-only; 0 for secretary |
 | `open_charges_amount_ils` | str \| None | ILS-formatted string e.g. `"₪1,234.5"`; null when count=0 or secretary |
 | `vat_stats` | VatDashboardStats | Monthly + bimonthly VAT + advance-payment period stats |
-| `quick_actions` | list[DashboardQuickAction] | Currently always empty (see Known issues) |
 | `attention` | AttentionResponse | Advisor-only; empty for secretary |
-| `advisor_today` | AdvisorTodayResponse | Advisor-only; empty for secretary |
 | `recent_activity` | list[RecentActivityItem] | Advisor-only; empty for secretary |
 
 ### TaxSubmissionWidgetResponse (`dashboard_tax.py:6`)
@@ -82,10 +80,6 @@ Dashboard has **no database tables**. All output is assembled from repositories 
 | `urgency` | str | WorkQueueUrgency value |
 | `href` | str | Deep-link path in the frontend |
 
-### DashboardQuickAction (`dashboard_extended.py:14`)
-
-Schema is defined; endpoint always returns `[]`. See Known issues F-32.
-
 ### VatDashboardStats / VatDashboardPeriodStat (`dashboard_extended.py:62-80`)
 
 Composed of `monthly`, `bimonthly`, and nested `advance_payments` (itself monthly + bimonthly). Each `VatDashboardPeriodStat` carries: `period`, `period_label`, `status_label`, `submitted`, `required`, `pending`, `completion_percent`.
@@ -114,9 +108,9 @@ Dashboard itself defines no enums. It references enums from other domains:
 
 ## Domain rules & invariants
 
-**Overview role split** (`dashboard_overview_service.py:57-87`):
+**Overview role split** (`dashboard_overview_service.py`):
 - `is_advisor = user_role == UserRole.ADVISOR`
-- Attention, quick_actions, advisor_today, recent_activity, open_charges are advisor-only.
+- Attention, recent_activity, open_charges are advisor-only.
 - Secretary receives: `is_empty`, zero `open_charges_*`, `vat_stats` (full), empty collections.
 - No 403 is raised; differentiation is purely in data returned.
 
@@ -140,7 +134,7 @@ Dashboard itself defines no enums. It references enums from other domains:
 - `submitted` = SUBMITTED + CLOSED
 - `in_progress` = IN_PREPARATION + PENDING_CLIENT
 - `material_collection` = COLLECTING_DOCS (counted internally; subtracted from not_started)
-- `not_started` = `total_clients − submitted − in_progress − material_collection`
+- `not_started` = `max(0, total_clients − submitted − in_progress − material_collection)` — clamped to prevent negative values when report counts exceed active business count.
 - `total_clients` counts active businesses, not client records.
 
 **Open charges** (`dashboard_overview_service.py:89-96`):
@@ -160,62 +154,13 @@ Dashboard itself defines no enums. It references enums from other domains:
 
 ## Error codes
 
-`DASHBOARD.LIMIT_EXCEEDED` — documented in `backend/app/dashboard/README.md` as raised when unpaid charges fetch exceeds an in-memory ceiling of 500.
-
-**Not observed in current code.** `DashboardExtendedService` and its hard limit are referenced in the README but the files (`dashboard_extended_service.py`, `dashboard_extended_builders.py`) do not exist in the current codebase. See Known issues F-32.
-
-No other `DASHBOARD.*` error codes are raised in the live service layer.
+No `DASHBOARD.*` error codes are raised in the live service layer.
 
 Error envelope format: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-32 — Stale README references to non-existent service files (Low / dead references)
-
-**What is wrong:** `backend/app/dashboard/README.md` documents:
-- `app/dashboard/services/dashboard_extended_service.py`
-- `app/dashboard/services/dashboard_extended_builders.py`
-- Test files: `tests/dashboard/api/test_dashboard_extended.py`, `tests/dashboard/service/test_dashboard_extended_service.py`, `tests/dashboard/service/test_dashboard_extended_builders.py`
-
-None of these `.py` source files exist on disk (confirmed by `find`). The module structure has been reorganised but the README was not updated.
-
-**Location:** `backend/app/dashboard/README.md` (Implementation references section)
-
-**Rule violated:** Pattern 5 — broken/stale imports & dead references (authoring guide).
-
-**Suggested fix:** Update the README Implementation references to reflect the actual service files: `advisor_today_service.py`, `dashboard_attention_service.py`, `dashboard_overview_service.py`, `dashboard_tax_service.py`, `recent_activity_service.py`, `tax_status_stats_service.py`. Remove references to `dashboard_extended_service.py` and `dashboard_extended_builders.py`.
-
-### F-33 — `quick_actions` always empty — dead schema contract (Low / planned feature)
-
-**What is wrong:** `DashboardOverviewResponse.quick_actions` is declared in the schema and returned in the API contract, but `_build_quick_actions` (`dashboard_overview_service.py:98-99`) unconditionally returns `[]`. The README notes "Phase 2 notification cleanup removed the populated reminder actions." The frontend receives an empty list at every call.
-
-**Location:** `backend/app/dashboard/services/dashboard_overview_service.py:98-99`
-
-**Not a security issue.** Noted here so the schema dead-weight is tracked. If quick_actions will remain permanently empty, remove from schema + openapi; if it will be reimplemented, mark as Future/planned in the roadmap.
-
-### F-34 — `AdvisorTodayService.build` returns empty list unconditionally (Low / planned feature)
-
-**What is wrong:** `AdvisorTodayService.build` always returns `{"deadline_items": []}` regardless of input (`advisor_today_service.py:12-13`). The `advisor_today` section of the overview is structurally present but never populated.
-
-**Location:** `backend/app/dashboard/services/advisor_today_service.py:12-13`
-
-**Suggested fix:** Either implement the service or mark `advisor_today` as `Future / planned` in product documentation and consider removing from schema until implemented.
-
-### F-35 — `DASHBOARD.LIMIT_EXCEEDED` documented but unreachable (Low / stale doc)
-
-**What is wrong:** README documents `DASHBOARD.LIMIT_EXCEEDED` with a hard ceiling of 500 unpaid charges, citing `DashboardExtendedService`. That service does not exist. The error code is therefore unreachable in the live codebase.
-
-**Location:** `backend/app/dashboard/README.md` (Error Envelope section)
-
-**Suggested fix:** Remove the error code from the README (or re-raise it from the actual service that handles charge fetching, if the limit is still desired).
-
-### F-36 — `reports_not_started` can go negative (Low / correctness)
-
-**What is wrong:** `reports_not_started = total_clients − (submitted + in_progress + material_collection)`. `total_clients` counts **active businesses** (`business_repo.count(status="active")`), while the report counts operate on **annual reports** which may include reports for clients without an active business, or multiple reports per business in edge cases. If `submitted + in_progress + material_collection > total_clients`, the field returns a negative integer.
-
-**Location:** `backend/app/dashboard/services/dashboard_tax_service.py:45`
-
-**Suggested fix:** Clamp to `max(0, ...)` or align the denominator to use the same population as the report counts.
+No open known issues.
 
 ## Decisions (preserved)
 
@@ -223,13 +168,18 @@ From `backend/app/dashboard/README.md` (2026-03-17 audit):
 
 - **No persistent tables.** Dashboard is a pure read-aggregation domain; all persistence belongs to source domains.
 - **Role differentiation via empty payloads, not 403.** Both roles receive 200; secretary gets zeros/empty collections for advisor-only fields. Rationale: single endpoint, simpler frontend handling.
-- **`quick_actions` retained in schema for frontend compatibility** even while returning `[]`, following Phase 2 reminder cleanup. This is intentional schema debt acknowledged in the README.
 - **Attention board capped at 7 items** with a fallback minimum of 3 (fills from UPCOMING if primary urgency tiers have fewer than 3 items).
 
 ## Future / planned
 
-- **`quick_actions` repopulation.** The schema and field exist; `_build_quick_actions` returns `[]`. Reimplementation is expected in a future phase (no committed date).
-- **`AdvisorTodayService` implementation.** The service skeleton returns an empty list. Deadline-item population is not yet implemented.
+None identified.
+
+## Resolved issues
+
+- **F-033/F-034** (2026-06-05): `quick_actions` and `advisor_today` were dead stubs in schema and service. Both fields and the `AdvisorTodayService` class removed. `advisor_today_service.py` deleted.
+- **F-035** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
+- **F-036** (2026-06-05): Stale service file references in README removed. `backend/app/dashboard/README.md` is now a pointer only.
+- **F-037** (2026-06-05): `reports_not_started` can go negative when report counts exceed active-business count. Fixed with `max(0, ...)` clamp in `dashboard_tax_service.py`.
 
 ## Historical notes
 

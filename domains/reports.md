@@ -54,7 +54,6 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 | client_name | str | Resolved from LegalEntity.official_name |
 | year | int | |
 | period_type | str | Enum value from VatWorkItem.period_type |
-| reporting_frequency | str | **Duplicate of period_type** — always set to the same value (see Known issues F-033) |
 | grouping_key | str | Synthetic: `"{client_record_id}:{year}:{period_type}"` |
 | periods_expected | int | |
 | periods_filed | int | |
@@ -150,11 +149,11 @@ See `docs/architecture/error-codes.md` for the global error envelope format.
 
 ## Known issues
 
-**F-033 — Low / design — `reporting_frequency` duplicates `period_type`**
+No open known issues.
 
-`VatComplianceReportItemResponse` exposes two fields (`period_type` and `reporting_frequency`) that are always set to the same value in `vat_compliance_report.py:55–56`. The schema redundancy inflates response payloads and misleads API consumers who might expect them to diverge. Suggested fix: remove `reporting_frequency` from the schema and service output; clients that need it can use `period_type`.
+## Resolved issues
 
-Location: `backend/app/reports/services/vat_compliance_report.py:55–56`, `backend/app/reports/schemas.py:15–16`.
+- **F-038** (2026-06-05): `reporting_frequency` was a duplicate of `period_type` in `VatComplianceReportItemResponse`. Field removed from `schemas.py` and `vat_compliance_report.py`. Consumers use `period_type`.
 
 ## Decisions (preserved)
 

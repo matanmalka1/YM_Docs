@@ -138,7 +138,7 @@ All rules sourced from `backend/app/timeline/services/timeline_service.py` unles
 
 7. **Signature events from audit log, not request row.** Events are emitted per `SignatureAuditEvent` row for the lifecycle types `sent`, `signed`, `declined`, `canceled`, `expired`. (`timeline_repository.py:41-59`)
 
-8. **Notifications: SENT and FAILED only.** Notifications with other statuses (e.g. `PENDING`) are excluded. (`timeline_service.py:130-141`)
+8. **Notifications: SENT and FAILED only.** Notifications with other statuses (e.g. `PENDING`) are excluded. (`timeline_service.py:130-141`) Both `notification_sent` and `notification_failed` events are included in the timeline.
 
 9. **Read-only, informational only.** Timeline events carry no executable action fields. The endpoint is GET-only.
 
@@ -154,25 +154,12 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-TL-001 — README excludes `notification_sent` but service includes it (doc/code divergence)
+No open known issues.
 
-**What is wrong:** `backend/app/timeline/README.md:113` lists `notification_sent` in the "Explicitly excluded noisy events" section. However, `timeline_service.py:104,129-141` calls `_build_notification_events`, which emits both `notification_sent` and `notification_failed` events. The exclusion documented in the README was not applied in code.
+## Resolved issues
 
-**Location:** `backend/app/timeline/services/timeline_service.py:129-141` vs `backend/app/timeline/README.md:113`.
-
-**Rule violated:** README states automated send rows are noisy and should be excluded. The code contradicts this.
-
-**Suggested fix:** Either remove the notification builder call from `_build_notification_events` to match the stated exclusion, or update the README to reflect that `notification_sent`/`notification_failed` are intentionally included. The intent (noisy vs. useful failure signal) is a product decision.
-
-### F-TL-002 — `decline_reason` in signature declined event reads current row, not audit snapshot
-
-**What is wrong:** `timeline_client_builders.py:73` reads `sig_request.decline_reason` from the live `SignatureRequest` row at query time. If the row is subsequently mutated, the decline reason shown in the timeline reflects the latest persisted value, not the value at the time of decline.
-
-**Location:** `backend/app/timeline/services/timeline_client_builders.py:70-73`.
-
-**Rule violated:** Timeline events are supposed to be a historical record. Reading mutable state from the live row violates temporal accuracy for the declined event.
-
-**Suggested fix:** Store `decline_reason` in the `SignatureAuditEvent.notes` column at decline time and read from `audit_event.notes` instead. This is a data-model change in the signature domain.
+- **F-TL-001** (2026-06-05): Legacy `backend/app/timeline/README.md` excluded `notification_sent` as noisy. Code intentionally emits both `notification_sent` and `notification_failed`. Decision: keep both — failure signals are useful. Domain doc updated to reflect current behaviour. Legacy README is a pointer only.
+- **F-TL-002** (2026-06-05): `decline_reason` for `signature_request_declined` events was read from the live `SignatureRequest.decline_reason` column (mutable, not a snapshot). Fixed: `signer_actions.py` already stores `reason` in `SignatureAuditEvent.notes` at decline time. `timeline_client_builders.py` now reads `audit_event.notes` instead.
 
 ## Decisions (preserved)
 
