@@ -86,7 +86,7 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 **AnnualReportStatusClientResponse** (`schemas.py:60`): `client_record_id`, `client_name`, `form_type: PrimaryAnnualReportForm | None`, `filing_deadline: date | None`, `days_until_deadline: int | None`.
 
 ### AgingReportResponse (`schemas.py:100`)
-`report_date`, `total_outstanding`, `items: list[AgingReportItemResponse]`, `summary: AgingReportSummaryResponse`, `capped: bool`, `cap_limit: int`.
+`report_date`, `total_outstanding`, `items: list[AgingReportItemResponse]`, `summary: AgingReportSummaryResponse`, `total`, `page`, `page_size`.
 
 **AgingReportItemResponse** (`schemas.py:80`):
 | Field | Type | Notes |
@@ -117,10 +117,10 @@ VAT period type values come from `VatWorkItem.period_type` (vat-reports domain).
 ## Domain rules & invariants
 
 **Aging report** (`backend/app/reports/services/reports_service.py`):
-- Only considers charges with status `issued` and non-null `issued_at` (enforced in `ChargeRepository.get_aging_buckets`).
+- Only considers charges with status `issued` and non-null `issued_at` (enforced in `ChargeRepository.get_aging_buckets_paginated` / `get_aging_totals`).
 - `as_of_date` defaults to `date.today()` when not provided (`reports_service.py:32`).
-- Results are sorted by `total_outstanding` descending (`reports_service.py:76`).
-- Cap: if total unpaid charge rows exceed `AGING_CHARGE_FETCH_LIMIT` (2000), only the first 2000 rows are included. Response includes `capped=true` and `cap_limit=2000` to signal truncation (`reports_service.py:36–37`).
+- Results are ordered by `total_outstanding` descending before pagination.
+- `GET /api/v1/reports/aging` supports `page` and `page_size`; totals and summary fields reflect the full filtered report, not just the current page.
 
 **VAT compliance report** (`backend/app/reports/services/vat_compliance_report.py`):
 - On-time vs. late counts compare `filed_at.date()` against `due_date_effective` (the effective deadline, not legacy `due_date`).

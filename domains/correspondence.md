@@ -26,7 +26,7 @@ Last verified against code + backend/openapi.json: 2026-05-29.
 
 All paths confirmed in `backend/openapi.json`.
 
-**List query parameters:** `page` (default 1), `page_size` (default 20, max 100), `business_id`, `correspondence_type`, `contact_id`, `from_date`, `to_date`, `sort_dir` (`asc`|`desc`, default `desc`).
+**List query parameters:** `page` (default 1), `page_size` (default 20, max 100), `business_id`, `correspondence_type`, `contact_id`, `from_date`, `to_date`, `order` (`asc`|`desc`, default `desc`).
 
 Router prefix `/clients` is declared in `backend/app/correspondence/api/correspondence.py:23` and mounted under `/api/v1` by `backend/app/router_registry.py`.
 
@@ -76,7 +76,7 @@ Source: `backend/app/correspondence/services/correspondence_service.py`.
 5. **`occurred_at` cannot be in the future.** Schema-level `field_validator` rejects future timestamps at request time (`schemas/correspondence.py:10-16`).
 6. **Soft delete only.** Delete sets `deleted_at` + `deleted_by`; `get_by_id` and all list queries filter `deleted_at IS NULL` (`repository.py:144-149`, `repository.py:54`).
 7. **Delete restricted to ADVISOR.** The DELETE endpoint uses `_ADVISOR_ONLY` dependency (`api/correspondence.py:120`); list/get/create/update allow ADVISOR or SECRETARY.
-8. **Default list order descending by `occurred_at`** (latest first); can be reversed with `sort_dir=asc`.
+8. **Default list order descending by `occurred_at`** (latest first); can be reversed with `order=asc`.
 
 ## Error codes
 

@@ -110,7 +110,7 @@ The queue does not define its own persisted lifecycle statuses. Instead it maps 
 
 ## Domain rules & invariants
 
-- `GET /api/v1/work-queue` accepts filters for `client_record_id`, `business_id`, `exclude_source_types`, `include_task_history`, `search`, `source_type`, `urgency`, `task_status`, `linked`, `scope`, `limit`, and `offset`; all are part of the published OpenAPI contract (`backend/app/work_queue/api/routes.py:23-73`, `backend/openapi.json:12168-12357`).
+- `GET /api/v1/work-queue` accepts filters for `client_record_id`, `business_id`, `exclude_source_types`, `include_task_history`, `search`, `source_type`, `urgency`, `task_status`, `linked`, `scope`, `page`, and `page_size`; all are part of the published OpenAPI contract (`backend/app/work_queue/api/routes.py`, `backend/openapi.json`).
 - The queue is built fully in memory on every request: `_build_items()` gathers candidate rows, `_apply_mode()` chooses active-vs-history standalone task rows, `apply_work_queue_filters()` applies Python-side filters, and only then does pagination slice the page (`backend/app/work_queue/services/work_queue_service.py:180-252,254-334`).
 - Summary is computed over the full filtered set before pagination, not over the current page (`backend/app/work_queue/services/work_queue_service.py:246-252`).
 - System rows come from source builders only. `vat_work_item`, `annual_report`, and `advance_payment` are client-level obligations and are skipped entirely when `business_id` is supplied; `charge` rows can be narrowed by both client and business; `binder` rows appear only on the completely unscoped queue (`backend/app/work_queue/services/work_queue_service.py:283-304`).

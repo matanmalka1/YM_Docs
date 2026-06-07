@@ -116,10 +116,8 @@ Dashboard itself defines no enums. It references enums from other domains:
 
 **Attention board selection** (`dashboard_attention_service.py:124-147`):
 - Only built for `ADVISOR`; returns `[]` for all others.
-- Fetches up to 200 work-queue items (no client identity) then filters eligible items.
+- Fetches one small work-queue page for urgency tiers `{OVERDUE, APPROACHING, IMPORTANT}` (no client identity) then filters eligible items.
 - `TASK` items require `due_date is not None` AND urgency in `{OVERDUE, APPROACHING, IMPORTANT}`.
-- Primary selection: items with urgency in `{OVERDUE, APPROACHING, IMPORTANT}`.
-- Fallback: if fewer than `_FALLBACK_MIN = 3` primary items, fills from `UPCOMING` items.
 - Sorted by urgency rank then `due_date`; capped at `_MAX_ITEMS = 7`.
 - Client names resolved via bulk `load_client_profiles`.
 
@@ -176,7 +174,7 @@ From `backend/app/dashboard/README.md` (2026-03-17 audit):
 
 - **No persistent tables.** Dashboard is a pure read-aggregation domain; all persistence belongs to source domains.
 - **Role differentiation via empty payloads, not 403.** Both roles receive 200; secretary gets zeros/empty collections for advisor-only fields. Rationale: single endpoint, simpler frontend handling.
-- **Attention board capped at 7 items** with a fallback minimum of 3 (fills from UPCOMING if primary urgency tiers have fewer than 3 items).
+- **Attention board capped at 7 items** from the primary urgency tiers.
 
 ## Future / planned
 
