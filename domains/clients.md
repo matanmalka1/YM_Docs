@@ -23,7 +23,7 @@ All endpoints require role `ADVISOR` or `SECRETARY` unless noted. `client_id` in
 | POST | /api/v1/clients/preview-impact | Dry-run: returns projected obligations without writing | ADVISOR |
 | POST | /api/v1/clients | Create LegalEntity + ClientRecord + first Business in one request | ADVISOR |
 | GET | /api/v1/clients | List clients (search, status, entity_type, accountant_id, tax_year, sort, page) | ADVISOR, SECRETARY |
-| GET | /api/v1/clients/sidebar | Lightweight list for sidebar nav (page_size ≤ 100) | ADVISOR, SECRETARY |
+| GET | /api/v1/clients/sidebar | Lightweight list for sidebar nav (page_size ≤ 100); does not include cross-domain alert counts | ADVISOR, SECRETARY |
 | GET | /api/v1/clients/{client_id} | Get full client by ClientRecord.id | ADVISOR, SECRETARY |
 | PATCH | /api/v1/clients/{client_id} | Partial update of identity/status fields | ADVISOR, SECRETARY |
 | DELETE | /api/v1/clients/{client_id} | Soft-delete (ADVISOR only) | ADVISOR |
@@ -210,6 +210,8 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 
 **Excel import**: partial-success semantics — valid rows are created, invalid rows are returned in an `errors` array. Requires `X-Idempotency-Key` header. Max upload size: 10 MB. Default entity type for import rows: `osek_murshe`; default VAT frequency: `bimonthly`; default advance payment frequency: `bimonthly` (`constants.py:41-43`).
 
+**Sidebar payload**: `GET /api/v1/clients/sidebar` returns only client identity/navigation fields and pagination metadata. The service delegates to `ClientRecordRepository.list_sidebar()` and `count_sidebar()`, so it currently does not attach notification, work-queue, or other cross-domain alert counts (`backend/app/clients/api/clients.py:115-131`, `backend/app/clients/services/client_query_service.py:132-153`, `backend/app/clients/repositories/client_record_repository.py:222-262`).
+
 ## Error codes
 
 Registry: `docs/architecture/error-codes.md`.
@@ -243,6 +245,7 @@ From `backend/docs/domain_decisions_v3.md` (still true, verified against code):
 
 ## Future / planned
 
+- Batched sidebar alert counts are not implemented. The current frontend client sidebar loads up to 100 clients from `/api/v1/clients/sidebar` and leaves an explicit TODO for alerts until a navigation-specific count surface exists (`frontend/src/components/layout/ClientSidebar/useClientSidebarClients.ts:7-14`, `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:129-132`).
 - Removal of `AdvancePayment.due_date` (the legacy column): per `domain_decisions_v3.md` decision #10, migration to `due_date_effective` as the single source of truth is in progress; the old column is still present in code.
 - `NATIONAL_INSURANCE` obligation type in `common/enums.py` is reserved but not yet wired to a `DeadlineRuleType` — intentionally unsupported.
 

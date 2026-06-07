@@ -111,6 +111,7 @@ The queue does not define its own persisted lifecycle statuses. Instead it maps 
 ## Domain rules & invariants
 
 - `GET /api/v1/work-queue` accepts filters for `client_record_id`, `business_id`, `exclude_source_types`, `include_task_history`, `search`, `source_type`, `urgency`, `task_status`, `linked`, `scope`, `page`, and `page_size`; all are part of the published OpenAPI contract (`backend/app/work_queue/api/routes.py`, `backend/openapi.json`).
+- `GET /api/v1/work-queue` returns one queue page and one summary for the supplied filters. It can summarize a single `client_record_id`, but it does not expose batched per-client counts for all sidebar clients (`backend/app/work_queue/api/routes.py:45-67`, `backend/app/work_queue/services/work_queue_service.py:180-252`).
 - The queue is built fully in memory on every request: `_build_items()` gathers candidate rows, `_apply_mode()` chooses active-vs-history standalone task rows, `apply_work_queue_filters()` applies Python-side filters, and only then does pagination slice the page (`backend/app/work_queue/services/work_queue_service.py:180-252,254-334`).
 - Summary is computed over the full filtered set before pagination, not over the current page (`backend/app/work_queue/services/work_queue_service.py:246-252`).
 - System rows come from source builders only. `vat_work_item`, `annual_report`, and `advance_payment` are client-level obligations and are skipped entirely when `business_id` is supplied; `charge` rows can be narrowed by both client and business; `binder` rows appear only on the completely unscoped queue (`backend/app/work_queue/services/work_queue_service.py:283-304`).
@@ -157,6 +158,7 @@ Still-true decisions carried forward from `docs/archive/work-queue-legacy.md`, v
 
 - `backend/docs/domain_decisions_v3.md` still marks removal of legacy `AdvancePayment.due_date` as future work after consumers are audited (`backend/docs/domain_decisions_v3.md:392-395`). Treat the current column as still present, but not as the long-term source of truth.
 - The same decision log keeps an explicit due-date override endpoint for tax-calendar-driven deadlines as `Future / planned` only if product later needs it, with reason/permission/terminal-state guards (`backend/docs/domain_decisions_v3.md:392-395`).
+- Batched work-queue counts for the client sidebar are not implemented. The existing endpoint can compute a filtered summary for one client at a time, but there is no navigation-specific response keyed by multiple `client_record_id` values (`backend/app/work_queue/api/routes.py:45-67`, `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:129-132`).
 
 ## Historical notes
 
