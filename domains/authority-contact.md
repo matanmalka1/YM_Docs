@@ -78,13 +78,17 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### F-001 — IDOR on GET, PATCH, DELETE contact endpoints — FIXED
+No open known issues.
+
+## Resolved issues
+
+### F-022 — IDOR on GET, PATCH, DELETE contact endpoints
 
 **Fixed in:** 2026-06-04.
 
 GET/PATCH/DELETE endpoints moved to `/{client_record_id}/authority-contacts/{contact_id}`. Service methods `get_contact`, `update_contact`, `delete_contact` now require `client_record_id` and delegate to scoped repo methods (`get_for_client`, `update_for_client`, `delete_for_client`) which filter by both `id` and `client_record_id`. Cross-client access returns `AUTHORITY_CONTACT.NOT_FOUND`.
 
-### F-002 — `AuthorityContactLink` described in model docstring but not implemented — FIXED
+### F-023 — `AuthorityContactLink` described in model docstring but not implemented
 
 **Fixed in:** 2026-06-04.
 

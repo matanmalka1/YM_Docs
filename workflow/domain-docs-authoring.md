@@ -51,7 +51,7 @@ Two agents run this in parallel, each on a **different** domain. The template be
    - Domain rules/invariants: `{MODULE}/services/`.
    - Error codes: grep `"{DOMAIN_UPPER}\\."` in `{MODULE}`; reference `docs/architecture/error-codes.md`.
 2. **Preserve domain decisions (hybrid).** From `{LEGACY_PATHS}` and `backend/docs/domain_decisions_v3.md`, keep decisions/rationale that are still true. Drop anything contradicted by code. Mark anything not yet implemented as `Future / planned`.
-3. **Verify every claim.** For each non-obvious fact, confirm against a `path:line`. Endpoints must exist in `backend/openapi.json`. Do not invent behavior. Before writing, skim `docs/project/security-findings.md` for patterns already found in other domains and check whether your domain has the same (see Known issues patterns below).
+3. **Verify every claim.** For each non-obvious fact, confirm against a `path:line`. Endpoints must exist in `backend/openapi.json`. Do not invent behavior. Before writing, skim existing domain docs for recurring Known issues patterns and check whether your domain has the same (see Known issues patterns below).
 4. **Write** `docs/domains/{DOMAIN}.md` using the skeleton below.
 5. **Archive legacy.** See Archiving.
 
@@ -132,7 +132,7 @@ Actively check for these recurring patterns before concluding "none found":
 4. **Error codes off the `DOMAIN.REASON` format.** Grep raised codes; flag any that are not `DOMAIN.REASON`. (Seen in vat-reports F-009.)
 5. **Broken/stale imports & dead references.** Imports of symbols not defined at the target, and module/README references to files that no longer exist. (Seen in businesses F-006.)
 
-Record each finding in this section AND report it so it can be added to `docs/project/security-findings.md`.
+Record each finding in this section and report it in the task summary.
 
 ## Decisions (preserved)
 

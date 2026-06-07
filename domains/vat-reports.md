@@ -148,7 +148,7 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-007, F-008, F-009, F-010** (2026-06-04): Resolved. See `docs/project/security-findings.md`.
+- **F-007, F-008, F-009, F-010** (2026-06-04): Resolved.
 
 ## Decisions (preserved)
 

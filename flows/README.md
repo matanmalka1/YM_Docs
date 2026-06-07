@@ -41,4 +41,4 @@ Conflicts between code and docs are marked explicitly.
 
 ## Known bugs in flows
 
-- **Flow 3 (Client freeze/close)**: `BinderRepository.close_in_office_by_client_record()` is called but the method does not exist. The entire cascade fails at runtime with `AttributeError`. See `docs/project/security-findings.md` for tracking.
+- **Flow 3 (Client freeze/close)**: `BinderRepository.close_in_office_by_client_record()` is called but the method does not exist. The entire cascade fails at runtime with `AttributeError`.

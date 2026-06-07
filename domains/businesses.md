@@ -155,6 +155,7 @@ No open known issues.
 
 ## Resolved issues
 
+- **F-006** (2026-06-04): `constants.py` imported `EntityType` from `models/business.py`, which did not define it. Fixed: the module imports `EntityType` from `app.common.enums`.
 - **Businesses-001** (2026-06-05): `backend/app/businesses/README.md` listed `business_repository_read.py` and `business_update_service.py` as source files, but neither existed. README has since been rewritten as a pointer-only file — stale references are gone.
 
 ## Decisions (preserved)

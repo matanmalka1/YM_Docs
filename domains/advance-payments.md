@@ -141,15 +141,17 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/architecture/error
 
 ## Known issues
 
-Current code discrepancies found during authoring. These are **bugs to fix in code**, not intended behavior. Docs-only — not fixed here.
+No open known issues.
 
-*No open issues.*
+## Resolved issues
+
+- **F-005** (2026-06-05): `timing_status` and `paid_late` were computed from legacy `due_date`, ignoring `due_date_effective`. Fixed: response schemas now use `due_date_effective or due_date` for both derived values (`backend/app/advance_payments/schemas/advance_payment.py:50-62,153-155`).
 
 ## Decisions (preserved)
 
 From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and `backend/docs/backend/domains/advance_payments_spec.md`:
 
-1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date` and `status`. `paid_late` is similarly computed from `paid_at vs due_date`. Decision confirmed in advance_payments_spec.md §Closed Decisions.
+1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. `paid_late` is similarly computed from `paid_at` versus the effective due date. Decision confirmed in advance_payments_spec.md §Closed Decisions and current schemas.
 
 2. **Turnover snapshot vs. live.** `turnover_amount` is a snapshot frozen on write. For pending/partial payments, `live_turnover` is fetched from `VatWorkItem` at read time via `TurnoverLookupRepository` when `turnover_amount is None`. No hard dependency on VAT report existing before advance payment.
 

@@ -137,8 +137,12 @@ This module raises no `WORK_QUEUE.*` domain error codes. The route is read-only 
 
 ## Known issues
 
-1. **Advance-payment queue rows still use the legacy `due_date` instead of `due_date_effective`.** `advance_payment_items()` filters upcoming payments and renders the row due date from `AdvancePayment.due_date` (`backend/app/work_queue/services/billing_items.py:29-54`), even though the model carries override-aware `due_date_original` / `due_date_effective` fields (`backend/app/advance_payments/models/advance_payment.py:94-99`) and the current decision log says work-queue due-date queries should use `due_date_effective` where relevant (`backend/docs/domain_decisions_v3.md:388-395`). This violates the due-date anchoring rule for overridden advance payments. Suggested fix: query and render with the effective due date, falling back to `due_date` only when no effective snapshot exists.
-2. **`business_id` scope skips task merge entirely.** `_merge_tasks()` returns immediately when `business_id` is provided (`backend/app/work_queue/services/work_queue_service.py:346-347`), so a business-scoped queue can still show a charge system row but never attach its linked open tasks, task actions, or urgency escalation. That conflicts with the historical queue construction rule that tasks are merged after source rows are built and with the historical scoping rule that `business_id` narrows charge rows rather than disabling the task-merge phase (`docs/archive/work-queue-legacy.md:41-54`). Suggested fix: keep task merge active for business-scoped charge rows and filter standalone task rows by resolved source scope instead of short-circuiting the whole merge.
+No open known issues.
+
+Previously tracked work-queue findings are resolved:
+
+- **F-020**: Advance-payment queue rows now filter by `due_date_effective` and render the effective due date, falling back to legacy `due_date` only when no effective snapshot exists (`backend/app/work_queue/services/billing_items.py:29-54`).
+- **F-021**: `business_id` scope no longer disables task merging. Open linked tasks can still attach to matching materialized system rows; only standalone task rows are skipped when a business filter is active (`backend/app/work_queue/services/work_queue_service.py:336-427`).
 
 ## Decisions (preserved)
 

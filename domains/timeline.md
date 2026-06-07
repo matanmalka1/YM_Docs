@@ -158,8 +158,8 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-TL-001** (2026-06-05): Legacy `backend/app/timeline/README.md` excluded `notification_sent` as noisy. Code intentionally emits both `notification_sent` and `notification_failed`. Decision: keep both — failure signals are useful. Domain doc updated to reflect current behaviour. Legacy README is a pointer only.
-- **F-TL-002** (2026-06-05): `decline_reason` for `signature_request_declined` events was read from the live `SignatureRequest.decline_reason` column (mutable, not a snapshot). Fixed: `signer_actions.py` already stores `reason` in `SignatureAuditEvent.notes` at decline time. `timeline_client_builders.py` now reads `audit_event.notes` instead.
+- **F-039 / F-TL-001** (2026-06-05): Legacy `backend/app/timeline/README.md` excluded `notification_sent` as noisy. Code intentionally emits both `notification_sent` and `notification_failed`. Decision: keep both — failure signals are useful. Domain doc updated to reflect current behaviour. Legacy README is a pointer only.
+- **F-040 / F-TL-002** (2026-06-05): `decline_reason` for `signature_request_declined` events was read from the live `SignatureRequest.decline_reason` column (mutable, not a snapshot). Fixed: `signer_actions.py` already stores `reason` in `SignatureAuditEvent.notes` at decline time. `timeline_client_builders.py` now reads `audit_event.notes` instead.
 
 ## Decisions (preserved)
 

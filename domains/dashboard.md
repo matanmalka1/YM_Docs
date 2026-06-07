@@ -164,9 +164,10 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-033/F-034** (2026-06-05): `quick_actions` and `advisor_today` were dead stubs in schema and service. Both fields and the `AdvisorTodayService` class removed. `advisor_today_service.py` deleted.
-- **F-035** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
-- **F-036** (2026-06-05): Stale service file references in README removed. `backend/app/dashboard/README.md` is now a pointer only.
+- **F-033** (2026-06-05): Stale service file references in README removed. `backend/app/dashboard/README.md` is now a pointer only.
+- **F-034** (2026-06-05): `quick_actions` was a dead schema/service stub. Field removed.
+- **F-035** (2026-06-05): `advisor_today` was a dead schema/service stub. Field and `AdvisorTodayService` removed.
+- **F-036** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
 - **F-037** (2026-06-05): `reports_not_started` can go negative when report counts exceed active-business count. Fixed with `max(0, ...)` clamp in `dashboard_tax_service.py`.
 
 ## Decisions (preserved)

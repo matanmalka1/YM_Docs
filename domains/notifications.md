@@ -151,7 +151,12 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-None currently tracked.
+No open known issues.
+
+## Resolved issues
+
+- **F-024** (2026-06-05): Notification preview/send permissioning was reviewed and resolved by product decision. Both routes intentionally share the router-level `ADVISOR` or `SECRETARY` permission model; no advisor-only guard is required.
+- **F-025** (2026-06-05): `GET /api/v1/notifications` OpenAPI now publishes `page_size` as `25 | 50`, matching runtime validation.
 
 ## Decisions (preserved)
 

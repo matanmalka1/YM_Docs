@@ -95,7 +95,7 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-CORR-001** (2026-06-05): `backend/app/correspondence/README.md` listed `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. Code never raises it; business mismatch surfaces as `BUSINESS.NOT_FOUND`. README has since been rewritten as a pointer-only file — stale error code is gone.
+- **F-019 / F-CORR-001** (2026-06-05): `backend/app/correspondence/README.md` listed `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. Code never raises it; business mismatch surfaces as `BUSINESS.NOT_FOUND`. README has since been rewritten as a pointer-only file — stale error code is gone.
 
 ## Decisions (preserved)
 

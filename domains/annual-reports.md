@@ -164,8 +164,9 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-AR-001** (2026-06-04): Transitioning to `pending_client` silently skipped signature creation when client record or business could not be found. Fixed: transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Source: `backend/app/annual_reports/services/status_signature_helper.py`.
-- **F-003** (2026-06-04): Legacy docs described annual-report status transitions syncing linked tax-calendar entries and reminders. Retired as stale: `TaxCalendarEntry` has no status field; grouped calendar reads `AnnualReport.status` live; reminders domain has no coupling to annual-reports. See `docs/project/security-findings.md`.
+- **F-001** (2026-06-04): Income/expense line update and delete paths checked only that the report existed, not that the line belonged to it. Fixed: repository mutation and audit snapshots are scoped by both `line_id` and `annual_report_id`.
+- **F-002 / F-AR-001** (2026-06-04): Transitioning to `pending_client` silently skipped signature creation when client record or business could not be found. Fixed: transition now raises `CLIENT_RECORD.NOT_FOUND` or `ANNUAL_REPORT.SIGNER_NAME_MISSING` before the DB write. Source: `backend/app/annual_reports/services/status_signature_helper.py`.
+- **F-003** (2026-06-04): Legacy docs described annual-report status transitions syncing linked tax-calendar entries and reminders. Retired as stale: `TaxCalendarEntry` has no status field; grouped calendar reads `AnnualReport.status` live; reminders domain has no coupling to annual-reports.
 - **F-004** (2026-06-04): VAT auto-populate was flagged for aggregating by `client_record_id`+`tax_year` with no per-business selector. Accepted design: annual reports are client-scoped; Business is activity grouping only. Adding `business_id` filter would create a client-level report with a business-level import boundary — an inconsistency. See `backend/app/annual_reports/services/vat_import_service.py:201`.
 
 ## Decisions (preserved)

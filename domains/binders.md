@@ -239,10 +239,13 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-Checked for all five recurring patterns from the authoring guide.
+No open known issues.
 
-**F-011 — resolved**
-`PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` added in `backend/app/binders/api/binders_history.py`. The endpoint scopes by `binder_id` before delegating to `BinderIntakeEditService.edit_intake`.
+## Resolved issues
+
+- **F-011** (2026-06-04): `BinderIntakeEditService.edit_intake` was implemented but inaccessible through the public API. Fixed: `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` was added in `backend/app/binders/api/binders_history.py`; the endpoint scopes by `binder_id` before delegating to `BinderIntakeEditService.edit_intake`.
+
+Checked for all five recurring patterns from the authoring guide.
 
 No IDOR found on lifecycle transitions: all update/delete paths load the binder by ID with `get_by_id_for_update` before mutating; grouped handover validates `binder.client_record_id == client_record_id` explicitly.
 

@@ -86,8 +86,8 @@ No open known issues.
 
 ## Resolved issues
 
-- **Notes-001** (2026-06-05): Client-note routes did not validate client existence. Fixed: `EntityNoteService._assert_client_exists()` now called on all `list_notes` and `add_note` operations for `entity_type="client"`. Source: `backend/app/notes/services/entity_note_service.py:21-23,53,65`.
-- **Notes-002** (2026-06-05): Business-note routes raised `BUSINESS.NOT_FOUND` for a missing client record. Fixed: `business_note_service.py:88` now raises `CLIENT.NOT_FOUND` when the client record does not exist.
+- **F-017 / Notes-001** (2026-06-05): Client-note routes did not validate client existence. Fixed: `EntityNoteService._assert_client_exists()` now called on all `list_notes` and `add_note` operations for `entity_type="client"`. Source: `backend/app/notes/services/entity_note_service.py:21-23,53,65`.
+- **F-018 / Notes-002** (2026-06-05): Business-note routes raised `BUSINESS.NOT_FOUND` for a missing client record. Fixed: `business_note_service.py:88` now raises `CLIENT.NOT_FOUND` when the client record does not exist.
 
 ## Decisions (preserved)
 

@@ -111,6 +111,11 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
+No open known issues.
+
+## Resolved issues
+
+- **F-012** (2026-06-05): `GET /api/v1/tasks` accepted `assigned_role` and `source_domain` as plain strings, so invalid values bypassed validation and silently returned empty results. Fixed: route filters now use `UserRole` and `WorkQueueSourceType` (`backend/app/tasks/api/routes.py:32-33`), and the service accepts those typed values (`backend/app/tasks/services/task_service.py:51-52`).
 
 ## Decisions (preserved)
 

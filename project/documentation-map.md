@@ -35,7 +35,6 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
 - `docs/project/domain-docs-plan.md` — ownership split + status tracker for the canonical per-domain docs migration.
-- `docs/project/security-findings.md` — central index of code findings (IDOR, correctness) surfaced during domain-docs authoring.
 - `docs/project/annual-reports-todo.md` — reference tracker for unresolved annual-report financial-lines audit follow-ups.
 
 ## Architecture (technical source of truth)
@@ -132,7 +131,7 @@ Cross-domain flow documentation. Each file traces one flow from trigger to side 
 - `docs/flows/README.md` — index of all flow docs.
 - `docs/flows/01-client-business-creation-cascade.md` — client + business creation, onboarding orchestration.
 - `docs/flows/02-annual-report-status-transition.md` — status machine, signature request lifecycle.
-- `docs/flows/03-client-freeze-close-cascade.md` — cascade effects (⚠️ contains critical bug F-040).
+- `docs/flows/03-client-freeze-close-cascade.md` — cascade effects.
 - `docs/flows/04-binder-material-intake.md` — intake, binder resolution, VAT auto-advance.
 - `docs/flows/05-vat-work-item-creation.md` — work item creation, tax calendar materialization.
 - `docs/flows/06-charge-work-queue.md` — charge-to-work-queue derivation.
