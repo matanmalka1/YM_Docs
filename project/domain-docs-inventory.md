@@ -399,6 +399,41 @@ Notes:
 
 - —
 
+### Legal Entities
+
+Status: Migrated
+Risk: Low
+
+Existing docs:
+
+- `docs/domains/legal-entities.md` ★ — canonical source of truth. Last verified 2026-06-10.
+
+Likely source of truth:
+
+- `docs/domains/legal-entities.md` — mandatory.
+
+Duplicates:
+
+- Historical clients docs mention the pre-extraction location for `LegalEntity`, `Person`, and `PersonLegalEntityLink`.
+
+Conflicts / drift:
+
+- None observed after Phase 1 extraction.
+
+Missing docs:
+
+- None.
+
+Recommended future structure:
+
+- Canonical: `docs/domains/legal-entities.md`
+- Reference: `docs/architecture/migration-phases.md`
+- Archive: —
+
+Notes:
+
+- Phase 1 extracted models and repositories only. No legal-entities router or service layer exists yet.
+
 ### Advance Payments
 
 Status: Conflicting

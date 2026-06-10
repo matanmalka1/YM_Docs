@@ -5,7 +5,7 @@ Maps target domains (from `target-domains-v1.md`) to current codebase folders.
 | Target Domain | Current Folder | Action | Priority | Notes |
 |---|---|---|---|---|
 | clients | clients/ | keep | P0 | |
-| legal_entities | clients/models/ | extract | P1 | legal_entity.py, person.py, person_legal_entity_link.py |
+| legal_entities | legal_entities/ | keep | P1 done | Phase 1 extracted models and repositories from clients/ |
 | businesses | businesses/ | keep | P0 | |
 | contacts | missing | create/extract | P1 | check if any code exists in clients/ |
 | authority_contacts | authority_contact/ | rename | P2 | cosmetic only |

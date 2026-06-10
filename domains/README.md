@@ -21,7 +21,8 @@ Canonical, code-verified docs — one per backend domain. Authoring template + r
 
 ## Client lifecycle & operations
 
-- [clients](clients.md) — LegalEntity + ClientRecord identity, status, onboarding side-effects.
+- [clients](clients.md) — ClientRecord CRM anchor, status, ownership, onboarding side-effects.
+- [legal-entities](legal-entities.md) — legal/tax identity graph: LegalEntity, Person, and person-to-entity links.
 - [businesses](businesses.md) — businesses under a client; soft-delete/restore lifecycle; status-card aggregation.
 - [binders](binders.md) — physical binder lifecycle: intake, location/capacity state machine, handover, audit.
 - [correspondence](correspondence.md) — CRUD log of client interactions (calls, letters, email, meetings, fax).

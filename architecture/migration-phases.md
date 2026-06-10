@@ -26,11 +26,11 @@ Execution plan for moving the backend toward the target domain structure defined
 - `app/invoice/` has **no `api/` folder** and is **not registered** in `router_registry.py`.
   Invoice is reachable only via `InvoiceService` / `InvoiceRepository`.
 - There is **no client `Contact` model**. The only contact-like code is
-  `authority_contact/` (separate domain), `clients/models/person.py` (legal-entity owners),
+  `authority_contact/` (separate domain), `legal_entities/models/person.py` (legal-entity owners),
   and `businesses/services/business_contact_service.py` (derives contact info from the owner Person).
-- `legal_entities`, `persons`, `person_legal_entity_links` models live under `clients/models/`
-  and their repositories (`legal_entity_repository.py`, `person_repository.py`) under
-  `clients/repositories/`.
+- `legal_entities`, `persons`, `person_legal_entity_links` models live under
+  `legal_entities/models/` and their repositories (`legal_entity_repository.py`,
+  `person_repository.py`) live under `legal_entities/repositories/` after Phase 1.
 - Alerts logic lives in `app/dashboard/services/dashboard_attention_service.py`.
 - Actions is a **flat** package (`app/actions/*.py`), no `api/models/services` subfolders.
 - Tests mirror app packages: `tests/<domain>/{api,repository,service}/`. There is no
@@ -47,10 +47,10 @@ checked in. No code touched.
 
 ---
 
-## Phase 1 — Legal Entities Extraction
+## Phase 1 — Legal Entities Extraction (DONE — commit 9372929e)
 
 ### What
-Extract the legal-entity / person identity models and their repositories out of `clients/`
+Extracted the legal-entity / person identity models and their repositories out of `clients/`
 into a new top-level package `app/legal_entities/`.
 
 Moves:
@@ -67,14 +67,14 @@ search, tax_calendar, timeline, vat_reports). It is currently buried inside `cli
 which misrepresents ownership. `target-domains-v1.md` lists `legal_entities/` as a first-class
 target package.
 
-### Files to move
+### Files moved
 - `app/clients/models/legal_entity.py`
 - `app/clients/models/person.py`
 - `app/clients/models/person_legal_entity_link.py`
 - `app/clients/repositories/legal_entity_repository.py`
 - `app/clients/repositories/person_repository.py`
 
-### Files to update (imports)
+### Files updated (imports)
 Registries:
 - `app/model_registry.py` (three model import lines: `legal_entity`, `person`, `person_legal_entity_link`)
 
@@ -136,10 +136,10 @@ Tests referencing legal-entity identity (update imports, do not rewrite assertio
 - Does **not** touch the cross-domain consumers' logic — import path only.
 
 ### Completion criteria
+- Done in commit `9372929e`.
 - `app/legal_entities/{models,repositories}/` contains the five moved files.
-- `grep -r "app.clients.models.legal_entity\|app.clients.models.person\|app.clients.repositories.legal_entity_repository\|app.clients.repositories.person_repository" app tests` returns **zero** matches.
-- `python -c "import app.model_registry"` succeeds (mappers configure).
-- Full test suite passes unchanged (no test assertions modified).
+- Old `app.clients.models.legal_entity`, `app.clients.models.person`, `app.clients.repositories.legal_entity_repository`, and `app.clients.repositories.person_repository` imports were repointed.
+- `app/model_registry.py` imports the moved ORM models from `app.legal_entities`.
 
 ---
 
@@ -333,8 +333,8 @@ Authority Contacts). `domain-migration-map.md` marks it P1 `create/extract` with
 "check if any code exists in clients/".
 
 **Research result:** there is **no client `Contact` model anywhere**. The only contact-like
-code is `authority_contact/` (a separate target domain), `clients/models/person.py`
-(legal-entity owners, moved in Phase 1), and `businesses/services/business_contact_service.py`
+code is `authority_contact/` (a separate target domain), `legal_entities/models/person.py`
+(legal-entity owners, extracted in Phase 1), and `businesses/services/business_contact_service.py`
 (derives email/phone from the owner Person). There is nothing to *extract* — a real client
 Contact entity is **net-new feature work**, which would introduce business logic and therefore
 violates the "structural moves only" rule of this plan.

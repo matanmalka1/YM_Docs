@@ -10,9 +10,9 @@ Source of truth: mandatory
 
 # Clients
 
-The clients domain manages the office's CRM representation of a reporting entity. It implements a two-layer identity model: `LegalEntity` (the stable tax/legal identity, globally unique) and `ClientRecord` (the operational CRM anchor, one active record per legal entity). All workflow objects (VAT work items, advance payments, annual reports, binders) anchor on `ClientRecord.id`, not on `LegalEntity.id` directly.
+The clients domain manages the office's CRM representation of a reporting entity. It owns `ClientRecord`, the operational CRM anchor, and still exposes the routed creation/update workflow that writes the related legal-entity identity graph. The stable tax/legal identity models (`LegalEntity`, `Person`, `PersonLegalEntityLink`) live in the legal-entities domain. All workflow objects (VAT work items, advance payments, annual reports, binders) anchor on `ClientRecord.id`, not on `LegalEntity.id` directly.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-10.
 
 ## Endpoints
 
@@ -51,7 +51,7 @@ Cross-domain endpoints scoped to a client (served by other modules):
 
 ## Model & fields
 
-### LegalEntity (`backend/app/clients/models/legal_entity.py`)
+### LegalEntity (`backend/app/legal_entities/models/legal_entity.py`)
 
 The stable tax/legal identity. Globally unique by `(id_number_type, id_number)`.
 
@@ -92,7 +92,7 @@ Office CRM anchor. One active record per LegalEntity (enforced by partial unique
 
 Indexes: partial unique on `(legal_entity_id)` where `deleted_at IS NULL`; partial unique on `(office_client_number)` where `deleted_at IS NULL`; partial index on `created_at DESC` where `deleted_at IS NULL`.
 
-### Person (`backend/app/clients/models/person.py`)
+### Person (`backend/app/legal_entities/models/person.py`)
 
 Natural-person identity optionally linked to a LegalEntity. Used for sole traders and similar.
 
@@ -116,7 +116,7 @@ Natural-person identity optionally linked to a LegalEntity. Used for sole trader
 
 Constraints: `UniqueConstraint("id_number_type", "id_number")`; check constraint prevents `id_number_type = 'corporation'`.
 
-### PersonLegalEntityLink (`backend/app/clients/models/person_legal_entity_link.py`)
+### PersonLegalEntityLink (`backend/app/legal_entities/models/person_legal_entity_link.py`)
 
 Join table associating a Person to a LegalEntity with a role.
 
@@ -160,7 +160,7 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 | `passport` | Foreign passport |
 | `other` | Other identifier |
 
-### PersonLegalEntityRole (`backend/app/clients/models/person_legal_entity_link.py:14`)
+### PersonLegalEntityRole (`backend/app/legal_entities/models/person_legal_entity_link.py:14`)
 
 | Value |
 |-------|
@@ -178,7 +178,7 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 
 ## Domain rules & invariants
 
-**Identity & creation** (`backend/app/clients/services/create_client_service.py`):
+**Identity & creation** (`backend/app/clients/services/create_client_service.py`, using repositories from `backend/app/legal_entities/repositories/`):
 
 - `EntityType.EMPLOYEE` cannot be created as a client — raises `ValueError` (`create_client_service.py:88`).
 - `EntityType.COMPANY_LTD` requires `id_number_type = corporation` — raises `ValueError` if mismatched (`create_client_service.py:154`).

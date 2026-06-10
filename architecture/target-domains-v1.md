@@ -1045,7 +1045,7 @@ Auth/session (login, refresh_token) — מחוץ למסמך זה, שייך ל-au
 ```
 backend/app/
   clients/
-  legal_entities/           # target — חדש
+  legal_entities/           # extracted in Phase 1
   businesses/
   contacts/                 # target — חדש
   authority_contacts/       # rename from authority_contact
