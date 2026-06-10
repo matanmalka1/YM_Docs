@@ -142,7 +142,7 @@ None. All state changes are written to the DB immediately.
 - `tests/annual_reports/service/test_status_service_additional.py`
 - `tests/annual_reports/service/test_annual_report_delete_report.py`
 - `tests/signature_requests/` (covers SR creation/cancellation on status transition)
-- `tests/notification/service/test_notification_policy_annual_report.py`
+- `tests/notifications/service/test_notification_policy_annual_report.py`
 
 Tests added covering: `pending_client` with no business succeeds, signer name resolved from Person, missing client record blocks before DB write.
 

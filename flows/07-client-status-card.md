@@ -62,7 +62,7 @@ Router: `backend/app/businesses/api/client_status_card_router.py`
 |--------|------|
 | `businesses` | Owns the endpoint and service |
 | `clients` | ClientRecord guard |
-| `vat_reports` | VatWorkItem read |
+| `vat` | VatWorkItem read |
 | `annual_reports` | AnnualReport read |
 | `charge` | Charge read |
 | `advance_payments` | AdvancePayment read |

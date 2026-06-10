@@ -23,10 +23,10 @@ Execution plan for moving the backend toward the target domain structure defined
 
 - API layer folder is `api/` across all domains; routers are aggregated in
   `app/router_registry.py`; models are eagerly imported in `app/model_registry.py`.
-- `app/invoice/` has an `api/` folder and is registered in `router_registry.py` after
-  Phase 2. The package rename to `app/invoices/` remains pending.
+- `app/invoices/` has an `api/` folder and is registered in `router_registry.py` after
+  Phases 2 and 7.5.
 - There is **no client `Contact` model**. The only contact-like code is
-  `authority_contact/` (separate domain), `legal_entities/models/person.py` (legal-entity owners),
+  `authority_contacts/` (separate domain), `legal_entities/models/person.py` (legal-entity owners),
   and `businesses/services/business_contact_service.py` (derives contact info from the owner Person).
 - `legal_entities`, `persons`, `person_legal_entity_links` models live under
   `legal_entities/models/` and their repositories (`legal_entity_repository.py`,
@@ -34,9 +34,9 @@ Execution plan for moving the backend toward the target domain structure defined
 - Alerts logic lives in `app/alerts/services/alert_service.py` after Phase 3.
 - Actions service modules live under `app/actions/services/` after Phase 4; there is still no
   actions API/model/schema layer.
-- Tests mirror app packages: `tests/<domain>/{api,repository,service}/`. There is no
-  `tests/legal_entities/`, no `tests/contacts/`, no `tests/alerts/`. `tests/documents/`
-  exists but is empty. `tests/invoice/api/` exists after Phase 2.
+- Tests mirror app packages where behavior exists. There is no `tests/legal_entities/` and
+  no `tests/alerts/`. `tests/contacts/` is scaffold-only. `tests/invoices/api/` exists after
+  Phases 2 and 7.5.
 
 ---
 
@@ -63,8 +63,8 @@ Moves:
 
 ### Why
 The legal entity is the source of truth for all tax classifications and is consumed by far
-more domains than `clients` (advance_payments, annual_reports, binders, notification, reports,
-search, tax_calendar, timeline, vat_reports). It is currently buried inside `clients/models/`,
+more domains than `clients` (advance_payments, annual_reports, binders, notifications, reports,
+search, tax_calendar, timeline, vat). It is currently buried inside `clients/models/`,
 which misrepresents ownership. `target-domains-v1.md` lists `legal_entities/` as a first-class
 target package.
 
@@ -148,14 +148,14 @@ Tests referencing legal-entity identity (update imports, do not rewrite assertio
 
 ### What
 Added the missing `api/` layer to `app/invoice/` and registered it, so the invoice domain is
-reachable over HTTP like every other domain. (Package stays `app/invoice/`; the rename to
-`invoices/` is Phase 7, cosmetic.)
+reachable over HTTP like every other domain. Phase 7.5 later renamed the package to
+`app/invoices/`.
 
 ### Why
 `domain-migration-map.md` marks invoices P1 specifically because the router layer is missing.
 `InvoiceService.attach_invoice_to_charge` exists and is unit-tested
-(`tests/invoice/service/test_invoice_service_rules.py`) but has no endpoint and is not in
-`router_registry.py`. Before Phase 2, `tests/invoice/api/` existed but was empty, confirming
+(`tests/invoices/service/test_invoice_service_rules.py`) but has no endpoint and is not in
+`router_registry.py`. Before Phase 2, `tests/invoices/api/` existed but was empty, confirming
 the gap.
 
 ### Files created
@@ -164,23 +164,23 @@ the gap.
   (attach invoice to charge, get charge invoice) using existing
   `InvoiceAttachRequest` / `InvoiceResponse` schemas. No new business logic; thin delegation.
 - `app/invoice/api/routers.py` — aggregates the invoice router (mirrors `charge/api/routers.py`).
-- `tests/invoice/api/test_invoices.py` — API-level tests for the new endpoints.
+- `tests/invoices/api/test_invoices.py` — API-level tests for the new endpoints.
 
 ### Files to update
-- `app/router_registry.py` — add `from app.invoice.api.routers import router as invoice_router`
+- `app/router_registry.py` — add `from app.invoices.api.routers import router as invoice_router`
   and `app.include_router(invoice_router, prefix="/api/v1")`.
 
 ### Non-goals
 - Does **not** add new service methods or payment logic (Charge remains source of truth for
   payment per `target-domains-v1.md`).
-- Does **not** rename the `invoice` package (Phase 7).
+- Does **not** rename the `invoice` package in Phase 2; the rename landed later in Phase 7.5.
 - Does **not** modify `InvoiceService`, `InvoiceRepository`, `Invoice` model, or schemas.
 
 ### Completion criteria
 - Done in commit `90651b97`.
 - `app/invoice/api/` exists and is registered in `router_registry.py`.
 - New endpoints are `POST /api/v1/invoices` and `GET /api/v1/invoices/charge/{charge_id}`.
-- `tests/invoice/api/test_invoices.py` was added with 7 API tests.
+- `tests/invoices/api/test_invoices.py` was added with 7 API tests.
 - 11 invoice tests passed on the phase branch.
 
 ---
@@ -251,10 +251,13 @@ External consumers of `app.actions.*`:
 - `app/clients/services/client_onboarding_orchestrator.py` (`obligation_orchestrator`,
   including two function-local imports of `_years_to_generate`)
 - `app/clients/services/impact_preview_service.py` (`obligation_orchestrator`)
-- `app/vat_reports/api/serializers.py` (`vat_report_actions`)
+- `app/vat/api/serializers.py` (`vat_report_actions`; package renamed from `vat_reports`
+  in Phase 7.6)
 - `app/businesses/services/client_business_service.py` (`action_registry`)
-- `app/charge/services/charge_response_builder.py` (`charge_actions`)
-- `app/charge/services/charge_query_service.py` (`charge_actions`)
+- `app/charges/services/charge_response_builder.py` (`charge_actions`; package renamed from
+  `charge` in Phase 7.4)
+- `app/charges/services/charge_query_service.py` (`charge_actions`; package renamed from
+  `charge` in Phase 7.4)
 - `app/binders/services/binder_list_service.py` (`action_registry`)
 - `app/annual_reports/services/base.py` (function-local import of `report_deadline_actions`)
 
@@ -279,10 +282,10 @@ Tests:
 
 ---
 
-## Phase 5 — Documents Parent Domain
+## Phase 5 — Documents Parent Domain (DONE — commit 2c3c4e64)
 
 ### What
-Introduce `app/documents/` as the parent domain and nest the existing
+Introduced `app/documents/` as the parent domain and nested the existing
 `permanent_documents/` package under it.
 
 Moves:
@@ -294,7 +297,7 @@ Moves:
 permanent_documents as parent domain", with `permanent_documents/` as a child.
 `domain-migration-map.md` marks it `create parent + move`.
 
-### Files to move
+### Files moved
 Whole `app/permanent_documents/` tree, including:
 - `app/permanent_documents/api/{permanent_documents.py,permanent_document_actions.py,routers.py}`
 - `app/permanent_documents/models/permanent_document.py`
@@ -303,7 +306,7 @@ Whole `app/permanent_documents/` tree, including:
 - `app/permanent_documents/services/*` (service, action service, response_builder, constants,
   messages, upload_constraints)
 
-### Files to update (imports)
+### Files updated (imports)
 - `app/model_registry.py` — `import app.permanent_documents.models.permanent_document` →
   `app.documents.permanent_documents.models.permanent_document`.
 - `app/router_registry.py` — `from app.permanent_documents.api.routers import router` →
@@ -320,6 +323,7 @@ Whole `app/permanent_documents/` tree, including:
 - Does **not** change the permanent-document table name or API routes.
 
 ### Completion criteria
+- Done in commit `2c3c4e64`.
 - `app/documents/permanent_documents/` contains the full moved tree; old
   `app/permanent_documents/` is gone.
 - `grep -r "app.permanent_documents" app tests` returns zero matches.
@@ -328,10 +332,10 @@ Whole `app/permanent_documents/` tree, including:
 
 ---
 
-## Phase 6 — Contacts Extraction
+## Phase 6 — Contacts Extraction (DONE — commit c3757ef5)
 
 ### What
-Scaffold the `app/contacts/` package (`api/`, `models/`, `repositories/`, `schemas/`,
+Scaffolded the `app/contacts/` package (`api/`, `models/`, `repositories/`, `schemas/`,
 `services/` with `__init__.py` placeholders).
 
 ### Why
@@ -340,7 +344,7 @@ Authority Contacts). `domain-migration-map.md` marks it P1 `create/extract` with
 "check if any code exists in clients/".
 
 **Research result:** there is **no client `Contact` model anywhere**. The only contact-like
-code is `authority_contact/` (a separate target domain), `legal_entities/models/person.py`
+code is `authority_contacts/` (a separate target domain), `legal_entities/models/person.py`
 (legal-entity owners, extracted in Phase 1), and `businesses/services/business_contact_service.py`
 (derives email/phone from the owner Person). There is nothing to *extract* — a real client
 Contact entity is **net-new feature work**, which would introduce business logic and therefore
@@ -350,7 +354,7 @@ This phase is therefore limited to creating the empty package skeleton so the ta
 exists. Actual Contact modeling, schemas, repository, and endpoints are tracked as a separate
 feature effort, **out of scope** for this structural migration.
 
-### Files to create
+### Files created
 - `app/contacts/__init__.py` and empty `api/`, `models/`, `repositories/`, `schemas/`,
   `services/` packages (each with `__init__.py`).
 - `tests/contacts/__init__.py` (mirrors layout; no test cases yet).
@@ -361,29 +365,30 @@ feature effort, **out of scope** for this structural migration.
 ### Non-goals
 - Does **not** define a `Contact` model, schema, repository, service, or router (that is
   feature work with business logic, explicitly excluded here).
-- Does **not** touch `authority_contact/`, `person.py`, or `business_contact_service.py`.
+- Does **not** touch `authority_contacts/`, `person.py`, or `business_contact_service.py`.
 - Does **not** register anything in `model_registry.py` or `router_registry.py` (nothing to register).
 
 ### Completion criteria
+- Done in commit `c3757ef5`.
 - `app/contacts/` skeleton exists and imports cleanly.
 - No behavior change anywhere; full test suite passes unchanged.
 - A follow-up ticket exists describing the net-new Contact entity (out of this plan's scope).
 
 ---
 
-## Phase 7 — Cosmetic Renames
+## Phase 7 — Cosmetic Renames (DONE — commits c3efddec, 1b2eca48, 8f684933, e4bfa6e3, 2c722045, 8b86fafb)
 
 Pure package renames (Python path only; table names untouched). Each rename is its own PR.
 Ordered by **least import surface first** to keep early PRs trivial and de-risk the large ones.
 
 ### Rename list (one at a time, not all at once)
 
-1. `app/correspondence/` → `app/communications/`
-2. `app/authority_contact/` → `app/authority_contacts/`
-3. `app/notification/` → `app/notifications/`
-4. `app/charge/` → `app/charges/`
-5. `app/invoice/` → `app/invoices/`  *(includes the `api/` layer added in Phase 2)*
-6. `app/vat_reports/` → `app/vat/`
+1. `app/correspondence/` → `app/communications/` — done in `c3efddec`
+2. `app/authority_contact/` → `app/authority_contacts/` — done in `1b2eca48`
+3. `app/notification/` → `app/notifications/` — done in `8f684933`
+4. `app/charge/` → `app/charges/` — done in `e4bfa6e3`
+5. `app/invoice/` → `app/invoices/` — done in `2c722045`
+6. `app/vat_reports/` → `app/vat/` — done in `8b86fafb`
 
 ### Order (by least import surface first)
 
@@ -404,7 +409,7 @@ charge↔invoice FK references twice. `vat_reports` is deliberately last — 75 
 make it the highest-risk rename and it should land alone, after the mechanics are proven on
 smaller packages.
 
-Each rename PR updates, for its package:
+Each rename PR updated, for its package:
 - the package directory name,
 - intra-package self-imports,
 - the corresponding line(s) in `app/model_registry.py` and `app/router_registry.py`,
@@ -412,6 +417,7 @@ Each rename PR updates, for its package:
 - the mirrored `tests/<oldpkg>/` directory name.
 
 ### Completion criteria (per rename)
+- All six renames are complete.
 - `grep -r "app\.<oldpkg>" app tests` returns zero matches.
 - `tests/<newpkg>/` mirrors the renamed package and passes.
 - `model_registry` / `router_registry` import cleanly; OpenAPI routes and DB table names unchanged.

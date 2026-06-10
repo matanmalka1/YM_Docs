@@ -28,7 +28,7 @@ Conflicts between code and docs are marked explicitly.
 | Flow | File | Entry Point |
 |------|------|-------------|
 | Binder material intake | [04-binder-material-intake.md](04-binder-material-intake.md) | `BinderIntakeService.receive()` |
-| VAT work item creation | [05-vat-work-item-creation.md](05-vat-work-item-creation.md) | `create_work_item()` in `vat_reports/services/intake.py` |
+| VAT work item creation | [05-vat-work-item-creation.md](05-vat-work-item-creation.md) | `create_work_item()` in `vat/services/intake.py` |
 | Charge → work queue derived item | [06-charge-work-queue.md](06-charge-work-queue.md) | `charge_items()` in `work_queue/services/billing_items.py` |
 
 ## Read-only aggregation flows

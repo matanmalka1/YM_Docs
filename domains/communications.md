@@ -1,6 +1,6 @@
 ## Scope
 This file owns only:
-- Canonical current-state documentation for the correspondence domain.
+- Canonical current-state documentation for the communications domain.
 
 This file must not contain:
 - Architecture/API rules (link to docs/architecture/*).
@@ -8,9 +8,9 @@ This file must not contain:
 
 Source of truth: mandatory
 
-# Correspondence
+# Communications
 
-The correspondence domain manages the per-client-record log of all interactions between the tax advisory firm, its clients, and external authority contacts (e.g., Israeli Tax Authority, National Insurance). Each entry records a single interaction event (call, letter, email, meeting, or fax) anchored to a `client_record_id`, with optional scoping to a specific business and optional linkage to an authority contact. The log is the audit trail used for ITA disputes and client timeline views.
+The communications domain manages the per-client-record log of all interactions between the tax advisory firm, its clients, and external authority contacts (e.g., Israeli Tax Authority, National Insurance). Each entry records a single interaction event (call, letter, email, meeting, or fax) anchored to a `client_record_id`, with optional scoping to a specific business and optional linkage to an authority contact. The log is the audit trail used for ITA disputes and client timeline views.
 
 Last verified against code + backend/openapi.json: 2026-05-29.
 
@@ -28,11 +28,11 @@ All paths confirmed in `backend/openapi.json`.
 
 **List query parameters:** `page` (default 1), `page_size` (default 20, max 100), `business_id`, `correspondence_type`, `contact_id`, `from_date`, `to_date`, `order` (`asc`|`desc`, default `desc`).
 
-Router prefix `/clients` is declared in `backend/app/correspondence/api/correspondence.py:23` and mounted under `/api/v1` by `backend/app/router_registry.py`.
+Router prefix `/clients` is declared in `backend/app/communications/api/correspondence.py:23` and mounted under `/api/v1` by `backend/app/router_registry.py`.
 
 ## Model & fields
 
-Table: `correspondence_entries`. Source: `backend/app/correspondence/models/correspondence.py`.
+Table: `correspondence_entries`. Source: `backend/app/communications/models/correspondence.py`.
 
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
@@ -55,7 +55,7 @@ No `updated_at` column — design decision: entries are immutable once created; 
 
 ## Enums / statuses
 
-`CorrespondenceType` (`backend/app/correspondence/models/correspondence.py:38`):
+`CorrespondenceType` (`backend/app/communications/models/correspondence.py:38`):
 
 | Value | Meaning |
 |-------|---------|
@@ -67,7 +67,7 @@ No `updated_at` column — design decision: entries are immutable once created; 
 
 ## Domain rules & invariants
 
-Source: `backend/app/correspondence/services/correspondence_service.py`.
+Source: `backend/app/communications/services/correspondence_service.py`.
 
 1. **Client record must exist.** Every write and read operation calls `_get_client_record_or_raise` first (`service.py:37-41`). Raises `CLIENT.NOT_FOUND`.
 2. **Entry ownership enforced on every access.** `_get_entry_or_raise` checks `entry.client_record_id == client_record_id` (`service.py:55-63`). Cross-client access returns `CORRESPONDENCE.NOT_FOUND`.
@@ -95,11 +95,11 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-019 / F-CORR-001** (2026-06-05): `backend/app/correspondence/README.md` listed `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. Code never raises it; business mismatch surfaces as `BUSINESS.NOT_FOUND`. README has since been rewritten as a pointer-only file — stale error code is gone.
+- **F-019 / F-CORR-001** (2026-06-05): `backend/app/communications/README.md` listed `CORRESPONDENCE.FORBIDDEN_BUSINESS` as a domain error code. Code never raises it; business mismatch surfaces as `BUSINESS.NOT_FOUND`. README has since been rewritten as a pointer-only file — stale error code is gone.
 
 ## Decisions (preserved)
 
-From `backend/app/correspondence/models/correspondence.py` docstring and README:
+From `backend/app/communications/models/correspondence.py` docstring and README:
 
 1. **`client_record_id` is the primary anchor.** Correspondence is tied to the legal entity record, not to a business. `business_id` is optional UI context for grouping.
 2. **No `updated_at` column.** Correspondence entries are treated as immutable log records once created. Corrections are made by soft-deleting the original entry and re-entering correct data. This preserves audit integrity.

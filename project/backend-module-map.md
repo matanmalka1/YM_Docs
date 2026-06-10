@@ -54,11 +54,11 @@ Key top-level files:
 
 Routed domains have an `api/` router and are mounted under `/api/v1/*`:
 
-`advance_payments`, `annual_reports`, `audit`, `authority_contact`, `binders`, `businesses`, `charge`, `clients`, `correspondence`, `dashboard`, `health`, `invoice`, `notes`, `notification`, `permanent_documents`, `reminders`, `reports`, `search`, `signature_requests`, `tasks`, `tax_calendar`, `timeline`, `users`, `vat_reports`, `work_queue`
+`advance_payments`, `annual_reports`, `audit`, `authority_contacts`, `binders`, `businesses`, `charges`, `clients`, `communications`, `dashboard`, `documents/permanent_documents`, `health`, `invoices`, `notes`, `notifications`, `reminders`, `reports`, `search`, `signature_requests`, `tasks`, `tax_calendar`, `timeline`, `users`, `vat`, `work_queue`
 
 Internal-only domains have no HTTP router. Some have a full backend layer stack; others currently expose only the layers needed by callers:
 
-`alerts`, `legal_entities`
+`alerts`, `contacts`, `documents`, `legal_entities`
 
 Cross-cutting packages do not follow the domain layer structure:
 

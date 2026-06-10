@@ -1047,25 +1047,25 @@ backend/app/
   clients/
   legal_entities/           # extracted in Phase 1
   businesses/
-  contacts/                 # target — חדש
-  authority_contacts/       # rename from authority_contact
+  contacts/                 # scaffolded in Phase 6
+  authority_contacts/       # renamed in Phase 7.2
   notes/
-  documents/                # target — replaces permanent_documents as parent domain
+  documents/                # parent introduced in Phase 5
     permanent_documents/
   signature_requests/
   tasks/
   reminders/
   alerts/                   # extracted in Phase 3
-  charges/                  # rename from charge
-  invoices/                 # target rename from invoice; API layer exists since Phase 2
+  charges/                  # renamed in Phase 7.4
+  invoices/                 # renamed in Phase 7.5; API layer exists since Phase 2
   advance_payments/
-  vat/                      # rename from vat_reports
+  vat/                      # renamed in Phase 7.6
   annual_reports/
   national_insurance/       # target — חדש
   tax_calendar/
   binders/
-  communications/           # rename from correspondence
-  notifications/            # rename from notification
+  communications/           # renamed in Phase 7.1
+  notifications/            # renamed in Phase 7.3
   search/
   dashboard/
   work_queue/

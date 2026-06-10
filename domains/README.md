@@ -15,21 +15,23 @@ Canonical, code-verified docs — one per backend domain. Authoring template + r
 
 - [advance-payments](advance-payments.md) — periodic income-tax prepayments (מקדמות), status, amounts, turnover snapshots.
 - [annual-reports](annual-reports.md) — annual income-tax reports per client/year; lifecycle, schedules, financials, readiness, PDF export.
-- [vat-reports](vat-reports.md) — VAT work items, invoices, filing, audit, summaries, exports.
+- [vat](vat.md) — VAT work items, invoices, filing, audit, summaries, exports.
 - [tax-calendar](tax-calendar.md) — shared regulatory tax-calendar entries, deadline rules, materialization.
-- [charge](charge.md) — office billing charges; draft/paid/canceled lifecycle + bulk actions.
-- [invoice](invoice.md) — external invoice references attached one-to-one to issued charges.
+- [charges](charges.md) — office billing charges; draft/paid/canceled lifecycle + bulk actions.
+- [invoices](invoices.md) — external invoice references attached one-to-one to issued charges.
 
 ## Client lifecycle & operations
 
 - [clients](clients.md) — ClientRecord CRM anchor, status, ownership, onboarding side-effects.
 - [legal-entities](legal-entities.md) — legal/tax identity graph: LegalEntity, Person, and person-to-entity links.
 - [businesses](businesses.md) — businesses under a client; soft-delete/restore lifecycle; status-card aggregation.
+- [contacts](contacts.md) — scaffold-only future client-contact domain; no behavior implemented.
 - [binders](binders.md) — physical binder lifecycle: intake, location/capacity state machine, handover, audit.
-- [correspondence](correspondence.md) — CRUD log of client interactions (calls, letters, email, meetings, fax).
+- [communications](communications.md) — CRUD log of client interactions (calls, letters, email, meetings, fax).
 - [notes](notes.md) — entity-scoped notes for client and business.
+- [documents](documents.md) — parent package for document domains; currently contains permanent documents.
 - [permanent-documents](permanent-documents.md) — durable per-client/business file storage with versioning, soft delete, signals.
-- [authority-contact](authority-contact.md) — named contacts at government authorities scoped to a client record.
+- [authority-contacts](authority-contacts.md) — named contacts at government authorities scoped to a client record.
 - [signature-requests](signature-requests.md) — digital signature request lifecycle: creation, signer token flow, audit.
 
 ## Work & messaging

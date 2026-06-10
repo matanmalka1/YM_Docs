@@ -40,7 +40,7 @@ Cross-domain endpoints scoped to a client (served by other modules):
 | GET | /api/v1/clients/{client_record_id}/binders | binders domain |
 | GET | /api/v1/clients/{client_id}/status-card | businesses domain |
 | GET | /api/v1/clients/{client_record_id}/annual-reports | annual_reports domain |
-| GET/POST/PATCH/DELETE | /api/v1/clients/{client_record_id}/correspondence | correspondence domain |
+| GET/POST/PATCH/DELETE | /api/v1/clients/{client_record_id}/correspondence | communications domain |
 | GET/POST/PATCH/DELETE | /api/v1/clients/{client_record_id}/advance-payments | advance_payments domain |
 | GET/POST/PATCH/DELETE | /api/v1/clients/{client_record_id}/authority-contacts | authority_contacts domain |
 | GET/POST/PATCH/DELETE | /api/v1/clients/{client_id}/notes | notes domain |

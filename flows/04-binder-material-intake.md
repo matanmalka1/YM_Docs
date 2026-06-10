@@ -72,7 +72,7 @@ Main logic: `backend/app/binders/services/binder_intake_service.py`
 | Domain | Role |
 |--------|------|
 | `binders` | Creates BinderIntake, BinderIntakeMaterials; conditionally creates Binder, BinderLifecycleLog |
-| `vat_reports` | Conditionally updates VatWorkItem (PENDING_MATERIALS → MATERIAL_RECEIVED) |
+| `vat` | Conditionally updates VatWorkItem (PENDING_MATERIALS → MATERIAL_RECEIVED) |
 | `clients` | Reads ClientRecord (guard) |
 | `businesses` | Reads Business list (guard: all-locked check) |
 
@@ -156,4 +156,4 @@ The `binder_id` path param scopes the lookup; a mismatched intake returns 404. A
 ## 14. Documentation Target
 
 - `docs/domains/binders.md` — intake flow, period resolution, VAT auto-advance, intake edit
-- `docs/domains/vat-reports.md` — PENDING_MATERIALS → MATERIAL_RECEIVED via binder intake
+- `docs/domains/vat.md` — PENDING_MATERIALS → MATERIAL_RECEIVED via binder intake

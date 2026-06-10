@@ -47,7 +47,7 @@ backend/app/clients/services/client_update_service.py
 | Domain | Role |
 |--------|------|
 | `clients` | Updates ClientRecord.status |
-| `vat_reports` | Bulk-cancels VatWorkItems |
+| `vat` | Bulk-cancels VatWorkItems |
 | `annual_reports` | Bulk-cancels AnnualReports |
 | `binders` | Bulk-marks IN_OFFICE binders as FULL |
 | `audit` | Writes client audit |
@@ -110,6 +110,6 @@ The active-client scope filter (`scope_to_active_clients_stmt`) excludes CLOSED/
 ## 13. Documentation Target
 
 - `docs/domains/clients.md` — freeze/close behavior and cascade
-- `docs/domains/vat-reports.md` — bulk cancel on client close
+- `docs/domains/vat.md` — bulk cancel on client close
 - `docs/domains/annual-reports.md` — bulk cancel on client close
 - `docs/domains/binders.md` — close-in-office on client close

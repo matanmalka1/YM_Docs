@@ -40,7 +40,7 @@ Router: `backend/app/dashboard/api/dashboard_overview.py`
 | Domain | Role |
 |--------|------|
 | `dashboard` | Owns the service and aggregation |
-| `vat_reports` | VAT stats (via TaxStatusStatsService) |
+| `vat` | VAT stats (via TaxStatusStatsService) |
 | `charge` | Open charges count + amount |
 | `annual_reports` | Attention items, advisor today deadlines |
 | `binders` | Attention items |

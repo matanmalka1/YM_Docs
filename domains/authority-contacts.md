@@ -1,6 +1,6 @@
 ## Scope
 This file owns only:
-- Canonical current-state documentation for the authority-contact domain.
+- Canonical current-state documentation for the authority-contacts domain.
 
 This file must not contain:
 - Architecture/API rules (link to docs/architecture/*).
@@ -8,9 +8,9 @@ This file must not contain:
 
 Source of truth: mandatory
 
-# Authority Contact
+# Authority Contacts
 
-The authority-contact domain manages named contacts at Israeli government authorities (Tax Authority / פקיד שומה, VAT branches / סניף מע"מ, National Insurance / ביטוח לאומי) that a tax advisor maintains for each client. Contacts are scoped to a `client_record` and may be referenced by the `correspondence` domain when logging interactions with those authorities.
+The authority-contacts domain manages named contacts at Israeli government authorities (Tax Authority / פקיד שומה, VAT branches / סניף מע"מ, National Insurance / ביטוח לאומי) that a tax advisor maintains for each client. Contacts are scoped to a `client_record` and may be referenced by the `communications` domain when logging interactions with those authorities.
 
 Last verified against code + backend/openapi.json: 2026-05-29.
 
@@ -24,11 +24,11 @@ Last verified against code + backend/openapi.json: 2026-05-29.
 | PATCH | `/api/v1/clients/{client_record_id}/authority-contacts/{contact_id}` | Partially update a contact | ADVISOR, SECRETARY |
 | DELETE | `/api/v1/clients/{client_record_id}/authority-contacts/{contact_id}` | Soft-delete a contact | ADVISOR only |
 
-All paths confirmed in `backend/openapi.json`. Router prefix `/clients` is set in `backend/app/authority_contact/api/authority_contact.py:16`; mounted under `/api/v1` via `router_registry`.
+All paths confirmed in `backend/openapi.json`. Router prefix `/clients` is set in `backend/app/authority_contacts/api/authority_contact.py:16`; mounted under `/api/v1` via `router_registry`.
 
 ## Model & fields
 
-**Table:** `authority_contacts` — `backend/app/authority_contact/models/authority_contact.py`
+**Table:** `authority_contacts` — `backend/app/authority_contacts/models/authority_contact.py`
 
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
@@ -45,11 +45,11 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/clients` is set i
 | `deleted_at` | datetime | yes | soft-delete timestamp |
 | `deleted_by` | int FK → `users.id` | yes | audit: who deleted |
 
-Source: `backend/app/authority_contact/models/authority_contact.py:48–72`.
+Source: `backend/app/authority_contacts/models/authority_contact.py:48–72`.
 
 ## Enums / statuses
 
-**`ContactType`** — `backend/app/authority_contact/models/authority_contact.py:41–45`
+**`ContactType`** — `backend/app/authority_contacts/models/authority_contact.py:41–45`
 
 | Value | Hebrew label |
 |-------|-------------|
@@ -60,12 +60,12 @@ Source: `backend/app/authority_contact/models/authority_contact.py:48–72`.
 
 ## Domain rules & invariants
 
-- **Client-record existence check on create/list.** `add_contact` and `list_client_contacts` validate the `client_record_id` via `ClientRecordRepository.get_by_id`; raise `CLIENT.NOT_FOUND` if missing. Source: `backend/app/authority_contact/services/authority_contact_service.py:32–33, 69–70`.
-- **Soft delete, never hard delete.** `delete_contact` sets `deleted_at` + `deleted_by`; the row is preserved for audit. Source: `backend/app/authority_contact/repositories/authority_contact_repository.py:81–96`.
-- **Deleted rows excluded from all reads.** `_base_where` always includes `deleted_at IS NULL`; `BaseRepository.get_by_id` also applies this filter. Source: `backend/app/authority_contact/repositories/authority_contact_repository.py:41–47`, `backend/app/common/repositories/base_repository.py:17–20`.
-- **List ordered newest-first.** `list_by_client_record` orders by `created_at DESC`. Source: `backend/app/authority_contact/repositories/authority_contact_repository.py:57–63`.
-- **Delete role-restricted to ADVISOR.** The DELETE endpoint overrides the router-level role with `require_role(UserRole.ADVISOR)`. Source: `backend/app/authority_contact/api/authority_contact.py:115`.
-- **Partial updates.** `AuthorityContactUpdateRequest` uses `model_dump(exclude_unset=True)`, so only provided fields are written. Source: `backend/app/authority_contact/api/authority_contact.py:107`.
+- **Client-record existence check on create/list.** `add_contact` and `list_client_contacts` validate the `client_record_id` via `ClientRecordRepository.get_by_id`; raise `CLIENT.NOT_FOUND` if missing. Source: `backend/app/authority_contacts/services/authority_contact_service.py:32–33, 69–70`.
+- **Soft delete, never hard delete.** `delete_contact` sets `deleted_at` + `deleted_by`; the row is preserved for audit. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:81–96`.
+- **Deleted rows excluded from all reads.** `_base_where` always includes `deleted_at IS NULL`; `BaseRepository.get_by_id` also applies this filter. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:41–47`, `backend/app/common/repositories/base_repository.py:17–20`.
+- **List ordered newest-first.** `list_by_client_record` orders by `created_at DESC`. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:57–63`.
+- **Delete role-restricted to ADVISOR.** The DELETE endpoint overrides the router-level role with `require_role(UserRole.ADVISOR)`. Source: `backend/app/authority_contacts/api/authority_contact.py:115`.
+- **Partial updates.** `AuthorityContactUpdateRequest` uses `model_dump(exclude_unset=True)`, so only provided fields are written. Source: `backend/app/authority_contacts/api/authority_contact.py:107`.
 
 ## Error codes
 
@@ -92,20 +92,20 @@ GET/PATCH/DELETE endpoints moved to `/{client_record_id}/authority-contacts/{con
 
 **Fixed in:** 2026-06-04.
 
-Stale docstring block removed from `backend/app/authority_contact/models/authority_contact.py`. Replaced with a short true-state description pointing to the Future / planned section. The planned design remains in Future / planned below.
+Stale docstring block removed from `backend/app/authority_contacts/models/authority_contact.py`. Replaced with a short true-state description pointing to the Future / planned section. The planned design remains in Future / planned below.
 
 ## Decisions (preserved)
 
-From `backend/app/authority_contact/README.md` (last audited 2026-04-13):
+From `backend/app/authority_contacts/README.md` (last audited 2026-04-13):
 
 - Contacts are `client_record`-scoped (not business-scoped) in the current implementation.
-- `correspondence` references a contact via `contact_id`; the validation checks that the contact's `client_record_id` matches the correspondence `client_record_id` (not business ownership).
+- The communications domain's correspondence entry model references a contact via `contact_id`; the validation checks that the contact's `client_record_id` matches the correspondence entry's `client_record_id` (not business ownership).
 - No soft delete on link records — links are simply deleted when removed (design intent; `AuthorityContactLink` not yet implemented).
 - `updated_at` tracked on `AuthorityContact` because contact details (phone, office) change over time.
 
 ## Future / planned
 
-- **`AuthorityContactLink` many-to-many sharing.** The model docstring describes a future `AuthorityContactLink` table allowing a single contact record to be shared across multiple clients/businesses, with an optional `business_id` column for VAT-branch-specific contacts. A `UniqueConstraint(contact_id, client_id, business_id)` is described. **Not implemented.** Source: `backend/app/authority_contact/models/authority_contact.py:12–27`.
+- **`AuthorityContactLink` many-to-many sharing.** The model docstring describes a future `AuthorityContactLink` table allowing a single contact record to be shared across multiple clients/businesses, with an optional `business_id` column for VAT-branch-specific contacts. A `UniqueConstraint(contact_id, client_id, business_id)` is described. **Not implemented.** Source: `backend/app/authority_contacts/models/authority_contact.py:12–27`.
 - **`business_id` on `AuthorityContact`.** The same docstring notes that `business_id` will be the primary association (the business that "owns" the contact), with sharing handled by `AuthorityContactLink`. **Not implemented.**
 
 ## Historical notes

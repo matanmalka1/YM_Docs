@@ -18,14 +18,16 @@ Source of truth: reference
 
 ## Summary
 
-- Total docs found: 22 backend app READMEs, 16 `backend/docs/` domain/spec files, 2 binder/domain-model satellite docs, and 3 frontend docs (`DESIGN.md`, `memory/MEMORY.md`, `components/ui/table/README.md`). The frontend has no per-feature domain docs despite 30 feature directories.
-- Domains with likely clear documentation ownership: Clients, Businesses, Charges, Correspondence, Signature Requests, Reports, Users, Notifications, Permanent Documents, Search, Dashboard, Invoice, Authority Contact, Actions, Timeline.
+- Total docs found: 30 canonical domain docs in `docs/domains/`, 16 `backend/docs/` domain/spec files, 2 binder/domain-model satellite docs, and 3 frontend docs (`DESIGN.md`, `memory/MEMORY.md`, `components/ui/table/README.md`). The frontend has no per-feature domain docs despite 30 feature directories.
+- Domains with likely clear documentation ownership: Clients, Businesses, Charges, Communications, Signature Requests, Reports, Users, Notifications, Permanent Documents, Search, Dashboard, Invoices, Authority Contacts, Actions, Timeline.
 - Domains with unclear or missing documentation ownership: Tasks, Reminders, Tax Calendar, Audit (no backend doc at all); Work Queue (doc exists but lives outside the app directory and has no app README).
 - Highest-risk areas: VAT, Binders, and Advance Payments. Each has a legacy spec that appears to contradict the implemented README.
 
-Observed pattern: `backend/app/<domain>/README.md` files are dated ("Last audited: …"), structured, and appear code-accurate. The `backend/docs/<domain>/` folders are mostly pre-implementation Hebrew domain specs or external-URL source maps that appear to have drifted from the code.
+Observed pattern: `backend/app/<domain>/README.md` files are now thin pointers to canonical docs under `docs/domains/`. The `backend/docs/<domain>/` folders are mostly pre-implementation Hebrew domain specs or external-URL source maps that appear to have drifted from the code.
 
 **2026-05-29 update:** All 18 `backend/app/<domain>/README.md` files have been converted to pointer-only files (one line: `See docs/domains/<domain>.md`). They are no longer authoritative. Canonical source of truth for all domains is `docs/domains/*.md` per `documentation-map.md:126-129`. Follow-up required: verify each canonical doc fully covers its legacy README before deletion.
+
+**2026-06-10 update:** Backend domain packages were aligned with plural target names in Phases 6 and 7: `contacts` was scaffolded, and `correspondence`, `authority_contact`, `notification`, `charge`, `invoice`, and `vat_reports` were renamed to `communications`, `authority_contacts`, `notifications`, `charges`, `invoices`, and `vat`. Canonical docs and pointer READMEs should use those names.
 
 ## Inventory Rules
 
@@ -43,11 +45,12 @@ Risk: Low
 
 Existing docs:
 
-- `backend/app/notification/README.md` — full product overview, domain model, service architecture, and API. Dated 2026-05-27 (schema v2 / Phase 2).
+- `docs/domains/notifications.md` — canonical current-state documentation.
+- `backend/app/notifications/README.md` — pointer-only README.
 
 Likely source of truth:
 
-- `backend/app/notification/README.md` — mandatory.
+- `docs/domains/notifications.md` — mandatory.
 
 Duplicates:
 
@@ -63,13 +66,13 @@ Missing docs:
 
 Recommended future structure:
 
-- Canonical: `backend/app/notification/README.md`
+- Canonical: `docs/domains/notifications.md`
 - Reference: —
 - Archive: —
 
 Notes:
 
-- Most current and complete README. A good template for the eventual canonical format.
+- The backend app README is intentionally pointer-only.
 
 ### Reminders
 
@@ -183,7 +186,8 @@ Risk: High
 
 Existing docs:
 
-- `backend/app/vat_reports/README.md` — work-item lifecycle. Dated 2026-04-11.
+- `docs/domains/vat.md` — canonical current-state documentation.
+- `backend/app/vat/README.md` — pointer-only README.
 - `backend/docs/vat_report/vat_reports_domain_summary.md` — Hebrew domain spec.
 - `backend/docs/vat_report/vat_reports_deep_summary.md` — Hebrew domain spec.
 - `backend/docs/vat_report/VAT_DEFINITIONS.md` — English domain definitions for modeling.
@@ -191,7 +195,7 @@ Existing docs:
 
 Likely source of truth:
 
-- `backend/app/vat_reports/README.md` — mandatory. The `vat_report/*` files appear historical/reference.
+- `docs/domains/vat.md` — mandatory. The `vat_report/*` files appear historical/reference.
 
 Duplicates:
 
@@ -199,15 +203,15 @@ Duplicates:
 
 Conflicts / drift:
 
-- Status model mismatch. The legacy `vat_reports_domain_summary.md` (section 5) defines statuses `draft, submitted, paid, refund_pending, refund_approved, zero_report`. The implemented README defines `pending_materials, material_received, data_entry_in_progress, ready_for_review, filed` (plus `canceled`). The legacy doc describes a filing/payment model; the code implements an intake/data-entry model.
+- Status model mismatch. The legacy `vat_reports_domain_summary.md` (section 5) defines statuses `draft, submitted, paid, refund_pending, refund_approved, zero_report`. The canonical VAT doc defines `pending_materials, material_received, data_entry_in_progress, ready_for_review, filed` (plus `canceled`). The legacy doc describes a filing/payment model; the code implements an intake/data-entry model.
 
 Missing docs:
 
-- None (the live README is strong).
+- None.
 
 Recommended future structure:
 
-- Canonical: `backend/app/vat_reports/README.md`
+- Canonical: `docs/domains/vat.md`
 - Reference: `VAT_DEFINITIONS.md`, `source-map.md`
 - Archive: `vat_reports_domain_summary.md`, `vat_reports_deep_summary.md`
 
@@ -334,11 +338,12 @@ Risk: Low
 
 Existing docs:
 
-- `backend/app/charge/README.md` — lifecycle, model, API, cross-domain notes. Dated 2026-03-22.
+- `docs/domains/charges.md` — canonical current-state documentation.
+- `backend/app/charges/README.md` — pointer-only README.
 
 Likely source of truth:
 
-- `backend/app/charge/README.md` — mandatory.
+- `docs/domains/charges.md` — mandatory.
 
 Duplicates:
 
@@ -354,7 +359,7 @@ Missing docs:
 
 Recommended future structure:
 
-- Canonical: `backend/app/charge/README.md`
+- Canonical: `docs/domains/charges.md`
 - Reference: —
 - Archive: —
 
@@ -579,18 +584,19 @@ Notes:
 
 - Tightly coupled to annual reports `PENDING_CLIENT` (runs inside its transaction); the annual-reports README already flags the "no business → silent skip" bug.
 
-### Correspondence
+### Communications
 
 Status: Clear
 Risk: Low
 
 Existing docs:
 
-- `backend/app/correspondence/README.md` — per-client-record correspondence entries. Dated 2026-03-17.
+- `docs/domains/communications.md` — canonical current-state documentation for communication/correspondence entries.
+- `backend/app/communications/README.md` — pointer-only README.
 
 Likely source of truth:
 
-- `backend/app/correspondence/README.md` — mandatory.
+- `docs/domains/communications.md` — mandatory.
 
 Duplicates:
 
@@ -598,7 +604,7 @@ Duplicates:
 
 Conflicts / drift:
 
-- None. The timeline README lists correspondence as not yet a timeline source, which is consistent.
+- None. The timeline README lists correspondence/communications as not yet a timeline source, which is consistent.
 
 Missing docs:
 
@@ -606,7 +612,7 @@ Missing docs:
 
 Recommended future structure:
 
-- Canonical: `backend/app/correspondence/README.md`
+- Canonical: `docs/domains/communications.md`
 - Reference: —
 - Archive: —
 
@@ -688,11 +694,13 @@ Notes:
 
 These in-scope domains have either migrated canonical docs or older app READMEs that appear to have clear documentation ownership at Low risk, unless noted:
 
-- Permanent Documents — `backend/app/permanent_documents/README.md` (2026-03-22). Clear / Low.
+- Permanent Documents — migrated to `docs/domains/permanent-documents.md`; pointer README lives at `backend/app/documents/permanent_documents/README.md`. Clear / Low.
+- Contacts — scaffolded in Phase 6 and documented at `docs/domains/contacts.md`. Clear / Low, scaffold-only.
+- Documents — parent package documented at `docs/domains/documents.md`. Clear / Low, parent/package-only.
 - Search — `backend/app/search/README.md` (2026-03-22). Clear / Low.
 - Dashboard — `backend/app/dashboard/README.md` (2026-03-17). Clear / Low.
-- Invoice — migrated to `docs/domains/invoice.md` (2026-06-10). Legacy app README is pointer-only.
-- Authority Contact — `backend/app/authority_contact/README.md` (2026-04-13). Clear / Low.
+- Invoices — migrated to `docs/domains/invoices.md` (2026-06-10). App README is pointer-only.
+- Authority Contacts — migrated to `docs/domains/authority-contacts.md` (2026-06-10). App README is pointer-only.
 - Actions — migrated to `docs/domains/actions.md` (2026-06-10). Legacy app README is pointer-only.
 - Alerts — documented at `docs/domains/alerts.md` (2026-06-10). No legacy app README existed.
 - Notes — no README. Missing source of truth / Low (small domain).

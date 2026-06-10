@@ -31,7 +31,7 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/documents` is mou
 
 ## Model & fields
 
-`PermanentDocument` — table `permanent_documents`. Source: `backend/app/permanent_documents/models/permanent_document.py`.
+`PermanentDocument` — table `permanent_documents`. Source: `backend/app/documents/permanent_documents/models/permanent_document.py`.
 
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
@@ -69,7 +69,7 @@ Composite indexes (`models/permanent_document.py:134`):
 
 ## Enums / statuses
 
-Source: `backend/app/permanent_documents/models/permanent_document.py`.
+Source: `backend/app/documents/permanent_documents/models/permanent_document.py`.
 
 **DocumentType** (line 42):
 | Value | Hebrew label |
@@ -103,7 +103,7 @@ Source: `backend/app/permanent_documents/models/permanent_document.py`.
 
 ## Domain rules & invariants
 
-Source: `backend/app/permanent_documents/services/permanent_document_service.py`.
+Source: `backend/app/documents/permanent_documents/services/permanent_document_service.py`.
 
 - **Client existence required.** `upload_document` calls `get_client_or_raise` before any other logic (`service.py:108`).
 - **Business ownership check.** When `business_id` is provided, `assert_business_belongs_to_legal_entity` verifies the business belongs to the client's legal entity (`service.py:121`). Uses `legal_entity_id` from the client record by default.
@@ -120,7 +120,7 @@ Source: `backend/app/permanent_documents/services/permanent_document_service.py`
 - **Default required types for signals.** `_DEFAULT_REQUIRED_TYPES = [id_copy, power_of_attorney, engagement_agreement]` (`service.py:43`). `get_client_operational_signals` returns the subset of these not yet present for the client (`service.py:249-255`).
 - **List endpoints.** By default exclude soft-deleted documents and superseded versions (`superseded_by IS NULL`).
 
-**Upload constraints** (`backend/app/permanent_documents/services/constants.py`):
+**Upload constraints** (`backend/app/documents/permanent_documents/services/constants.py`):
 - `MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024` (10 MB)
 - `ALLOWED_MIME_TYPES`: `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `image/jpeg`, `image/png`
 
@@ -151,7 +151,7 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Decisions (preserved)
 
-From `backend/app/permanent_documents/README.md` and model docstring (still true per code):
+From `backend/app/documents/permanent_documents/README.md` and model docstring (still true per code):
 
 1. **Denormalized `client_record_id`.** Every document carries `client_record_id` even when `business_id` is also set, enabling fast client-level queries without a JOIN to `businesses`.
 2. **Self-FK versioning.** `superseded_by` chains versions; the head (latest) always has `superseded_by = NULL`. This allows full version history without a separate versions table.
@@ -170,4 +170,4 @@ These behaviors are documented in the model or README but are **not implemented*
 
 ## Historical notes
 
-No legacy `backend/docs` files exist for this domain. The module README at `backend/app/permanent_documents/README.md` contains detailed implementation notes that informed this doc; that file is authoritative for implementation detail at the backend module level.
+No legacy `backend/docs` files exist for this domain. The module README at `backend/app/documents/permanent_documents/README.md` is pointer-only; this canonical doc owns the current domain detail.

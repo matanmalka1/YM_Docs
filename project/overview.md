@@ -10,7 +10,7 @@ Source of truth: reference
 
 # Project Overview
 
-YM Tax CRM is an internal staff CRM for clients, binders, billing, charges, tax workflows, VAT reports, annual reports, reminders, notifications, signing, correspondence, and operational work tracking.
+YM Tax CRM is an internal staff CRM for clients, binders, billing, charges, tax workflows, VAT, annual reports, reminders, notifications, signing, communications, and operational work tracking.
 
 The staff-facing roles are `ADVISOR` for full access and `SECRETARY` for operational access with limited write permissions.
 

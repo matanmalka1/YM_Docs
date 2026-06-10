@@ -29,7 +29,7 @@ backend/app/work_queue/services/work_queue_service.py
 ## 3. Sequence
 
 1. Compute `threshold = ctx.today - timedelta(days=UNPAID_CHARGE_TASK_THRESHOLD_DAYS)`.
-   - `UNPAID_CHARGE_TASK_THRESHOLD_DAYS = 30` (defined in `backend/app/charge/services/constants.py`).
+   - `UNPAID_CHARGE_TASK_THRESHOLD_DAYS = 30` (defined in `backend/app/charges/services/constants.py`).
 
 2. Query `Charge` table:
    ```
@@ -112,5 +112,5 @@ There is no explicit "dismiss" or "snooze" for charge work queue items.
 
 ## 14. Documentation Target
 
-- `docs/domains/charge.md` — work queue derivation, 30-day threshold
+- `docs/domains/charges.md` — work queue derivation, 30-day threshold
 - `docs/domains/work-queue.md` — charge items, source types, urgency

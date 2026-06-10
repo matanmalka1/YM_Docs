@@ -86,7 +86,7 @@ File: `backend/app/businesses/services/business_service.py`
 | `businesses` | Creates Business |
 | `binders` | Creates Binder, BinderLifecycleLog |
 | `annual_reports` | Creates AnnualReport (1–2 rows) |
-| `vat_reports` | Creates VatWorkItem rows |
+| `vat` | Creates VatWorkItem rows |
 | `advance_payments` | Creates AdvancePayment rows |
 | `tax_calendar` | Find-or-creates TaxCalendarEntry (shared global rows) |
 | `audit` | Writes AuditLog (CLIENT, BUSINESS) |
@@ -167,4 +167,4 @@ None at creation. Work queue items referencing newly created VAT work items, ann
 - `docs/domains/clients.md` — client creation behavior
 - `docs/domains/annual-reports.md` — obligation generation
 - `docs/domains/binders.md` — initial binder creation
-- `docs/domains/vat-reports.md` — onboarding VAT work items
+- `docs/domains/vat.md` — onboarding VAT work items

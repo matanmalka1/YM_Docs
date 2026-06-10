@@ -16,7 +16,7 @@ Two paths:
 ## 2. Entry Point in Code
 
 ```
-backend/app/vat_reports/services/intake.py
+backend/app/vat/services/intake.py
   create_work_item(work_item_repo, db, *, client_record_id, period, created_by, ...)
     → VatClientContextService.get_active_client_and_entity()
     → resolve_effective_vat_type()
@@ -79,7 +79,7 @@ backend/app/vat_reports/services/intake.py
 
 | Domain | Role |
 |--------|------|
-| `vat_reports` | Creates VatWorkItem, writes audit |
+| `vat` | Creates VatWorkItem, writes audit |
 | `tax_calendar` | Find-or-creates TaxCalendarEntry |
 | `clients` | Reads ClientRecord, LegalEntity (guard) |
 
@@ -145,12 +145,12 @@ Changes to `DeadlineRule` do not retroactively update existing work items.
 
 ## 12. Tests
 
-- `tests/vat_reports/api/test_vat_reports_intake.py`
-- `tests/vat_reports/api/test_vat_reports_status.py`
-- `tests/vat_reports/api/test_vat_reports_materials_complete.py`
+- `tests/vat/api/test_vat_reports_intake.py`
+- `tests/vat/api/test_vat_reports_status.py`
+- `tests/vat/api/test_vat_reports_materials_complete.py`
 - `tests/clients/service/test_client_onboarding_orchestrator.py` (onboarding path)
 
 ## 13. Documentation Target
 
-- `docs/domains/vat-reports.md` — work item lifecycle, creation rules
+- `docs/domains/vat.md` — work item lifecycle, creation rules
 - `docs/domains/tax-calendar.md` — TaxCalendarEntry materialization
