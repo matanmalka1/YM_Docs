@@ -13,7 +13,7 @@ Source of truth: mandatory
 
 # Alerts
 
-The alerts domain owns internal attention-signal calculation used by the dashboard. After Phase 3, the alert calculation service lives in `backend/app/alerts/services/alert_service.py`; dashboard remains the routed read surface that exposes the computed attention board.
+The alerts domain owns internal attention-signal calculation used by the dashboard. It is a logical domain only: there is no `backend/app/alerts/` module. The calculation lives in `backend/app/dashboard/services/dashboard_attention_service.py` (`DashboardAttentionService`), and dashboard is the routed read surface that exposes the computed attention board.
 
 Last verified against code + current OpenAPI export: 2026-06-10.
 
@@ -40,10 +40,9 @@ Attention eligibility uses `{OVERDUE, APPROACHING, IMPORTANT}`.
 
 - Alerts are advisor-only. `DashboardAttentionService.build(...)` returns an empty list unless `user_role == UserRole.ADVISOR`.
 - Alerts are read-only and derived from `WorkQueueService`; no alert rows are persisted.
-- The service fetches one work-queue page of up to 20 items from the attention urgency tiers, filters eligible items, sorts by urgency rank and due date, then caps the result at 7 items.
+- `DashboardAttentionService.build(...)` fetches one work-queue page of up to 20 items (`_ATTENTION_FETCH_PAGE_SIZE`) from the attention urgency tiers, filters eligible items, sorts by urgency rank and due date, then caps the result at 7 items (`_MAX_ITEMS`). Cite: `backend/app/dashboard/services/dashboard_attention_service.py:120-144`.
 - `TASK` items require a `due_date` and an attention urgency tier. Non-task source types are eligible after the work-queue urgency filter.
-- Client names are attached in bulk through `load_client_profiles`.
-- Phase 3 was structural: the class and methods stayed the same while the service moved from dashboard to alerts.
+- Client names are attached in bulk through `load_client_profiles` (`_attach_client_names`).
 
 ## Error codes
 
@@ -56,7 +55,7 @@ Alerts raises no local `ALERT.*` error codes.
 ## Decisions (preserved)
 
 1. **Alerts are internal signals.** They are separate from notifications, which send outbound messages, and from dashboard, which is a read model.
-2. **Dashboard remains the public surface.** Phase 3 moved ownership of calculation logic only; it did not change API contracts.
+2. **Dashboard remains the public surface and the home of the calculation.** Alert logic lives in `DashboardAttentionService` inside the dashboard module; there is no separate `app/alerts/` module and no dedicated alert API contract.
 
 ## Future / planned
 
