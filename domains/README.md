@@ -18,6 +18,7 @@ Canonical, code-verified docs — one per backend domain. Authoring template + r
 - [vat-reports](vat-reports.md) — VAT work items, invoices, filing, audit, summaries, exports.
 - [tax-calendar](tax-calendar.md) — shared regulatory tax-calendar entries, deadline rules, materialization.
 - [charge](charge.md) — office billing charges; draft/paid/canceled lifecycle + bulk actions.
+- [invoice](invoice.md) — external invoice references attached one-to-one to issued charges.
 
 ## Client lifecycle & operations
 
@@ -33,6 +34,7 @@ Canonical, code-verified docs — one per backend domain. Authoring template + r
 
 ## Work & messaging
 
+- [actions](actions.md) — backend action metadata factories and cross-domain obligation orchestration helpers.
 - [tasks](tasks.md) — manual office tasks: standalone or source-linked work items with CRUD and lifecycle.
 - [reminders](reminders.md) — scheduled reminder records (see Known issues — execution path currently broken).
 - [notifications](notifications.md) — notification audit, preview/send, automatic binder-handover delivery.
@@ -40,6 +42,7 @@ Canonical, code-verified docs — one per backend domain. Authoring template + r
 ## Aggregation & read surfaces
 
 - [work-queue](work-queue.md) — aggregated open-work feed across tax/billing/binder sources + tasks.
+- [alerts](alerts.md) — internal attention-signal calculation used by the dashboard attention board.
 - [timeline](timeline.md) — unified per-client operational activity feed (reverse-chronological).
 - [dashboard](dashboard.md) — read-only overview and tax-submissions widgets; no persistent tables.
 - [reports](reports.md) — read-only management reports: aging, VAT compliance, advance-payments, annual-report status.

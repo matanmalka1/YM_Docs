@@ -23,19 +23,20 @@ Execution plan for moving the backend toward the target domain structure defined
 
 - API layer folder is `api/` across all domains; routers are aggregated in
   `app/router_registry.py`; models are eagerly imported in `app/model_registry.py`.
-- `app/invoice/` has **no `api/` folder** and is **not registered** in `router_registry.py`.
-  Invoice is reachable only via `InvoiceService` / `InvoiceRepository`.
+- `app/invoice/` has an `api/` folder and is registered in `router_registry.py` after
+  Phase 2. The package rename to `app/invoices/` remains pending.
 - There is **no client `Contact` model**. The only contact-like code is
   `authority_contact/` (separate domain), `legal_entities/models/person.py` (legal-entity owners),
   and `businesses/services/business_contact_service.py` (derives contact info from the owner Person).
 - `legal_entities`, `persons`, `person_legal_entity_links` models live under
   `legal_entities/models/` and their repositories (`legal_entity_repository.py`,
   `person_repository.py`) live under `legal_entities/repositories/` after Phase 1.
-- Alerts logic lives in `app/dashboard/services/dashboard_attention_service.py`.
-- Actions is a **flat** package (`app/actions/*.py`), no `api/models/services` subfolders.
+- Alerts logic lives in `app/alerts/services/alert_service.py` after Phase 3.
+- Actions service modules live under `app/actions/services/` after Phase 4; there is still no
+  actions API/model/schema layer.
 - Tests mirror app packages: `tests/<domain>/{api,repository,service}/`. There is no
   `tests/legal_entities/`, no `tests/contacts/`, no `tests/alerts/`. `tests/documents/`
-  exists but is empty. `tests/invoice/api/` exists but is empty (no router to test).
+  exists but is empty. `tests/invoice/api/` exists after Phase 2.
 
 ---
 
@@ -143,10 +144,10 @@ Tests referencing legal-entity identity (update imports, do not rewrite assertio
 
 ---
 
-## Phase 2 — Invoice API Layer
+## Phase 2 — Invoice API Layer (DONE — commit 90651b97)
 
 ### What
-Add the missing `api/` layer to `app/invoice/` and register it, so the invoice domain is
+Added the missing `api/` layer to `app/invoice/` and registered it, so the invoice domain is
 reachable over HTTP like every other domain. (Package stays `app/invoice/`; the rename to
 `invoices/` is Phase 7, cosmetic.)
 
@@ -154,9 +155,10 @@ reachable over HTTP like every other domain. (Package stays `app/invoice/`; the 
 `domain-migration-map.md` marks invoices P1 specifically because the router layer is missing.
 `InvoiceService.attach_invoice_to_charge` exists and is unit-tested
 (`tests/invoice/service/test_invoice_service_rules.py`) but has no endpoint and is not in
-`router_registry.py`. `tests/invoice/api/` exists but is empty, confirming the gap.
+`router_registry.py`. Before Phase 2, `tests/invoice/api/` existed but was empty, confirming
+the gap.
 
-### Files to create
+### Files created
 - `app/invoice/api/__init__.py`
 - `app/invoice/api/invoices.py` — endpoints wrapping existing `InvoiceService`
   (attach invoice to charge, get charge invoice) using existing
@@ -175,17 +177,18 @@ reachable over HTTP like every other domain. (Package stays `app/invoice/`; the 
 - Does **not** modify `InvoiceService`, `InvoiceRepository`, `Invoice` model, or schemas.
 
 ### Completion criteria
+- Done in commit `90651b97`.
 - `app/invoice/api/` exists and is registered in `router_registry.py`.
-- New endpoints appear in the OpenAPI schema under `/api/v1`.
-- `tests/invoice/api/test_invoices.py` passes; existing invoice service/repo tests still pass.
-- No file outside `app/invoice/api/` and `app/router_registry.py` is modified.
+- New endpoints are `POST /api/v1/invoices` and `GET /api/v1/invoices/charge/{charge_id}`.
+- `tests/invoice/api/test_invoices.py` was added with 7 API tests.
+- 11 invoice tests passed on the phase branch.
 
 ---
 
-## Phase 3 — Alerts Extraction
+## Phase 3 — Alerts Extraction (DONE — commit 06f293d3)
 
 ### What
-Extract alert calculation/read logic from `dashboard/` into a new `app/alerts/` package.
+Extracted alert calculation/read logic from `dashboard/` into a new `app/alerts/` package.
 
 Moves:
 - `app/dashboard/services/dashboard_attention_service.py` →
@@ -197,12 +200,13 @@ rules), explicitly separate from Dashboard (pure read model) and Notifications (
 `domain-migration-map.md` marks it `extract` from `dashboard/`. The only consumer today is
 `dashboard_overview_service.py`, so the blast radius is small.
 
-### Files to move
+### Files moved
 - `app/dashboard/services/dashboard_attention_service.py`
 
-### Files to update (imports)
+### Files updated (imports)
 - `app/dashboard/services/dashboard_overview_service.py` (the one current importer of
   `dashboard_attention_service`).
+- `tests/dashboard/service/test_dashboard_attention_service.py`.
 
 ### Non-goals
 - Does **not** add an alerts `api/` router (dashboard still surfaces alert data; no endpoint
@@ -211,17 +215,19 @@ rules), explicitly separate from Dashboard (pure read model) and Notifications (
 - Does **not** extract `recent_activity_service.py` or any other dashboard service.
 
 ### Completion criteria
+- Done in commit `06f293d3`.
 - `app/alerts/services/alert_service.py` exists; `dashboard/services/dashboard_attention_service.py`
   is gone.
 - `grep -r "dashboard_attention_service" app tests` returns zero matches.
-- Dashboard endpoints return identical responses (existing `tests/dashboard/` suite passes unchanged).
+- Dashboard endpoints return identical responses.
+- 17 dashboard tests passed on the phase branch.
 
 ---
 
-## Phase 4 — Actions Vertical Slice
+## Phase 4 — Actions Vertical Slice (DONE — commit bc4e6e7a)
 
 ### What
-Restructure the flat `app/actions/` package into the standard vertical-slice layout
+Restructured the flat `app/actions/` package into the standard vertical-slice layout
 (`app/actions/services/`), keeping module names so import surface is mechanical.
 
 Moves (flat → `services/`):
@@ -265,8 +271,9 @@ Tests:
 - Does **not** rename or merge any action module or change action definitions.
 
 ### Completion criteria
-- All eight modules live under `app/actions/services/`; `app/actions/` top level contains only
-  `services/` (plus `__init__.py`).
+- Done in commit `bc4e6e7a`.
+- All eight runtime modules live under `app/actions/services/`; no flat action service module
+  remains at `app/actions/*.py`.
 - `grep -rE "from app.actions.(action_registry|action_helpers|binder_actions|business_actions|charge_actions|obligation_orchestrator|report_deadline_actions|vat_report_actions)" app tests` returns zero matches (all now go through `app.actions.services.*`).
 - `tests/actions/` passes; consumers in clients/charge/binders/vat/businesses/annual_reports still pass.
 

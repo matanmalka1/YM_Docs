@@ -686,30 +686,29 @@ Notes:
 
 ### Other Discovered Domains
 
-These in-scope domains have a dated app README and appear to have clear documentation ownership at Low risk, unless noted:
+These in-scope domains have either migrated canonical docs or older app READMEs that appear to have clear documentation ownership at Low risk, unless noted:
 
 - Permanent Documents — `backend/app/permanent_documents/README.md` (2026-03-22). Clear / Low.
 - Search — `backend/app/search/README.md` (2026-03-22). Clear / Low.
 - Dashboard — `backend/app/dashboard/README.md` (2026-03-17). Clear / Low.
-- Invoice — `backend/app/invoice/README.md` (2026-03-17). Clear / Low. The domain-model summary flags that provider integration is incomplete.
+- Invoice — migrated to `docs/domains/invoice.md` (2026-06-10). Legacy app README is pointer-only.
 - Authority Contact — `backend/app/authority_contact/README.md` (2026-04-13). Clear / Low.
-- Actions — `backend/app/actions/README.md` (2026-04-23). Clear / Low. Cross-domain executable-action registry.
+- Actions — migrated to `docs/domains/actions.md` (2026-06-10). Legacy app README is pointer-only.
+- Alerts — documented at `docs/domains/alerts.md` (2026-06-10). No legacy app README existed.
 - Notes — no README. Missing source of truth / Low (small domain).
 - Health, Infrastructure, Middleware — READMEs exist; these are infrastructure, not product domains.
 
 ## Do Not Touch Yet
 
-The following must not be edited until a domain docs migration phase is approved:
+The following older documentation areas must not be rewritten as active source of truth until a domain docs migration phase is approved:
 
-- All `backend/app/*/README.md` (the live, highest-value docs — do not edit during inventory).
-- `backend/docs/vat_report/*` (4 files).
-- `backend/docs/annual_reports/*` (3 files).
-- `backend/docs/advance_payments_spec.md`.
-- `backend/docs/binder_lifecycle_refactor_spec.md`.
-- `backend/app/binders/binder_domain_definitions.md`.
-- `backend/docs/backend/domains/work-queue.md`.
-- `backend/docs/history-vs-timeline.md` and `backend/docs/history-map.md`.
+- Non-pointer `backend/app/*/README.md` files that have not yet migrated to `docs/domains/`.
+
+
+
+
 - `backend/docs/frontend_screen_spec.md`.
+- `backend/docs/domain_decisions_v3.md`.
 - `backend/docs/domain_model/*`.
 - All Hebrew content in any file — do not translate or normalize.
 

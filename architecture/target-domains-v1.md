@@ -1055,9 +1055,9 @@ backend/app/
   signature_requests/
   tasks/
   reminders/
-  alerts/                   # target — may be extracted from clients/work_queue
+  alerts/                   # extracted in Phase 3
   charges/                  # rename from charge
-  invoices/                 # rename from invoice
+  invoices/                 # target rename from invoice; API layer exists since Phase 2
   advance_payments/
   vat/                      # rename from vat_reports
   annual_reports/
@@ -1069,7 +1069,7 @@ backend/app/
   search/
   dashboard/
   work_queue/
-  actions/
+  actions/                  # vertical service layout completed in Phase 4
   reports/
   audit/
   users/

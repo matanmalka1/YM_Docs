@@ -54,11 +54,11 @@ Key top-level files:
 
 Routed domains have an `api/` router and are mounted under `/api/v1/*`:
 
-`advance_payments`, `annual_reports`, `audit`, `authority_contact`, `binders`, `businesses`, `charge`, `clients`, `correspondence`, `dashboard`, `health`, `notes`, `notification`, `permanent_documents`, `reminders`, `reports`, `search`, `signature_requests`, `tasks`, `tax_calendar`, `timeline`, `users`, `vat_reports`, `work_queue`
+`advance_payments`, `annual_reports`, `audit`, `authority_contact`, `binders`, `businesses`, `charge`, `clients`, `correspondence`, `dashboard`, `health`, `invoice`, `notes`, `notification`, `permanent_documents`, `reminders`, `reports`, `search`, `signature_requests`, `tasks`, `tax_calendar`, `timeline`, `users`, `vat_reports`, `work_queue`
 
 Internal-only domains have no HTTP router. Some have a full backend layer stack; others currently expose only the layers needed by callers:
 
-`invoice`, `legal_entities`
+`alerts`, `legal_entities`
 
 Cross-cutting packages do not follow the domain layer structure:
 
@@ -68,7 +68,7 @@ Cross-cutting packages do not follow the domain layer structure:
 | `app/core/` | Exceptions, logging, env validation, API types |
 | `app/infrastructure/` | Storage provider, notification channels, idempotency |
 | `app/middleware/` | RequestIDMiddleware, rate limiting |
-| `app/actions/` | UI action metadata registry |
+| `app/actions/` | UI action metadata registry and cross-domain action orchestration helpers; service modules live under `app/actions/services/` |
 | `app/utils/` | General helpers for time, enums, Excel, and ID validation |
 | `app/seed/` | Development data seeding orchestrator and builders |
 

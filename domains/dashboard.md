@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The dashboard domain provides read-only aggregated widgets for the CRM home screen. It has no persistent tables of its own; instead it composes data from multiple other domains (clients, binders, charges, annual-reports, VAT reports, advance payments, work-queue, audit log) and returns derived response models. All endpoints are role-gated to `ADVISOR` and `SECRETARY`, with advisor-only sections returning empty payloads for secretaries rather than 403s.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-10.
 
 ## Endpoints
 
@@ -114,7 +114,7 @@ Dashboard itself defines no enums. It references enums from other domains:
 - Secretary receives: `is_empty`, zero `open_charges_*`, `vat_stats` (full), empty collections.
 - No 403 is raised; differentiation is purely in data returned.
 
-**Attention board selection** (`dashboard_attention_service.py:124-147`):
+**Attention board selection** (`backend/app/alerts/services/alert_service.py:124-147`):
 - Only built for `ADVISOR`; returns `[]` for all others.
 - Fetches one small work-queue page for urgency tiers `{OVERDUE, APPROACHING, IMPORTANT}` (no client identity) then filters eligible items.
 - `TASK` items require `due_date is not None` AND urgency in `{OVERDUE, APPROACHING, IMPORTANT}`.
@@ -167,6 +167,7 @@ No open known issues.
 - **F-035** (2026-06-05): `advisor_today` was a dead schema/service stub. Field and `AdvisorTodayService` removed.
 - **F-036** (2026-06-05): `DASHBOARD.LIMIT_EXCEEDED` error code was documented but unreachable (referenced `DashboardExtendedService` which did not exist). Removed from docs.
 - **F-037** (2026-06-05): `reports_not_started` can go negative when report counts exceed active-business count. Fixed with `max(0, ...)` clamp in `dashboard_tax_service.py`.
+- **Phase 3** (2026-06-10): Attention-board calculation moved from dashboard to `backend/app/alerts/services/alert_service.py`; dashboard still exposes the result through `/api/v1/dashboard/overview`.
 
 ## Decisions (preserved)
 

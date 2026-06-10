@@ -14,9 +14,9 @@ Maps target domains (from `target-domains-v1.md`) to current codebase folders.
 | signature_requests | signature_requests/ | keep | P0 | |
 | tasks | tasks/ | keep | P0 | |
 | reminders | reminders/ | keep | P0 | |
-| alerts | dashboard/ | extract | P2 | dashboard_attention_service.py |
+| alerts | alerts/ | keep | P2 done | Phase 3 extracted alert_service.py from dashboard/ |
 | charges | charge/ | rename | P2 | cosmetic only |
-| invoices | invoice/ | rename + add api layer | P1 | missing routers/ |
+| invoices | invoice/ | rename | P1 API done / P2 rename pending | Phase 2 added api layer; package rename still pending |
 | advance_payments | advance_payments/ | keep | P0 | |
 | vat | vat_reports/ | rename | P2 | cosmetic only |
 | annual_reports | annual_reports/ | keep | P0 | |
@@ -28,7 +28,7 @@ Maps target domains (from `target-domains-v1.md`) to current codebase folders.
 | search | search/ | keep | P0 | |
 | dashboard | dashboard/ | keep | P0 | after alerts extraction |
 | work_queue | work_queue/ | keep | P0 | |
-| actions | actions/ | restructure | P2 | flat → vertical slice |
+| actions | actions/ | keep | P2 done | Phase 4 moved flat modules under services/ |
 | reports | reports/ | keep | P0 | |
 | audit | audit/ | keep | P0 | |
 | users | users/ | keep | P0 | |

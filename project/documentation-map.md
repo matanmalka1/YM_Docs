@@ -83,7 +83,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 Per-domain canonical docs, one file each. Authoring rules: `docs/workflow/domain-docs-authoring.md`.
 
-- `docs/domains/README.md` ★ — index of all 25 domain docs.
+- `docs/domains/README.md` ★ — index of all 28 domain docs.
 
 Tax chain:
 
@@ -92,6 +92,7 @@ Tax chain:
 - `docs/domains/vat-reports.md` ★
 - `docs/domains/tax-calendar.md` ★
 - `docs/domains/charge.md` ★
+- `docs/domains/invoice.md` ★
 
 Client lifecycle & operations:
 
@@ -110,10 +111,12 @@ Work & messaging:
 - `docs/domains/tasks.md` ★
 - `docs/domains/reminders.md` ★
 - `docs/domains/notifications.md` ★
+- `docs/domains/actions.md` ★
 
 Aggregation & read:
 
 - `docs/domains/work-queue.md` ★
+- `docs/domains/alerts.md` ★
 - `docs/domains/timeline.md` ★
 - `docs/domains/dashboard.md` ★
 - `docs/domains/reports.md` ★
