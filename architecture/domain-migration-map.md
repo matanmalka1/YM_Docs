@@ -16,7 +16,7 @@ Maps target domains (from `target-domains-v1.md`) to current codebase folders.
 | reminders | reminders/ | keep | P0 | |
 | alerts | alerts/ | keep | P2 done | Phase 3 extracted alert_service.py from dashboard/ |
 | charges | charges/ | keep | P2 done | Phase 7.4 renamed from charge/ |
-| invoices | invoices/ | keep | P2 done | Phase 7.5 renamed from invoice/ |
+| invoices | invoices/ | keep | P1/P2 done | Phase 2 added api/ layer; Phase 7.5 renamed from invoice/ |
 | advance_payments | advance_payments/ | keep | P0 | |
 | vat | vat/ | keep | P2 done | Phase 7.6 renamed from vat_reports/ |
 | annual_reports | annual_reports/ | keep | P0 | |

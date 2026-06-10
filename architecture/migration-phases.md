@@ -3,6 +3,17 @@
 Execution plan for moving the backend toward the target domain structure defined in
 `target-domains-v1.md`, sequenced per the priorities in `domain-migration-map.md`.
 
+> **Status — COMPLETE (2026-06-10).** Phases 0–7 are merged into `main`; full suite green
+> (`1211 passed`). Phase 8 is deferred by design (trigger-gated — see bottom of this file);
+> the structural migration is finished.
+>
+> **Branch/commit note.** Phase 1 was first committed as `9372929e` on branch
+> `phase-1-legal-entities-extraction`, which was never merged and has since been deleted.
+> The extraction was **replayed on `main` as commit `9e300f29`** (the current tip) *after*
+> Phases 2–7, so the live `legal_entities` consumers reference the post-rename package paths
+> (`app.notifications`, `app.vat`, `app.charges`, `app.invoices`). Per-phase commit SHAs below
+> are the original phase-branch commits; all are contained in `main`'s linear history.
+
 ## Conventions used by every phase
 
 - **Structural moves only.** No method signatures, SQL, table names, enum values, or
@@ -48,7 +59,7 @@ checked in. No code touched.
 
 ---
 
-## Phase 1 — Legal Entities Extraction (DONE — commit 9372929e)
+## Phase 1 — Legal Entities Extraction (DONE — replayed on `main` as `9e300f29`; original branch commit `9372929e` deleted)
 
 ### What
 Extracted the legal-entity / person identity models and their repositories out of `clients/`
@@ -137,7 +148,7 @@ Tests referencing legal-entity identity (update imports, do not rewrite assertio
 - Does **not** touch the cross-domain consumers' logic — import path only.
 
 ### Completion criteria
-- Done in commit `9372929e`.
+- Done; replayed on `main` as commit `9e300f29` (original branch commit `9372929e` deleted).
 - `app/legal_entities/{models,repositories}/` contains the five moved files.
 - Old `app.clients.models.legal_entity`, `app.clients.models.person`, `app.clients.repositories.legal_entity_repository`, and `app.clients.repositories.person_repository` imports were repointed.
 - `app/model_registry.py` imports the moved ORM models from `app.legal_entities`.
@@ -159,12 +170,15 @@ reachable over HTTP like every other domain. Phase 7.5 later renamed the package
 the gap.
 
 ### Files created
-- `app/invoice/api/__init__.py`
 - `app/invoice/api/invoices.py` — endpoints wrapping existing `InvoiceService`
   (attach invoice to charge, get charge invoice) using existing
   `InvoiceAttachRequest` / `InvoiceResponse` schemas. No new business logic; thin delegation.
 - `app/invoice/api/routers.py` — aggregates the invoice router (mirrors `charge/api/routers.py`).
 - `tests/invoices/api/test_invoices.py` — API-level tests for the new endpoints.
+
+> No `app/invoice/api/__init__.py` was created: `app/` uses PEP 420 implicit namespace
+> packages (no `__init__.py` at domain/api level, matching `charge/api/`). The earlier draft of
+> this list named an `__init__.py`; the implementation correctly omitted it.
 
 ### Files to update
 - `app/router_registry.py` — add `from app.invoices.api.routers import router as invoice_router`
@@ -355,9 +369,14 @@ exists. Actual Contact modeling, schemas, repository, and endpoints are tracked 
 feature effort, **out of scope** for this structural migration.
 
 ### Files created
-- `app/contacts/__init__.py` and empty `api/`, `models/`, `repositories/`, `schemas/`,
-  `services/` packages (each with `__init__.py`).
-- `tests/contacts/__init__.py` (mirrors layout; no test cases yet).
+- `app/contacts/` plus empty `api/`, `models/`, `repositories/`, `schemas/`, `services/`
+  subpackages as PEP 420 namespace dirs (no `__init__.py`, matching the rest of `app/`).
+  Each carries a `.gitkeep` so the empty dirs persist in git.
+- `tests/contacts/__init__.py` (regular package, per the `tests/` convention; no test cases yet).
+
+> The earlier draft named `__init__.py` files for the `app/contacts/*` packages. Since `app/`
+> is PEP 420 (namespace packages, no `__init__.py`), the implementation used `.gitkeep` markers
+> instead. `tests/` does use `__init__.py`, so `tests/contacts/__init__.py` was created.
 
 ### Files to update
 - None. No existing import is repointed, because no contact code is moving.
