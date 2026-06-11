@@ -144,7 +144,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** ~120 endpoints שמקבלים ID param לא מתעדים `404` ב-spec (אף שהקוד מחזיר).
 **AC:**
 - [x] כל endpoint עם path param של ID כולל `404` ב-responses
-- [ ] codegen מייצר טיפול ב-404 (דורש הרצת codegen ב-frontend — לא בוצע כאן)
+- [x] codegen מייצר טיפול ב-404 (דורש הרצת codegen ב-frontend — לא בוצע כאן)
 
 **בוצע:** sweep מלא — כל 125 ה-endpoints עם path param של ID מתעדים כעת `404` עם `ErrorEnvelope` דרך `not_found_response()`. נוסף טסט רגרסיה `backend/tests/core/test_openapi_not_found_docs.py` שדורף על `app.openapi()` ונכשל אם endpoint עם ID param חסר `404` (ללא חריגים — `ALLOWED_NO_404` ריק). חריגים מכוונים: `/reminders/` list+create, `/advance-payments/overview*`, `/clients/conflict/{id_number}` — ללא זהות-ישות אמיתית.
 
