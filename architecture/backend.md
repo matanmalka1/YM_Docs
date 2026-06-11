@@ -58,4 +58,7 @@ app/<domain>/
 - UI-visible client-scoped list queries must apply the active-client scope where relevant.
 - Background jobs must be idempotent.
 - Services that coordinate external I/O, such as file uploads or notification sends, must explicitly commit or roll back database changes before the external call.
+- Backend business-local current dates must use `app.utils.time_utils.israel_today()`.
+- UTC timestamps must use `app.utils.time_utils.utcnow()` or `app.utils.time_utils.utcnow_aware()` according to the column timezone type.
+- Plain `date.today()` is allowed only for non-domain tooling or tests that do not assert business-local date behavior.
 - Backend messages that surface to users must be Hebrew where relevant.
