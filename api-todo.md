@@ -271,16 +271,19 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [ ] `BinderIntakeListResponse` — `intakes` → `items`
 - [ ] `CorrespondenceListResponse` — `total_pages` מוסר או מתווסף לכולם (החלטה אחת)
 
-### 43. 🔍 metadata נוסף לא עקבי
+### 43. 🔍 metadata נוסף לא עקבי ✅ בוצע (מדיניות תועדה)
 **בעיה:** `stats`/`counters`/`summary` רק בחלק מה-responses.
 **AC:**
-- [ ] בירור: מבנה metadata אחיד לכל LIST שצריך, או הסרה מאלה שלא צריך
+- [x] בירור: כל 5 בלוקי ה-metadata (BinderListResponse.counters, ChargeListResponse.stats, ClientRecordListResponse.stats, WorkQueueListResponse.summary, TaxCalendarGroupListResponse.summary) חיוניים למסך ונצרכים ב-UI — אף אחד לא הוסר.
+- [x] מדיניות תועדה ב-[api-contracts.md](architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
 
-### 44. `sort_order` vs `order`
+### 44. `sort_order` vs `order` ✅ בוצע
 **בעיה:** שני שמות לאותו param.
+**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) שורות 24,27 — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
 **AC:**
-- [ ] שם אחיד אחד (`sort_order`) בכל ה-endpoints: annual-reports, binders, correspondence
-- [ ] ה-frontend מעודכן
+- [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
+- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות.
+- [x] ה-frontend מעודכן (clients types/contracts/hooks/filters; binders כבר שלח `order`).
 
 ### 45. POST מחזיר 200 במקום 201
 **בעיה:** 4 endpoints יוצרים משאב ומחזירים 200.
