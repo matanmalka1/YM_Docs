@@ -290,10 +290,16 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] `POST /clients/import`, `/charges/bulk-action`, `/annual-reports/{id}/deadline`, `/auth/forgot-password` — בירור 🔍 לכל אחד: האם באמת יוצר משאב? אם כן → 201
 
-### 46. `updated_at` חסר על Response schemas
+### 46. `updated_at` חסר על Response schemas ⏳ בוצע חלקית / חסום
 **בעיה:** קיים `created_at` בכל, אבל `updated_at` רק בחלק.
+**מצב:** מתוך 6 ה-schemas שב-AC, רק 2 מהמודלים שלהם מחזיקים עמודת `updated_at` אמיתית. לא מזייפים מ-`created_at`, ולא מוסיפים עמודות/migrations בפאס הזה.
 **AC:**
-- [ ] להוסיף `updated_at` ל: BinderResponse, ChargeResponse, CorrespondenceResponse, BusinessResponse, SignatureRequestResponse, ReminderResponse
+- [x] `ReminderResponse` — כבר כלל `updated_at` (no-op).
+- [x] `BusinessResponse` — נוסף `updated_at` (העמודה קיימת במודל, nullable + `onupdate`). additive.
+- [ ] `BinderResponse` — **דחוי**: למודל אין עמודת `updated_at`. דורש עמודה חדשה + Alembic migration + `onupdate=utcnow` + audit של נתיבי העדכון + בדיקות.
+- [ ] `ChargeResponse` — **דחוי**: כנ"ל (אין עמודה במודל).
+- [ ] `SignatureRequestResponse` — **דחוי**: למודל יש `created_at` + `signed_at` בלבד; שינויי סטטוס נרשמים ב-audit trail נפרד. דורש החלטה אם נחוצה עמודת `updated_at` + migration.
+- [ ] `CorrespondenceResponse` — **דחוי + החלטת דומיין**: ה-docstring של המודל ([correspondence.py](../backend/app/communications/models/correspondence.py)) טוען immutability ("No updated_at"), אבל קיימים `PATCH` endpoint + `update_entry` service + `CorrespondenceUpdateRequest` שמשנים רשומות. יש לפתור את הסתירה (האם correspondence באמת mutable?) לפני הוספת `updated_at`.
 
 ## 🟤 כפילויות ו-Versioning
 
