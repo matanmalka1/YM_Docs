@@ -32,6 +32,7 @@ Source of truth: mandatory
 - Sorting fields must be allowlisted.
 - Standard list responses must return `items`, `total`, `page`, and `page_size`.
 - List responses may include additional aggregate fields such as counters when the owning endpoint contract defines them.
+- Aggregate metadata is allowed only where the list UI actually consumes it; do not force it onto every list or emit empty metadata objects. New list endpoints should name the aggregate block `summary`; existing `stats`/`counters` blocks may remain where already justified by the consuming UI.
 - Endpoints that back KPI cards or filtered dashboards must expose the aggregate fields the UI needs, such as totals, counts, or sums, instead of requiring the frontend to infer them from paginated `items`.
 - List endpoints must not return the same full detail DTO used by `GET /{id}` when that DTO contains fields the list UI does not render.
 - List endpoints must return a dedicated thin row/card DTO, such as `XxxListItem` or `XxxCard`; detail endpoints must return the full detail DTO, such as `XxxResponse` or `XxxDetailResponse`.

@@ -271,26 +271,42 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [ ] `BinderIntakeListResponse` — `intakes` → `items`
 - [ ] `CorrespondenceListResponse` — `total_pages` מוסר או מתווסף לכולם (החלטה אחת)
 
-### 43. 🔍 metadata נוסף לא עקבי
+### 43. 🔍 metadata נוסף לא עקבי ✅ בוצע (מדיניות תועדה)
 **בעיה:** `stats`/`counters`/`summary` רק בחלק מה-responses.
 **AC:**
-- [ ] בירור: מבנה metadata אחיד לכל LIST שצריך, או הסרה מאלה שלא צריך
+- [x] בירור: כל 5 בלוקי ה-metadata (BinderListResponse.counters, ChargeListResponse.stats, ClientRecordListResponse.stats, WorkQueueListResponse.summary, TaxCalendarGroupListResponse.summary) חיוניים למסך ונצרכים ב-UI — אף אחד לא הוסר.
+- [x] מדיניות תועדה ב-[api-contracts.md](architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
 
-### 44. `sort_order` vs `order`
+### 44. `sort_order` vs `order` ✅ בוצע
 **בעיה:** שני שמות לאותו param.
+**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) שורות 24,27 — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
 **AC:**
-- [ ] שם אחיד אחד (`sort_order`) בכל ה-endpoints: annual-reports, binders, correspondence
-- [ ] ה-frontend מעודכן
+- [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
+- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות.
+- [x] ה-frontend מעודכן (clients types/contracts/hooks/filters; binders כבר שלח `order`).
 
-### 45. POST מחזיר 200 במקום 201
-**בעיה:** 4 endpoints יוצרים משאב ומחזירים 200.
+### 45. POST מחזיר 200 במקום 201 ✅ בוצע (בירור — אף אחד לא משתנה)
+**בעיה:** 4 endpoints חשודים כיוצרים משאב ומחזירים 200.
 **AC:**
-- [ ] `POST /clients/import`, `/charges/bulk-action`, `/annual-reports/{id}/deadline`, `/auth/forgot-password` — בירור 🔍 לכל אחד: האם באמת יוצר משאב? אם כן → 201
+- [x] בירור לכל endpoint. מסקנה: **כל 4 נשארים 200** — אף אחד לא מחזיר ייצוג של משאב חדש שניתן לאחזר.
 
-### 46. `updated_at` חסר על Response schemas
+| Endpoint | מצב | יוצר משאב אחזיר? | החלטה | סיבה |
+|---|---|---|---|---|
+| `POST /clients/import` | 200 | לא — דו"ח batch | **200** | מחזיר סיכום `{created, total_rows, errors[]}`; יכול ליצור 0 (כל השורות נכשלות); partial-success; idempotency-guarded; לא ייצוג משאב |
+| `POST /charges/bulk-action` | 200 | לא — פעולה | **200** | פעולה על charges קיימים, idempotent |
+| `POST /annual-reports/{id}/deadline` | 200 | לא — עדכון | **200** | מעדכן deadline על דוח קיים |
+| `POST /auth/forgot-password` | 200 | לא (security-neutral) | **200** | מניעת user enumeration; הלקוח לא צורך משאב |
+
+### 46. `updated_at` חסר על Response schemas ⏳ בוצע חלקית / חסום
 **בעיה:** קיים `created_at` בכל, אבל `updated_at` רק בחלק.
+**מצב:** מתוך 6 ה-schemas שב-AC, רק 2 מהמודלים שלהם מחזיקים עמודת `updated_at` אמיתית. לא מזייפים מ-`created_at`, ולא מוסיפים עמודות/migrations בפאס הזה.
 **AC:**
-- [ ] להוסיף `updated_at` ל: BinderResponse, ChargeResponse, CorrespondenceResponse, BusinessResponse, SignatureRequestResponse, ReminderResponse
+- [x] `ReminderResponse` — כבר כלל `updated_at` (no-op).
+- [x] `BusinessResponse` — נוסף `updated_at` (העמודה קיימת במודל, nullable + `onupdate`). additive.
+- [ ] `BinderResponse` — **דחוי**: למודל אין עמודת `updated_at`. דורש עמודה חדשה + Alembic migration + `onupdate=utcnow` + audit של נתיבי העדכון + בדיקות.
+- [ ] `ChargeResponse` — **דחוי**: כנ"ל (אין עמודה במודל).
+- [ ] `SignatureRequestResponse` — **דחוי**: למודל יש `created_at` + `signed_at` בלבד; שינויי סטטוס נרשמים ב-audit trail נפרד. דורש החלטה אם נחוצה עמודת `updated_at` + migration.
+- [ ] `CorrespondenceResponse` — **דחוי + החלטת דומיין**: ה-docstring של המודל ([correspondence.py](../backend/app/communications/models/correspondence.py)) טוען immutability ("No updated_at"), אבל קיימים `PATCH` endpoint + `update_entry` service + `CorrespondenceUpdateRequest` שמשנים רשומות. יש לפתור את הסתירה (האם correspondence באמת mutable?) לפני הוספת `updated_at`.
 
 ## 🟤 כפילויות ו-Versioning
 
