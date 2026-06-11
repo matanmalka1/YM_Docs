@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Annual Reports
 
 The annual reports domain manages Israeli annual income-tax report work items per client record and tax year, including lifecycle status, statutory form/profile metadata, required schedules, annex data, income/expense lines, tax calculation, readiness checks, client approval, PDF export, and client/year season views.
-Last verified against code + backend/openapi.json: 2026-06-04.
+Last verified against code + backend/openapi.json: 2026-06-11 for the linked charges endpoint response schema; full-domain verification remains 2026-06-04.
 
 ## Endpoints
 
@@ -59,7 +59,7 @@ All paths below exist in `backend/openapi.json`. The `annual_reports` router is 
 | `GET` | `/api/v1/tax-year/{tax_year}/summary` | Summarize reports for a tax year. |
 | `GET` | `/api/v1/annual-reports/{report_id}/export/pdf` | Download a draft annual-report PDF. |
 | `POST` | `/api/v1/annual-reports/{report_id}/tax-calculation/save` | Persist `tax_due` or `refund_due`. |
-| `GET` | `/api/v1/annual-reports/{report_id}/charges` | List charges linked to a report. |
+| `GET` | `/api/v1/annual-reports/{report_id}/charges` | List charges linked to a report, returned as `PaginatedResponse[ChargeResponse]` (`items`, `page`, `page_size`, `total`). |
 
 ## Model & fields
 

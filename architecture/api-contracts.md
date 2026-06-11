@@ -35,11 +35,13 @@ Source of truth: mandatory
 - Endpoints that back KPI cards or filtered dashboards must expose the aggregate fields the UI needs, such as totals, counts, or sums, instead of requiring the frontend to infer them from paginated `items`.
 - Every response-bearing endpoint must declare `response_model=`.
 - Endpoints with no response body must use HTTP 204.
-- Application error responses must use the standard error envelope.
-- Standard application error responses must include `error.code`, `error.message`, and optional `error.details`.
+- Application error responses must use the standard error envelope: `{ "error": { "code": string, "message": string, "details": unknown | null, "request_id"?: string | null } }`.
+- Standard application error responses must include `error.code`, `error.message`, and `error.details`.
 - Standard application error responses may include `error.request_id` when a request ID is available.
 - `error.code` is stable and machine-readable; clients must match on `error.code`, not translated message text.
 - Domain error codes use the `DOMAIN.REASON` pattern, such as `BINDER.NOT_FOUND` or `AUTH.INVALID_REFRESH_TOKEN`.
+- Documented OpenAPI responses for application errors must reference the shared `ErrorEnvelope` schema; backend routers should use the shared response-doc helpers from `app/core/exceptions.py` for 400, 401, 403, 404, 409, and 500 responses.
+- Frontend code that needs backend error details must parse the standard envelope through the shared error utility and must not read endpoint-specific response shapes directly.
 - SlowAPI rate-limit responses must use the standard error envelope with a rate-limit error code.
 - Validation errors must expose enough field/form detail for frontend display without endpoint-specific parsing.
 - Validation error details must identify request fields without transport-specific prefixes such as `body.`.

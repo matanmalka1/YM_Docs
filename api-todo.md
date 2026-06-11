@@ -327,14 +327,18 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 ### 53. אין schema גנרי לשגיאות עסקיות
 **בעיה:** רק `HTTPValidationError` (422) מוגדר. אין תיעוד ל-400/403/409/500.
 **AC:**
-- [ ] schema אחיד `ErrorResponse { code, message, details? }`
+- [x] schema אחיד `ErrorEnvelope { error: { code, message, details, request_id? } }`
 - [ ] משויך ל-responses השגיאה בכל ה-endpoints
-- [ ] ה-frontend מסתמך על מבנה ידוע
+- [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
+
+**בוצע חלקית:** נוסף schema אחיד `ErrorEnvelope`/`ErrorBody` ב-`backend/app/core/exceptions.py`, helperים לתיעוד OpenAPI של `400/401/403/404/409/500`, וטסט `backend/tests/core/test_error_openapi_schema.py` שמוודא שכל error response מתועד משתמש ב-`#/components/schemas/ErrorEnvelope`. בקומיט האחרון תועדו statuses נפוצים ב-`POST /api/v1/charges` וב-`POST /api/v1/charges/{charge_id}/cancel`. עדיין לא בוצע sweep שמוסיף את כל סטטוסי השגיאה הרלוונטיים לכל endpoint.
 
 ### 54. `GET /annual-reports/{id}/charges` — response schema ריק
 **בעיה:** מחזיר `{}` במקום schema מוגדר.
 **AC:**
-- [ ] schema מפורש לתגובה
+- [x] schema מפורש לתגובה
+
+**בוצע:** `GET /api/v1/annual-reports/{report_id}/charges` מצהיר `response_model=PaginatedResponse[ChargeResponse]`, וה-OpenAPI מייצר `PaginatedResponse_ChargeResponse_`.
 
 ---
 
