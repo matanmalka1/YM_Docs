@@ -205,6 +205,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [x] אומת: ב-frontend השדות הופיעו רק ב-interface `ReportDetailResponse` (`contracts.ts`) וב-`generated.ts` — לא נצרכו בשום קומפוננטה
 - [x] הוסרו מ-`ReportDetailResponse` (`annual_report_detail.py` schema). `_enrich_detail_response` נמחק כולו — מטרתו היחידה הייתה הצבת שני השדות, כך שגם query מיותר ל-DB נחסך
+- [x] ה-frontend manual contract של `ReportDetailResponse` נוקה גם משדות credit-point מחושבים (`credit_points`, `pension_credit_points`, `life_insurance_credit_points`, `tuition_credit_points`) שאינם חוזרים מ-`GET/PATCH /details`; הערכים המחושבים זמינים רק דרך `AnnualReportDetailResponse.tax_calculation`
 - [x] frontend נקי (0 הפניות); generated types + OpenAPI מעודכנים; tests עוברים (105)
 
 ### 36. קיבוץ חישובי מס ב-`AnnualReportDetailResponse` ✅ בוצע
