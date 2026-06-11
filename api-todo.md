@@ -459,7 +459,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:** איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
 
 ### 71. `history` vs `audit`
-**בעיה:** שני דפוסים לאותו concept (binders/annual-reports=history, VAT/users=audit).
+**סטטוס:** בוצע. `audit` הוא הדפוס הקנוני לנתיבי audit trail; נתיבי binders/annual-reports הועברו ל-`/audit`.
 **AC:** בחירת דפוס אחד + יישום בכל הדומיינים.
 
 ### 72. `restore` לא עקבי

@@ -31,7 +31,7 @@ Last verified against code + backend/openapi.json: 2026-06-04.
 | POST | /api/v1/binders/{binder_id}/revert-ready-for-handover | Revert ready-for-handover back to in-office |
 | POST | /api/v1/binders/{binder_id}/handover-to-client | Hand over single binder to client |
 | POST | /api/v1/binders/handover-to-client-bulk | Hand over multiple binders in one grouped event |
-| GET | /api/v1/binders/{binder_id}/history | Lifecycle audit log for binder |
+| GET | /api/v1/binders/{binder_id}/audit | Lifecycle audit log for binder |
 | GET | /api/v1/binders/{binder_id}/intakes | All material intakes for binder |
 | PATCH | /api/v1/binders/{binder_id}/intakes/{intake_id} | Edit an existing intake (fields + cross-client transfer) |
 | GET | /api/v1/clients/{client_record_id}/binders | All binders for a specific client |
@@ -243,7 +243,7 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-011** (2026-06-04): `BinderIntakeEditService.edit_intake` was implemented but inaccessible through the public API. Fixed: `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` was added in `backend/app/binders/api/binders_history.py`; the endpoint scopes by `binder_id` before delegating to `BinderIntakeEditService.edit_intake`.
+- **F-011** (2026-06-04): `BinderIntakeEditService.edit_intake` was implemented but inaccessible through the public API. Fixed: `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}` was added in `backend/app/binders/api/binders_audit.py`; the endpoint scopes by `binder_id` before delegating to `BinderIntakeEditService.edit_intake`.
 
 Checked for all five recurring patterns from the authoring guide.
 

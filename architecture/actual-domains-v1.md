@@ -349,9 +349,9 @@ No repository layer
 ## API Endpoints
 | Method | Path | Function | File |
 |---|---|---|---|
-| GET | /{binder_id}/history | get_binder_history | [binders_history.py](../../backend/app/binders/api/binders_history.py) |
-| GET | /{binder_id}/intakes | get_binder_intakes | [binders_history.py](../../backend/app/binders/api/binders_history.py) |
-| PATCH | /{binder_id}/intakes/{intake_id} | patch_binder_intake | [binders_history.py](../../backend/app/binders/api/binders_history.py) |
+| GET | /{binder_id}/audit | get_binder_audit | [binders_audit.py](../../backend/app/binders/api/binders_audit.py) |
+| GET | /{binder_id}/intakes | get_binder_intakes | [binders_audit.py](../../backend/app/binders/api/binders_audit.py) |
+| PATCH | /{binder_id}/intakes/{intake_id} | patch_binder_intake | [binders_audit.py](../../backend/app/binders/api/binders_audit.py) |
 | GET | (root) | list_binders | [binders_list_get.py](../../backend/app/binders/api/binders_list_get.py) |
 | GET | /{binder_id} | get_binder | [binders_list_get.py](../../backend/app/binders/api/binders_list_get.py) |
 | DELETE | /{binder_id} | delete_binder | [binders_list_get.py](../../backend/app/binders/api/binders_list_get.py) |

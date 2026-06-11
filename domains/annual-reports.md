@@ -50,7 +50,7 @@ All paths below exist in `backend/openapi.json`. The `annual_reports` router is 
 | `POST` | `/api/v1/annual-reports/{report_id}/status` | Transition to a specific status. |
 | `POST` | `/api/v1/annual-reports/{report_id}/submit` | Submit a report through the status transition path. |
 | `POST` | `/api/v1/annual-reports/{report_id}/deadline` | Update deadline type and deadline note. |
-| `GET` | `/api/v1/annual-reports/{report_id}/history` | List status history. |
+| `GET` | `/api/v1/annual-reports/{report_id}/audit` | List status audit entries. |
 | `GET` | `/api/v1/clients/{client_record_id}/annual-reports` | List annual reports for a client record. |
 | `GET` | `/api/v1/tax-year/active/reports` | List reports for the active annual-report tax year. |
 | `GET` | `/api/v1/tax-year/active/summary` | Summarize the active annual-report tax year. |

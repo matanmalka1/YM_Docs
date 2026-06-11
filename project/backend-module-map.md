@@ -94,7 +94,7 @@ app/binders/api/
 |-- binders_list_get.py
 |-- binders_receive_return.py
 |-- binders_operations.py
-|-- binders_history.py
+|-- binders_audit.py
 |-- binders_reminders.py
 `-- client_binders_router.py
 ```

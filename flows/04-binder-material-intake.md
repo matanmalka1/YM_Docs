@@ -143,7 +143,7 @@ None. All writes are to DB rows.
 
 `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}`
 
-Entry point: `backend/app/binders/api/binders_history.py:patch_binder_intake`
+Entry point: `backend/app/binders/api/binders_audit.py:patch_binder_intake`
 Service: `backend/app/binders/services/binder_intake_edit_service.py:BinderIntakeEditService.edit_intake`
 
 Patchable fields (all optional):
