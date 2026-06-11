@@ -10,6 +10,10 @@ Source of truth: mandatory
 # Security
 
 - Backend authorization is the source of truth.
+- The OpenAPI spec defaults every operation to the global `HTTPBearer` security scheme; the custom schema builder lives in `app/core/openapi.py`.
+- Public (unauthenticated) endpoints opt out with `security: []` and must be listed in `app/core/public_endpoints.py` (the single source of truth for the public allowlist).
+- OpenAPI `security` is documentation only; runtime auth is enforced by the `get_current_user` dependency. `tests/core/test_endpoint_auth_guard.py` fails if any non-allowlisted endpoint lacks a real auth dependency.
+- `POST /api/v1/auth/logout` requires a bearer token, invalidates outstanding tokens by incrementing the authenticated user's `token_version`, and clears the refresh cookie.
 - Access tokens are JWT HS256 bearer tokens and must be short-lived.
 - The default access-token lifetime is 15 minutes.
 - Refresh tokens are JWT HS256 tokens stored in HttpOnly cookies scoped to `/api/v1/auth`.
