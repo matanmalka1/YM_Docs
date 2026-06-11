@@ -221,33 +221,42 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ## 🔵 בעיות DTO ו-Schema
 
-### 38. שמות schemas לא עקביים
+### 38. שמות schemas לא עקביים ✅ בוצע
 **בעיה:** רוב הדומיינים `XxxCreateRequest`, אבל `CreateClientRequest` הפוך, ו-`BinderIntakePatchRequest` חורג.
 **AC:**
-- [ ] `CreateClientRequest` → `ClientCreateRequest`
-- [ ] `BinderIntakePatchRequest` → `BinderIntakeUpdateRequest`
-- [ ] כל ה-frontend references מעודכנים
+- [x] `CreateClientRequest` → `ClientOnboardingRequest` (היעד `ClientCreateRequest` כבר תפוס ע"י מחלקה אחרת; השם החדש מדויק כי זה composite של client + business)
+- [x] `BinderIntakePatchRequest` → `BinderIntakeUpdateRequest`
+- [x] כל ה-frontend references מעודכנים (ללא alias תאימות)
 
-### 39. Create = Update (8 schemas זהים)
+### 39. Create = Update (8 schemas זהים) ✅ בוצע
 **בעיה:** schemas של Create ו-Update זהים, כך ש-PATCH לא partial בפועל — שולחים את כל השדות כמו PUT.
 **מושפעים:** AuthorityContact, Correspondence, ExpenseLine, IncomeLine, Task, Business (Create/Update כל אחד).
 **AC:**
-- [ ] בכל זוג: Update הופך לכל-שדות-אופציונליים אמיתי
-- [ ] תיעוד: PATCH עם שדה בודד לא מאפס שאר השדות
-- [ ] בדיקה לכל זוג
+- [x] בכל זוג: Update הופך לכל-שדות-אופציונליים אמיתי (`exclude_unset=True`, הוסר None-dropping פנימי)
+- [x] תיעוד: PATCH עם שדה בודד לא מאפס שאר השדות
+- [x] בדיקה לכל זוג
 
-### 40. 🔍 שדות נסתרים ב-`ClientUpdateRequest`
+### 40. 🔍 שדות נסתרים ב-`ClientUpdateRequest` ✅ בוצע
 **בעיה:** `status`, `annual_revenue`, `advance_rate_updated_at` קיימים ב-Update אבל לא ב-Create.
 **AC:**
-- [ ] בירור: מדוע השדות רק ב-Update? לתעד במפורש
-- [ ] ה-frontend חושף אותם בטופס העריכה (לוודא ש-`status` לא נשמט)
+- [x] בירור: `status` + `annual_revenue` נשארים user-editable; `advance_rate_updated_at` הפך server-owned (מתועד ב-[update-request-conventions.md](architecture/update-request-conventions.md))
+- [x] ה-frontend חושף `status`/`annual_revenue`; `advance_rate_updated_at` הוסר מ-update payload (frontend + taxProfile) ונשאר read-only ב-response
 
-### 41. 🔍 UpdateRequest ללא validation
+### 41. 🔍 UpdateRequest ללא validation ✅ בוצע
 **בעיה:** 30 Update schemas ללא `required` ולא הגבלות. ניתן לשלוח PATCH ריק `{}` ולקבל 200.
 **AC:**
-- [ ] בירור: מה ההתנהגות הרצויה ל-PATCH ריק? (no-op / 400?)
-- [ ] בירור: `title: ""` ב-`TaskUpdateRequest` — חוקי?
-- [ ] התנהגות מתועדת + validation בהתאם
+- [x] בירור: PATCH ריק `{}` → **422** (validation ב-Pydantic/FastAPI, לא 400, כדי למנוע כפילות endpoint)
+- [x] בירור: `title: ""` / whitespace ב-`TaskUpdateRequest` → 422 (`NonBlankStr`)
+- [x] התנהגות מתועדת + validation בהתאם
+
+**מה בוצע (38–41):**
+- `NonEmptyUpdateMixin` ([app/core/schemas/validation.py](../backend/app/core/schemas/validation.py)) — `extra="forbid"` (שדה לא מוכר → 422) + דחיית `{}` ריק → 422. הוחל על כל 15 ה-`*UpdateRequest` (14 קיימים + `BinderIntakeUpdateRequest` ששמו שונה).
+- `NonBlankStr` ([app/core/api_types.py](../backend/app/core/api_types.py)) — strip + `min_length=1`, על שדות טקסט עסקיים-נדרשים: `title`, `subject`, `business_name`, `name`, `full_name` (client+user), `note`.
+- explicit-null נדחה (422) על שדות non-nullable לפי עמודת המודל (לא לפי Create-optionality); שדות nullable אמיתיים מתנקים ע"י null.
+- חריגים מתועדים (single-payload required): `EntityNoteUpdateRequest.note`, `AnnexDataUpdateRequest.data`. `DeadlineUpdateRequest` הפך partial (POST, deadline_type אופציונלי).
+- VAT invoice update עבר ל-`exclude_unset` semantics מלא + ולידציה של ה-counterparty pair האפקטיבי (merged) בשירות.
+- תיעוד: [docs/architecture/update-request-conventions.md](architecture/update-request-conventions.md) (רשום ב-documentation-map). OpenAPI + frontend `generated.ts` יוצאו מחדש.
+- בדיקות: סוויטת backend מלאה ירוקה; frontend typecheck/lint/build ירוקים.
 
 ---
 
