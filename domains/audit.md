@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Audit
 
 The audit domain stores append-only change records for selected business entities and exposes one read-only HTTP endpoint for staff to inspect those records. In the current implementation, writes happen indirectly through `EntityAuditWriter` from other domains; the `audit` module itself owns the generic table, response schema, repository query path, and entity-type validation for read access.
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-11.
 
 ## Endpoints
 
@@ -43,7 +43,7 @@ There is also a composite index `idx_entity_audit_type_id` on (`entity_type`, `e
 
 ### Response schema
 
-`EntityAuditLogResponse` exposes the stored fields plus `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `limit`, and `offset`. Source: `backend/app/audit/schemas/entity_audit_log.py:8-27`; OpenAPI components: `backend/openapi.json:19406-19524`.
+`EntityAuditLogResponse` exposes the stored fields plus `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `page`, and `page_size`. Source: `backend/app/audit/schemas/entity_audit_log.py:8-27`; OpenAPI components: `backend/openapi.json`.
 
 ## Enums / statuses
 
@@ -59,7 +59,7 @@ This domain does not use Python enums for audit entity types or actions. Current
 - The only HTTP route is read-only and role-gated to `ADVISOR` and `SECRETARY`. Source: `backend/app/audit/api/routes.py:13-27`.
 - The read API rejects any `entity_type` not present in `ALLOWED_READ_ENTITY_TYPES` with `AUDIT.INVALID_ENTITY_TYPE`. Source: `backend/app/audit/services/audit_trail_service.py:35-37`.
 - Read access first verifies that the target entity exists in its owning repository (`ClientRecord`, `Business`, `Charge`, or `AnnualReport`) and raises `AUDIT.ENTITY_NOT_FOUND` with HTTP 404 when absent. Source: `backend/app/audit/services/audit_trail_service.py:39-53`.
-- Audit trail queries are filtered by the exact `(entity_type, entity_id)` pair, ordered newest-first by `performed_at DESC, id DESC`, and support `limit`/`offset` pagination. Source: `backend/app/audit/repositories/entity_audit_log_repository.py:37-61`.
+- The read API accepts `page` and `page_size` query parameters; the service translates them to repository `limit`/`offset` internally. Audit trail queries are filtered by the exact `(entity_type, entity_id)` pair and ordered newest-first by `performed_at DESC, id DESC`. Source: `backend/app/audit/api/routes.py:18-27`, `backend/app/audit/services/audit_trail_service.py:55-75`, `backend/app/audit/repositories/entity_audit_log_repository.py:37-61`.
 - `performed_by_name` is not stored on the audit row; it is enriched at read time by bulk-loading distinct user ids from `users` and mapping them onto the response items. Source: `backend/app/audit/services/audit_trail_service.py:63-74`.
 - Audit rows are append-only by design: the model has no soft-delete columns and no update path in this module. Corrections are represented by new rows, not edits to existing ones. Source: `backend/app/audit/models/entity_audit_log.py:4-12,24-44`.
 - `EntityAuditWriter.append()` is a no-op when `actor_id` is `None`; callers only get an audit row when a concrete actor id is available. Source: `backend/app/audit/services/entity_audit_writer.py:26-47`.

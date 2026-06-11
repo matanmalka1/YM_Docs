@@ -77,8 +77,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] בירור 🔍: האם DELETE נחוץ בנוסף ל-cancel, או ש-cancel מספיק? אם כן — `204` + soft delete
 
----
-
 ## 🟠 עדיפות בינונית
 
 ### 11. `GET /api/v1/documents/client/{client_record_id}/{document_id}`
@@ -148,8 +146,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **בוצע:** sweep מלא — כל 125 ה-endpoints עם path param של ID מתעדים כעת `404` עם `ErrorEnvelope` דרך `not_found_response()`. נוסף טסט רגרסיה `backend/tests/core/test_openapi_not_found_docs.py` שדורף על `app.openapi()` ונכשל אם endpoint עם ID param חסר `404` (ללא חריגים — `ALLOWED_NO_404` ריק). חריגים מכוונים: `/reminders/` list+create, `/advance-payments/overview*`, `/clients/conflict/{id_number}` — ללא זהות-ישות אמיתית.
 
----
-
 ## 🟡 עדיפות נמוכה
 
 ### 26–27. Bulk operations ל-clients
@@ -181,8 +177,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [ ] `POST /tasks/bulk-complete` — השלמה מרובה
 - [ ] `POST /tasks/bulk-assign` — שיוך מחדש מרובה
 
----
-
 ## 🟧 DTOs שמנים ו-Over-fetching
 
 ### 34. DTOs שמנים ב-double-duty (list + detail)
@@ -198,26 +192,34 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **הושלם** (2026-06-11). חוק contract חדש ב-[architecture/api-contracts.md](architecture/api-contracts.md). תיעוד דומיינים עודכן (vat/charges/clients/notifications). הערה: notifications list שומר `content_snapshot`/`subject_snapshot`/`business_name` כי ה-bell drawer/tab מציגים preview inline.
 
-### 35. 🔍 שדות כפולים חשודים ב-`AnnualReportDetailResponse`
-**בעיה:** שלושה זוגות שנראים שרידי מיגרציה — `refund_due`+`tax_refund_amount`, `tax_due`+`tax_due_amount`, `assessment_amount`+`final_balance`.
+### 35. 🔍 שדות כפולים חשודים ב-`AnnualReportDetailResponse` ✅ בוצע
+**בעיה:** שלושה זוגות שנראו שרידי מיגרציה — `refund_due`+`tax_refund_amount`, `tax_due`+`tax_due_amount`, `assessment_amount`+`final_balance`.
+**ממצא:** רק זוג אחד אמיתי. `tax_refund_amount`/`tax_due_amount` היו עותקי float לא-מוצגים של עמודות ה-DB הקנוניות `refund_due`/`tax_due`. `assessment_amount` (קלט שומת רשות) ו-`final_balance` (מחושב: `tax_after_credits − advances_paid`) אינם כפילות.
 **AC:**
-- [ ] בירור: איזה מכל זוג canonical? לבדוק שימוש ב-frontend
-- [ ] השדה המיותר מסומן deprecated, ואז מוסר
-- [ ] אין שבירה ב-UI (בדיקה לפני הסרה)
+- [x] canonical: `refund_due` על פני `tax_refund_amount`, `tax_due` על פני `tax_due_amount` (עמודות DB, בשימוש ברחבי status/list/history)
+- [x] השדות הכפולים הוסרו (לא deprecated — entry-point.md אוסר legacy compat ללא בקשה; השדות לא הוצגו ב-UI)
+- [x] אין שבירה ב-UI (typecheck+lint frontend עוברים; הצריכה היחידה הייתה merge ב-`useReportMutations`)
 
-### 36. קיבוץ חישובי מס ב-`AnnualReportDetailResponse`
-**בעיה:** 18 מתוך 52 השדות הם חישובי מס שטוחים. ה-schema מערבב 5 תחומי אחריות.
+### 35b. עותקי `tax_refund_amount`/`tax_due_amount` ב-`ReportDetailResponse` (follow-up ל-35) ✅ בוצע
+**בעיה:** אותם עותקי float מתים שהוסרו מ-`AnnualReportDetailResponse` (פריט 35) עדיין קיימים ב-`ReportDetailResponse` — endpoint נפרד `GET/PATCH /annual-reports/{id}/details` (`annual_report_detail.py` + `_enrich_detail_response`).
 **AC:**
-- [ ] חישובי המס מקובצים ל-sub-object `tax_calculation: { ... }`
-- [ ] ה-frontend מעודכן למבנה החדש
-- [ ] ה-schema הראשי יורד מ-52 שדות שטוחים למבנה היררכי
+- [x] אומת: ב-frontend השדות הופיעו רק ב-interface `ReportDetailResponse` (`contracts.ts`) וב-`generated.ts` — לא נצרכו בשום קומפוננטה
+- [x] הוסרו מ-`ReportDetailResponse` (`annual_report_detail.py` schema). `_enrich_detail_response` נמחק כולו — מטרתו היחידה הייתה הצבת שני השדות, כך שגם query מיותר ל-DB נחסך
+- [x] frontend נקי (0 הפניות); generated types + OpenAPI מעודכנים; tests עוברים (105)
 
-### 37. 🔍 DTO רזה ל-`AnnualReportResponse` (31 שדות) ברשימה
-**בעיה:** `GET /annual-reports` מחזיר 31 שדות לכל פריט, אף ש-`AnnualReportCard` (5 שדות) קיים.
+### 36. קיבוץ חישובי מס ב-`AnnualReportDetailResponse` ✅ בוצע
+**בעיה:** חישובי מס שטוחים מעורבבים עם זהות/סטטוס/מטא-דאטה.
 **AC:**
-- [ ] בירור: מדוע הרשימה לא משתמשת ב-Card? אם מספיק — לעבור אליו
+- [x] כל פלטי החישוב (11 שדות) מקובצים ל-`tax_calculation` (`AnnualReportTaxCalculationResponse`); קלטי ניכוי שמוזנים ידנית ועמודות outcome נשארו flat
+- [x] ה-frontend מעודכן למבנה החדש (`report.tax_calculation.*`)
+- [x] ה-schema הראשי שטוח-יותר; מבנה היררכי
 
----
+### 37. 🔍 DTO רזה ל-`AnnualReportResponse` (31 שדות) ברשימה ✅ בוצע
+**בעיה:** `GET /annual-reports` החזיר 31 שדות לכל פריט. (אין `AnnualReportCard` לדומיין זה — ההפניה המקורית הייתה לדומיין אחר.)
+**AC:**
+- [x] נוצר `AnnualReportListItem` רזה (15 שדות שה-UI באמת מציג); list/overdue/season/client endpoints עברו אליו, detail נשאר `AnnualReportDetailResponse`
+- [x] mapper נפרד `_to_list_items` מדלג על חישוב actions/transitions היקר
+- [x] ה-frontend list contract/types מעודכנים; regression guard מוודא הפרדת list/detail
 
 ## 🔵 בעיות DTO ו-Schema
 
@@ -258,8 +260,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - תיעוד: [docs/architecture/update-request-conventions.md](architecture/update-request-conventions.md) (רשום ב-documentation-map). OpenAPI + frontend `generated.ts` יוצאו מחדש.
 - בדיקות: סוויטת backend מלאה ירוקה; frontend typecheck/lint/build ירוקים.
 
----
-
 ## 🟣 בעיות Response ו-Envelope
 
 ### 42. Response envelopes לא עקביים
@@ -291,8 +291,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] להוסיף `updated_at` ל: BinderResponse, ChargeResponse, CorrespondenceResponse, BusinessResponse, SignatureRequestResponse, ReminderResponse
 
----
-
 ## 🟤 כפילויות ו-Versioning
 
 ### 47. 🔍 `status` vs `transition` ב-annual-reports
@@ -309,8 +307,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** מחזיר `AnnualReportStatusReportResponse` (דו"ח סטטוס), לא רשימה.
 **AC:**
 - [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
-
----
 
 ## 🔶 פערי Filter ו-Search
 
@@ -331,8 +327,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
 
----
-
 ## 🔴 Error Schemas
 
 ### 53. אין schema גנרי לשגיאות עסקיות
@@ -351,14 +345,12 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **בוצע:** `GET /api/v1/annual-reports/{report_id}/charges` מצהיר `response_model=PaginatedResponse[ChargeResponse]`, וה-OpenAPI מייצר `PaginatedResponse_ChargeResponse_`.
 
----
-
 ## 🔍 ממצאים נוספים
 
-### 55. שני audit endpoints עם shapes שונות
-**בעיה:** `VatAuditTrailResponse` = `{items, total}`; `EntityAuditTrailResponse` = `{items, total, limit, offset}`.
+### 55. שני audit endpoints עם shapes שונות ✅ בוצע
+**בעיה:** `VatAuditTrailResponse` היה `{items, total}` ו-`EntityAuditTrailResponse` היה `{items, total, limit, offset}`.
 **AC:**
-- [ ] envelope אחיד לשני ה-audit endpoints
+- [x] envelope אחיד לשני ה-audit endpoints: שניהם מחזירים `items`, `total`, `page`, `page_size`.
 
 ### 56. 🔍 VAT CREATE רק global, לא per-client
 **בעיה:** בניגוד לדומיינים אחרים שיש להם `POST /clients/{id}/X`.
@@ -374,8 +366,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** `anyOf: [schema, null]` — POST ללא body מותר.
 **AC:**
 - [ ] בירור: מכוון? אם כן — לתעד. אם לא — להסיר את ה-null
-
----
 
 ## 🔺 חוסר עקביות בטיפוסים (Type Conflicts)
 
@@ -411,8 +401,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` כ-float.
 **AC:** בירור: float מקובל לשיעורים, או `decimal` כמו שאר הכספים (סיכון עיגול)?
 
----
-
 ## 🔻 בעיות עיצוב Schema ו-Enum
 
 ### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType`
@@ -427,7 +415,19 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** pagination מוגבל ל-2 ערכים דרך enum.
 **AC:** בירור: ההגבלה מכוונת? אם לא — param רגיל עם min/max.
 
----
+## ⚠️ תיקוני עקביות חוצי-מערכת
+
+### 70. `client_id` vs `client_record_id`
+**בעיה:** שני path params מעורבבים ב-spec.
+**AC:** איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
+
+### 71. `history` vs `audit`
+**סטטוס:** בוצע. `audit` הוא הדפוס הקנוני לנתיבי audit trail; נתיבי binders/annual-reports הועברו ל-`/audit`.
+**AC:** בחירת דפוס אחד + יישום בכל הדומיינים.
+
+### 72. `restore` לא עקבי
+**בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.
+**AC:** restore בכל דומיין עם soft delete (מקושר לפריטים 22, 30).
 
 ## 🐞 באגים מובהקים (תיקון ישיר, ללא בירור)
 
@@ -464,19 +464,3 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] `DELETE /binders/{binder_id}/intakes/{intake_id}` — מחיקת intake בודד
 - [ ] מחזיר `204` + `404` אם לא קיים
-
----
-
-## ⚠️ תיקוני עקביות חוצי-מערכת
-
-### 70. `client_id` vs `client_record_id`
-**בעיה:** שני path params מעורבבים ב-spec.
-**AC:** איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
-
-### 71. `history` vs `audit`
-**סטטוס:** בוצע. `audit` הוא הדפוס הקנוני לנתיבי audit trail; נתיבי binders/annual-reports הועברו ל-`/audit`.
-**AC:** בחירת דפוס אחד + יישום בכל הדומיינים.
-
-### 72. `restore` לא עקבי
-**בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.
-**AC:** restore בכל דומיין עם soft delete (מקושר לפריטים 22, 30).

@@ -148,7 +148,7 @@ No repository layer
 | POST | /{report_id}/status | transition_status | [annual_report_status.py](../../backend/app/annual_reports/api/annual_report_status.py) |
 | POST | /{report_id}/submit | submit_report | [annual_report_status.py](../../backend/app/annual_reports/api/annual_report_status.py) |
 | POST | /{report_id}/deadline | update_deadline | [annual_report_status.py](../../backend/app/annual_reports/api/annual_report_status.py) |
-| GET | /{report_id}/history | get_status_history | [annual_report_status.py](../../backend/app/annual_reports/api/annual_report_status.py) |
+| GET | /{report_id}/audit | get_report_audit | [annual_report_status.py](../../backend/app/annual_reports/api/annual_report_status.py) |
 | POST | /{report_id}/tax-calculation/save | save_tax_calculation | [annual_report_tax.py](../../backend/app/annual_reports/api/annual_report_tax.py) |
 | GET | /{report_id}/export/pdf | export_annual_report_pdf | [routes_export.py](../../backend/app/annual_reports/api/routes_export.py) |
 | GET | /{client_record_id}/annual-reports | list_client_reports | [annual_report_client.py](../../backend/app/annual_reports/api/annual_report_client.py) |
@@ -200,7 +200,7 @@ No repository layer
 | list_reports | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
 | get_season_summary | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
 | get_overdue | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
-| get_status_history | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
+| get_report_audit | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
 | get_detail_report | [query_service.py](../../backend/app/annual_reports/services/query_service.py) |
 | get_readiness_check | [readiness_service.py](../../backend/app/annual_reports/services/readiness_service.py) |
 | add_schedule | [schedule_service.py](../../backend/app/annual_reports/services/schedule_service.py) |
@@ -279,8 +279,8 @@ No repository layer
 | get_schedules | [schedule_repository.py](../../backend/app/annual_reports/repositories/schedule_repository.py) |
 | mark_schedule_complete | [schedule_repository.py](../../backend/app/annual_reports/repositories/schedule_repository.py) |
 | schedules_complete | [schedule_repository.py](../../backend/app/annual_reports/repositories/schedule_repository.py) |
-| append_status_history | [status_history_repository.py](../../backend/app/annual_reports/repositories/status_history_repository.py) |
-| get_status_history | [status_history_repository.py](../../backend/app/annual_reports/repositories/status_history_repository.py) |
+| append_status_audit_entry | [status_audit_repository.py](../../backend/app/annual_reports/repositories/status_audit_repository.py) |
+| list_status_audit_entries | [status_audit_repository.py](../../backend/app/annual_reports/repositories/status_audit_repository.py) |
 
 ---
 
