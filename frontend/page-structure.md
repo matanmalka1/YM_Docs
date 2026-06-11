@@ -124,7 +124,7 @@ Every List page must handle all of these consistently:
 |---------|---------------|
 | `search` | Debounced 300–500ms, URL param |
 | `filters` | URL params, reset-all supported |
-| `sort_by` / `sort_order` | URL params |
+| `sort_by` / `order` | URL params (sort direction param is `order` with `asc`/`desc`, per `docs/architecture/api-contracts.md`) |
 | `page` / `page_size` | URL params (or cursor if backend uses cursor) |
 | Loading state | Skeleton or spinner |
 | Empty state | Distinct `<XEmptyState />` component |
