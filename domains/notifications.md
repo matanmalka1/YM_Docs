@@ -16,17 +16,20 @@ Last verified against code + backend/openapi.json: 2026-06-04.
 
 ## Endpoints
 
-Router prefix is `/notifications` under `/api/v1` (`backend/app/notifications/api/notifications.py:33-37`). All four paths below exist in `backend/openapi.json`.
+Router prefix is `/notifications` under `/api/v1` (`backend/app/notifications/api/notifications.py:33-37`). All five paths below exist in `backend/openapi.json`.
 
 Auth:
 - Notification endpoints intentionally allow both `ADVISOR` and `SECRETARY` at the router level (`backend/app/notifications/api/notifications.py:33-36`).
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /api/v1/notifications | List persisted notification rows with filters and pagination |
+| GET | /api/v1/notifications | List persisted notification rows (thin `NotificationListItem`) with filters and pagination |
+| GET | /api/v1/notifications/{notification_id} | Return one full notification (`NotificationResponse`); `404 NOTIFICATION.NOT_FOUND` when missing |
 | GET | /api/v1/notifications/summary | Return counts by persisted status (`pending`, `sent`, `failed`, `skipped`) plus `total` |
 | POST | /api/v1/notifications/preview | Render a manual notification preview or return `blocked` with a reason |
 | POST | /api/v1/notifications/send | Execute a manual send attempt with idempotency protection |
+
+The list and detail responses are intentionally split: the list returns the thin `NotificationListItem` (row fields plus the `content_snapshot`/`subject_snapshot`/`business_name` previews the bell drawer and per-client tab render inline), while routing/delivery/debug fields (`channel`, `binder_id`, `annual_report_id`, `signature_request_id`, `entity_type`, `entity_id`, `sent_at`, `failed_at`, `error_message`, `retry_count`, `triggered_by`) are served only by `GET /{notification_id}` as `NotificationResponse` (`backend/app/notifications/schemas/notification_schemas.py`, `backend/app/notifications/api/notifications.py`). The notifications-center detail drawer fetches `GET /{notification_id}` on open rather than reusing the list row.
 
 ## Model & fields
 
@@ -62,7 +65,7 @@ Indexes:
 
 Schema notes:
 - `NotificationSendRequest.channel` accepts only `email` or `null`; omitted channel defaults to email in the service (`backend/app/notifications/schemas/notification_schemas.py:32-42`, `backend/app/notifications/services/notification_send_service.py:290`).
-- Read responses add derived `client_name`, `business_name`, `trigger_label`, and `domain_label`; those are enrichment fields, not model columns (`backend/app/notifications/schemas/notification_schemas.py:65-107`, `backend/app/notifications/services/notification_service.py:29-43,76-137`).
+- Both read DTOs add derived `client_name`, `business_name`, `trigger_label`, and `domain_label`; those are enrichment fields, not model columns. The list builds the thin `NotificationListItem` (`_enrich_list_item`) and the detail endpoint builds the full `NotificationResponse` (`_enrich`) (`backend/app/notifications/schemas/notification_schemas.py`, `backend/app/notifications/services/notification_service.py`).
 
 ## Enums / statuses
 
@@ -138,6 +141,7 @@ Registry: `docs/architecture/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|
+| `NOTIFICATION.NOT_FOUND` | `GET /api/v1/notifications/{notification_id}` requests a notification that does not exist (`backend/app/notifications/services/notification_service.py`) |
 | `NOTIFICATION.MISSING_IDEMPOTENCY_KEY` | Manual send is missing `X-Idempotency-Key`, or auto-send receives a blank idempotency key (`backend/app/notifications/api/notifications.py:120-127`, `backend/app/notifications/services/notification_auto_send_service.py:110-111`) |
 | `NOTIFICATION.INVALID_IDEMPOTENCY_KEY` | Manual send header is present but not a valid UUID (`backend/app/notifications/api/notifications.py:128-135`) |
 | `NOTIFICATION.AUTO_SEND_TRIGGER_NOT_ALLOWED` | Internal auto-send is called with a trigger other than `binder_ready_for_handover` (`backend/app/notifications/services/notification_auto_send_service.py:105-109`) |

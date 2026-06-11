@@ -30,18 +30,20 @@ All paths exist in `backend/openapi.json` (`backend/openapi.json:9757`, `backend
 | `POST` | `/api/v1/vat/work-items/{item_id}/send-back` | Advisor sends a reviewed item back for correction |
 | `POST` | `/api/v1/vat/work-items/{item_id}/file` | Advisor files the VAT return |
 | `GET` | `/api/v1/vat/work-items/groups` | List grouped work-item summaries |
-| `GET` | `/api/v1/vat/work-items/groups/{group_key}/items` | List items in a grouped due-date bucket |
+| `GET` | `/api/v1/vat/work-items/groups/{group_key}/items` | List items (thin `VatWorkItemListItem`) in a grouped due-date bucket |
 | `GET` | `/api/v1/vat/work-items/lookup` | Look up one item by `client_record_id` and `period` |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/period-options` | Return valid period options for a client |
 | `GET` | `/api/v1/vat/work-items/status-summary` | Count work items by status |
-| `GET` | `/api/v1/vat/work-items/{item_id}` | Get one enriched work item |
-| `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items |
-| `GET` | `/api/v1/vat/work-items` | List work items across clients |
+| `GET` | `/api/v1/vat/work-items/{item_id}` | Get one enriched work item (full `VatWorkItemResponse`) |
+| `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items (thin `VatWorkItemListItem`) |
+| `GET` | `/api/v1/vat/work-items` | List work items across clients (thin `VatWorkItemListItem`) |
 | `GET` | `/api/v1/vat/work-items/{item_id}/audit` | Get audit trail for a work item |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/summary` | Get client-level VAT period and annual aggregates |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/export` | Export a client's VAT data as Excel or PDF |
 
 Router sources: `backend/app/vat/api/routes_intake.py:14-22`, `backend/app/vat/api/routes_data_entry.py:16-104`, `backend/app/vat/api/routes_status.py:16-50`, `backend/app/vat/api/routes_filing.py:13-24`, `backend/app/vat/api/routes_grouped.py:17-46`, `backend/app/vat/api/routes_queries.py:25-158`, `backend/app/vat/api/routes_client_summary.py:12-38`.
+
+List/detail DTO split: the three work-item list endpoints return the thin `VatWorkItemListItem` — only the fields the VAT list/grouped table/cards render (identity, period, status, `net_vat`/`final_vat_amount`/`is_overridden`, the displayed deadline fields, `filed_at`, `updated_at`, `available_actions`). Detail-only fields (raw `total_*` amounts, `override_justification`, `submission_method`/`submission_reference`, `filed_by`/`filed_by_name`, `assigned_to`/`assigned_to_name`, `statutory_deadline`, amendment links, `client_status`, `pending_materials_note`) are served only by `GET /vat/work-items/{item_id}` as the full `VatWorkItemResponse`; the list-row click navigates to the detail page, which refetches by id (`backend/app/vat/schemas/vat_report.py`, `backend/app/vat/api/serializers.py`).
 
 ## Model & fields
 

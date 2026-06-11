@@ -33,6 +33,10 @@ Source of truth: mandatory
 - Standard list responses must return `items`, `total`, `page`, and `page_size`.
 - List responses may include additional aggregate fields such as counters when the owning endpoint contract defines them.
 - Endpoints that back KPI cards or filtered dashboards must expose the aggregate fields the UI needs, such as totals, counts, or sums, instead of requiring the frontend to infer them from paginated `items`.
+- List endpoints must not return the same full detail DTO used by `GET /{id}` when that DTO contains fields the list UI does not render.
+- List endpoints must return a dedicated thin row/card DTO, such as `XxxListItem` or `XxxCard`; detail endpoints must return the full detail DTO, such as `XxxResponse` or `XxxDetailResponse`.
+- A list DTO may keep a preview field only when the list UI renders that content inline; routing, debug, internal, and other detail-only fields must not appear in list responses.
+- The thin-list-DTO rule applies to new endpoints and to endpoints touched during a refactor; it does not require an immediate retroactive migration of all existing domains.
 - Every response-bearing endpoint must declare `response_model=`.
 - Endpoints with no response body must use HTTP 204.
 - Application error responses must use the standard error envelope: `{ "error": { "code": string, "message": string, "details": unknown | null, "request_id"?: string | null } }`.

@@ -191,10 +191,12 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - `VatWorkItemResponse` (36 שדות) — רשימה מחזירה `override_justification`, `submission_reference`, `filed_by_name`, `statutory_deadline`, `extended_deadline`
 - `ClientRecordResponse` (27), `ChargeResponse` (23), `NotificationResponse` (24)
 **AC:**
-- [ ] DTO רזה (`XxxCard` / `XxxListItem`) לכל אחד מה-4, עם רק השדות שמוצגים בטבלה
-- [ ] endpoints של LIST עוברים ל-DTO הרזה
-- [ ] ה-DTO השמן נשאר רק ב-`GET /{id}`
-- [ ] מדידה: payload של LIST קטֵן (לתעד before/after)
+- [x] DTO רזה (`XxxListItem`) לכל אחד מה-4: `VatWorkItemListItem`, `ClientRecordListItem`, `ChargeListItem`, `NotificationListItem`
+- [x] endpoints של LIST עוברים ל-DTO הרזה (vat work-items + grouped + by-client, clients, charges, notifications)
+- [x] ה-DTO השמן נשאר רק ב-`GET /{id}` — וב-notifications נוסף `GET /notifications/{id}` חדש (לא היה detail endpoint)
+- [x] מדידה: [performance/list-dto-payloads.md](performance/list-dto-payloads.md) (VAT −56.9%, clients −66.0%, charges −32.7%, notifications −31.6%)
+
+**הושלם** (2026-06-11). חוק contract חדש ב-[architecture/api-contracts.md](architecture/api-contracts.md). תיעוד דומיינים עודכן (vat/charges/clients/notifications). הערה: notifications list שומר `content_snapshot`/`subject_snapshot`/`business_name` כי ה-bell drawer/tab מציגים preview inline.
 
 ### 35. 🔍 שדות כפולים חשודים ב-`AnnualReportDetailResponse`
 **בעיה:** שלושה זוגות שנראים שרידי מיגרציה — `refund_due`+`tax_refund_amount`, `tax_due`+`tax_due_amount`, `assessment_amount`+`final_balance`.

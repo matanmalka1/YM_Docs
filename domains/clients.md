@@ -22,7 +22,7 @@ All endpoints require role `ADVISOR` or `SECRETARY` unless noted. `client_id` in
 |--------|------|---------|------|
 | POST | /api/v1/clients/preview-impact | Dry-run: returns projected obligations without writing | ADVISOR |
 | POST | /api/v1/clients | Create LegalEntity + ClientRecord + first Business in one request | ADVISOR |
-| GET | /api/v1/clients | List clients (search, status, entity_type, accountant_id, tax_year, sort, page) | ADVISOR, SECRETARY |
+| GET | /api/v1/clients | List clients (thin `ClientRecordListItem`; search, status, entity_type, accountant_id, sort, page) | ADVISOR, SECRETARY |
 | GET | /api/v1/clients/sidebar | Lightweight list for sidebar nav (page_size ≤ 100); does not include cross-domain alert counts | ADVISOR, SECRETARY |
 | GET | /api/v1/clients/{client_id} | Get full client by ClientRecord.id | ADVISOR, SECRETARY |
 | PATCH | /api/v1/clients/{client_id} | Partial update of identity/status fields | ADVISOR, SECRETARY |
@@ -209,6 +209,8 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 **Soft delete**: `ClientRecord` uses `SoftDeletableMixin` (adds `deleted_at`, `deleted_by`, `restored_at`, `restored_by`). Hard deletes are not supported. Restore checks that no active client already holds the same `id_number` before restoring.
 
 **Excel import**: partial-success semantics — valid rows are created, invalid rows are returned in an `errors` array. Requires `X-Idempotency-Key` header. Max upload size: 10 MB. Default entity type for import rows: `osek_murshe`; default VAT frequency: `bimonthly`; default advance payment frequency: `bimonthly` (`constants.py:41-43`).
+
+**List payload (thin DTO)**: `GET /api/v1/clients` returns the thin `ClientRecordListItem` (identity, status, contact, `office_client_number`, `active_binder_number`, `created_at`) — only the fields the clients table renders. Full profile fields (tax-reporting config, address, advance-rate, `annual_revenue`, `annual_turnover`, metadata) are served only by `GET /api/v1/clients/{client_id}` as `ClientRecordResponse`; the list-page edit form fetches the client by id before editing. Because turnover is detail-only, the list no longer performs the per-page annual-turnover lookup and the list endpoint no longer accepts the (previously turnover-only) `tax_year` query param (`backend/app/clients/services/client_query_service.py`, `backend/app/clients/services/client_enrichment_service.py`).
 
 **Sidebar payload**: `GET /api/v1/clients/sidebar` returns only client identity/navigation fields and pagination metadata. The service delegates to `ClientRecordRepository.list_sidebar()` and `count_sidebar()`, so it currently does not attach notification, work-queue, or other cross-domain alert counts (`backend/app/clients/api/clients.py:115-131`, `backend/app/clients/services/client_query_service.py:132-153`, `backend/app/clients/repositories/client_record_repository.py:222-262`).
 

@@ -21,7 +21,7 @@ All paths below exist in `backend/openapi.json:6195-6675`. All routes require `A
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/api/v1/charges` | Create a draft charge for a client record, optionally scoped to one business |
-| `GET` | `/api/v1/charges` | List non-deleted charges with business/client/status/type/period/date filters, pagination, and per-status stats |
+| `GET` | `/api/v1/charges` | List non-deleted charges (thin `ChargeListItem`) with business/client/status/type/period/date filters, pagination, and per-status stats |
 | `GET` | `/api/v1/charges/{charge_id}` | Fetch one non-deleted charge by id |
 | `POST` | `/api/v1/charges/{charge_id}/issue` | Transition a draft charge to `issued` and stamp `issued_at` / `issued_by` |
 | `POST` | `/api/v1/charges/{charge_id}/mark-paid` | Transition an issued charge to `paid` and stamp `paid_at` / `paid_by` |
@@ -63,7 +63,8 @@ Indexes declared on the model:
 
 API shape notes:
 - Create accepts `client_record_id`, optional `business_id`, positive `amount`, enum `charge_type`, optional `period`, and `months_covered` constrained to `1..2`. (`backend/app/charges/schemas/charge.py:13-26`)
-- Response adds enriched `client_name`, `business_name`, `office_client_number`, and `available_actions`. (`backend/app/charges/schemas/charge.py:29-54`, `backend/app/charges/services/charge_response_builder.py:11-20`)
+- Both read DTOs add enriched `client_name`, `business_name`, `office_client_number`, and `available_actions`. (`backend/app/charges/schemas/charge.py`, `backend/app/charges/services/charge_response_builder.py:11-20`)
+- List/detail DTO split: `GET /api/v1/charges` returns the thin `ChargeListItem` (the fields the charges table renders), while detail-only fields (`description`, `annual_report_id`, audit actors `created_by`/`issued_by`/`paid_by`/`canceled_by`, `canceled_at`, `cancellation_reason`) are served only by `GET /api/v1/charges/{charge_id}` as `ChargeResponse`. The charge detail drawer fetches the charge by id. (`backend/app/charges/schemas/charge.py`, `backend/app/charges/services/charge_query_service.py`)
 
 ## Enums / statuses
 
