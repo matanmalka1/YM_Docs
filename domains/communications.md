@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The communications domain manages the per-client-record log of all interactions between the tax advisory firm, its clients, and external authority contacts (e.g., Israeli Tax Authority, National Insurance). Each entry records a single interaction event (call, letter, email, meeting, or fax) anchored to a `client_record_id`, with optional scoping to a specific business and optional linkage to an authority contact. The log is the audit trail used for ITA disputes and client timeline views.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` (#46); full-domain verification remains 2026-05-29.
 
 ## Endpoints
 
@@ -46,12 +46,13 @@ Table: `correspondence_entries`. Source: `backend/app/communications/models/corr
 | `occurred_at` | DateTime (timezone=True) | No | stored UTC; frontend renders as Asia/Jerusalem |
 | `created_by` | int FK → `users.id` | No | |
 | `created_at` | DateTime | No | auto-set via `utcnow_aware` |
+| `updated_at` | DateTime | Yes | set on real update (PATCH) via `onupdate=utcnow_aware`; NULL until first update — never faked from `created_at` |
 | `deleted_at` | DateTime | Yes | soft-delete timestamp |
 | `deleted_by` | int FK → `users.id` | Yes | soft-delete actor |
 
 Indexes: `idx_correspondence_business_occurred` (`business_id`, `occurred_at`), `idx_correspondence_occurred` (`occurred_at`), and implicit index on `client_record_id`.
 
-No `updated_at` column — design decision: entries are immutable once created; corrections are soft-deleted and re-entered (see Decisions).
+Entries are mutable via the PATCH endpoint. The `updated_at` column (nullable) is set on a real update via `onupdate=utcnow_aware`; it is NULL for entries never updated and is never derived from `created_at` (see Decisions, issue #46).
 
 ## Enums / statuses
 
@@ -102,7 +103,7 @@ No open known issues.
 From `backend/app/communications/models/correspondence.py` docstring and README:
 
 1. **`client_record_id` is the primary anchor.** Correspondence is tied to the legal entity record, not to a business. `business_id` is optional UI context for grouping.
-2. **No `updated_at` column.** Correspondence entries are treated as immutable log records once created. Corrections are made by soft-deleting the original entry and re-entering correct data. This preserves audit integrity.
+2. **Mutable with `updated_at` (resolved, issue #46).** Correspondence entries are editable in place via the PATCH endpoint (`update_entry` service). The `updated_at` column (nullable) records the last real update via `onupdate=utcnow_aware`; it stays NULL for entries never updated and is never faked from `created_at`. Soft delete remains available and also bumps `updated_at` (it is a mutation). This supersedes the original "immutable, no `updated_at`" design once the PATCH path shipped — the model docstring previously still claimed immutability and was corrected in the same change.
 3. **`occurred_at` stored as UTC.** Frontend is responsible for converting to `Asia/Jerusalem` for display. This avoids DST ambiguity in stored data.
 4. **`contact_id` validated against `client_record_id`, not `business_id`.** Authority contacts belong to clients, not businesses. The ownership check uses the client record anchor to avoid incorrect cross-business mismatches.
 5. **Soft delete with actor tracking.** `deleted_at` + `deleted_by` support audit requirements for Israeli tax advisory practices.

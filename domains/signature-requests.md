@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 Manages the full lifecycle of digital signature requests sent to clients for legally-binding approval of documents. Built under Israeli Electronic Signature Law 5761-2001: every request anchors to a `client_record_id`, carries a one-time signing token, captures a content hash for tamper detection, and records every lifecycle transition in an append-only audit trail.
 
-Last verified against code + backend/openapi.json: 2026-06-05.
+Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` on the request row (#46); full-domain verification remains 2026-06-05.
 
 ## Endpoints
 
@@ -61,6 +61,7 @@ Source: `backend/app/signature_requests/models/signature_request.py:56`
 | `status` | pg_enum(`SignatureRequestStatus`) | no | default `pending_signature` |
 | `signing_token` | String | yes | unique one-time URL-safe token; cleared on terminal state |
 | `created_at` | datetime | no | UTC |
+| `updated_at` | datetime | yes | `onupdate=utcnow`; set on real row mutation (send/sign/decline/cancel/expire/soft-delete); NULL until first update — never faked from `created_at` (#46). Distinct from the append-only audit trail. |
 | `sent_at` | datetime | yes | set at creation time |
 | `expires_at` | datetime | yes | `created_at + expiry_days` |
 | `expiry_days` | int | no | default 14, max 90 |

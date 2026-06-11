@@ -297,16 +297,16 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 | `POST /annual-reports/{id}/deadline` | 200 | לא — עדכון | **200** | מעדכן deadline על דוח קיים |
 | `POST /auth/forgot-password` | 200 | לא (security-neutral) | **200** | מניעת user enumeration; הלקוח לא צורך משאב |
 
-### 46. `updated_at` חסר על Response schemas ⏳ בוצע חלקית / חסום
+### 46. `updated_at` חסר על Response schemas ✅ סגור
 **בעיה:** קיים `created_at` בכל, אבל `updated_at` רק בחלק.
-**מצב:** מתוך 6 ה-schemas שב-AC, רק 2 מהמודלים שלהם מחזיקים עמודת `updated_at` אמיתית. לא מזייפים מ-`created_at`, ולא מוסיפים עמודות/migrations בפאס הזה.
+**מצב:** כל 6 ה-schemas שב-AC מחזיקים כעת `updated_at` אמיתי. לא מזייפים מ-`created_at` (לא ב-runtime ולא ב-migration): העמודה nullable, מתחילה NULL, ומתמלאת רק ב-update אמיתי דרך `onupdate`. כל מודל קיבל עמודה + Alembic migration (0002–0005) + audit של נתיבי העדכון + בדיקות, ו-OpenAPI/`generated.ts` יוצאו מחדש.
 **AC:**
 - [x] `ReminderResponse` — כבר כלל `updated_at` (no-op).
 - [x] `BusinessResponse` — נוסף `updated_at` (העמודה קיימת במודל, nullable + `onupdate`). additive.
-- [ ] `BinderResponse` — **דחוי**: למודל אין עמודת `updated_at`. דורש עמודה חדשה + Alembic migration + `onupdate=utcnow` + audit של נתיבי העדכון + בדיקות.
-- [ ] `ChargeResponse` — **דחוי**: כנ"ל (אין עמודה במודל).
-- [ ] `SignatureRequestResponse` — **דחוי**: למודל יש `created_at` + `signed_at` בלבד; שינויי סטטוס נרשמים ב-audit trail נפרד. דורש החלטה אם נחוצה עמודת `updated_at` + migration.
-- [ ] `CorrespondenceResponse` — **דחוי + החלטת דומיין**: ה-docstring של המודל ([correspondence.py](../backend/app/communications/models/correspondence.py)) טוען immutability ("No updated_at"), אבל קיימים `PATCH` endpoint + `update_entry` service + `CorrespondenceUpdateRequest` שמשנים רשומות. יש לפתור את הסתירה (האם correspondence באמת mutable?) לפני הוספת `updated_at`.
+- [x] `ChargeResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0002. מתעדכן ב-issue/pay/cancel/soft-delete.
+- [x] `BinderResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0003. מתעדכן בשינויי lifecycle/handover/capacity/soft-delete.
+- [x] `SignatureRequestResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0004. מתעדכן ב-send/sign/decline/cancel/expire/soft-delete. `SignatureAuditEvent` נשאר append-only ללא `updated_at`.
+- [x] `CorrespondenceResponse` — **החלטת דומיין: correspondence הוא mutable**. ה-PATCH path אמיתי ונשאר; נוספה עמודה `updated_at` (nullable, `onupdate=utcnow_aware`) + migration 0005, ה-docstring המיושן ("No updated_at"/immutable) ו-[docs/domains/communications.md](domains/communications.md) תוקנו.
 
 ## 🟤 כפילויות ו-Versioning
 

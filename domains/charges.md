@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The charges domain owns office-managed billing charges linked to a `client_record_id`, with an optional business scope and optional annual-report linkage. It exposes a small lifecycle surface: create a draft charge, transition it through issued/paid/canceled states, soft-delete eligible charges, and list/get charges with enrichment used by the CRM UI.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` (#46); full-domain verification remains 2026-05-29.
 
 ## Endpoints
 
@@ -46,6 +46,7 @@ Model: `Charge` in `backend/app/charges/models/charge.py:31-101`.
 | `months_covered` | int | No | defaults to `1`; current schema allows `1..2` |
 | `description` | text | Yes | persisted but not accepted by current create API |
 | `created_at` | datetime | No | default `utcnow` |
+| `updated_at` | datetime | Yes | `onupdate=utcnow`; set on real mutation (issue/pay/cancel/soft-delete); NULL until first update — never faked from `created_at` (#46) |
 | `created_by` | int FK -> `users.id` | Yes | actor who created the charge |
 | `issued_at` | datetime | Yes | set on issue transition |
 | `issued_by` | int FK -> `users.id` | Yes | set on issue transition |

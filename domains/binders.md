@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The binders domain manages physical binders that hold client tax documents. Each binder belongs to one `client_record`, receives material intakes over time, transitions through a defined lifecycle, and is eventually handed over to the client. All materials from all of a client's businesses are stored in the same binder; the material type is tracked at the `BinderIntakeMaterial` level, not at binder level.
 
-Last verified against code + backend/openapi.json: 2026-06-04.
+Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` on the Binder table (#46); full-domain verification remains 2026-06-04.
 
 ## Endpoints
 
@@ -57,6 +57,7 @@ Cite: `backend/app/binders/models/binder.py`
 | handover_recipient_name | str | yes | name of person who received binders on client side |
 | notes | text | yes | physical logistics info |
 | created_at | datetime | no | UTC |
+| updated_at | datetime | yes | `onupdate=utcnow`; set on real mutation (status/handover/capacity/soft-delete); NULL until first update — never faked from `created_at` (#46) |
 | created_by | int FK→users.id | no | |
 | deleted_at | datetime | yes | soft delete |
 | deleted_by | int FK→users.id | yes | soft delete actor |
