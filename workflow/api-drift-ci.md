@@ -58,7 +58,7 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 
 # 2. Regenerate generated.ts
 cd ../frontend
-npx --yes openapi-typescript ../backend/openapi.json -o src/types/generated.ts
+npm run gen:types
 
 # 3. Review what changed
 git diff src/types/generated.ts

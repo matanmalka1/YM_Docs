@@ -1,14 +1,356 @@
-# API TODO — מפורט עם Acceptance Criteria
+# API TODO לפי אזורים
 _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **מקרא:** 🔍 = דורש בירור/החלטה לפני תיקון · AC = Acceptance Criteria (מתי המשימה גמורה)
 
 ---
 
-## 🔴 עדיפות גבוהה
+## פתוח / לביצוע
 
-### 1. Security global default ✅ בוצע
-**בעיה:** ה-`security` הגלובלי ב-spec ריק (`[]`). האבטחה מוגדרת ידנית על כל endpoint. endpoint חדש שנכתב בלי `security` field יהיה פתוח ללא אימות — וזה לא נראה לעין בקוד.
+### VAT
+
+#### 2. `PATCH /api/v1/vat/work-items/{item_id}`
+**בעיה:** אין דרך לעדכן work item אחרי יצירה (סטטוס, הערות, שדות פנימיים).
+**AC:**
+- [ ] endpoint מקבל `VatWorkItemUpdateRequest` עם שדות אופציונליים
+- [ ] עדכון חלקי (שדה בודד) לא מאפס שדות אחרים
+- [ ] מחזיר `VatWorkItemResponse` מעודכן + `404` אם לא קיים
+
+#### 3. `DELETE /api/v1/vat/work-items/{item_id}`
+**בעיה:** אין מחיקת work item.
+**AC:**
+- [ ] מחיקה רכה (soft delete) עקבית עם שאר הדומיינים
+- [ ] מחזיר `204` בהצלחה, `404` אם לא קיים
+- [ ] פריט מחוק לא מופיע ב-LIST כברירת מחדל
+
+#### 4. `POST /api/v1/vat/work-items/bulk-transition`
+**בעיה:** אין שינוי סטטוס מרובה — צריך לעבור פריט-פריט.
+**AC:**
+- [ ] מקבל רשימת IDs + transition יעד
+- [ ] מחזיר סיכום הצלחות/כשלונות לכל פריט (כמו `BulkChargeActionResponse`)
+- [ ] transition לא חוקי לפריט בודד לא מפיל את כל ה-batch
+
+#### 56. 🔍 VAT CREATE רק global, לא per-client
+**בעיה:** בניגוד לדומיינים אחרים שיש להם `POST /clients/{id}/X`.
+**AC:**
+- [ ] בירור: להוסיף `POST /vat/clients/{id}/work-items` לעקביות?
+
+### Charges
+
+#### 5. `PATCH /api/v1/charges/{charge_id}`
+**בעיה:** charge שנוצר לא ניתן לעריכה (סכום, תיאור, תאריך).
+**AC:**
+- [ ] עדכון מותר רק בסטטוס `draft` (בירור 🔍: האם לאפשר גם ב-`issued`?)
+- [ ] מחזיר `ChargeResponse` מעודכן + `409` אם הסטטוס לא מאפשר עריכה
+
+#### 30. `POST /api/v1/charges/{charge_id}/restore`
+**AC:**
+- [ ] משחזר charge מבוטל/מחוק (בירור 🔍: מאיזה סטטוס ניתן לשחזר?)
+
+### Notifications
+
+#### 6. `PATCH /api/v1/notifications/{notification_id}` — mark read/unread
+**בעיה:** אין endpoint לסימון notification כנקרא. ה-UI כנראה עוקף את זה בצד הלקוח.
+**AC:**
+- [ ] מאפשר עדכון סטטוס קריאה
+- [ ] מחזיר ה-notification מעודכן + `404` אם לא קיים
+
+#### 7. `POST /api/v1/notifications/mark-all-read`
+**בעיה:** אין סימון גורף.
+**AC:**
+- [ ] מסמן את כל ה-notifications של המשתמש כנקראו
+- [ ] מחזיר מספר הפריטים שעודכנו
+
+#### 8. `DELETE /api/v1/notifications/{notification_id}` — dismiss
+**בעיה:** אין הסרה/dismiss.
+**AC:**
+- [ ] מסיר notification מהתצוגה
+- [ ] מחזיר `204` + `404` אם לא קיים
+
+### Reminders
+
+#### 9. `PATCH /api/v1/reminders/{reminder_id}`
+**בעיה:** אין עדכון תזכורת (תאריך, טקסט).
+**AC:**
+- [ ] עדכון חלקי של תזכורת בסטטוס `scheduled`
+- [ ] מחזיר `409` אם התזכורת כבר `fired`/`canceled`
+
+#### 10. `DELETE /api/v1/reminders/{reminder_id}`
+**בעיה:** אין מחיקה — רק cancel.
+**AC:**
+- [ ] בירור 🔍: האם DELETE נחוץ בנוסף ל-cancel, או ש-cancel מספיק? אם כן — `204` + soft delete
+
+### Documents
+
+#### 11. `GET /api/v1/documents/client/{client_record_id}/{document_id}`
+**בעיה:** אפשר לרשום, להעלות, למחוק ולהחליף מסמך — אבל אין שליפת מסמך בודד.
+**AC:**
+- [ ] מחזיר metadata של מסמך יחיד + `404`
+
+#### 12. `PATCH /api/v1/documents/client/{client_record_id}/{document_id}`
+**בעיה:** אין עדכון metadata (שם, סוג, תגיות) בלי להחליף את הקובץ.
+**AC:**
+- [ ] עדכון metadata בלבד, ללא העלאה מחדש
+- [ ] לא משנה את גרסת הקובץ
+
+#### 13. `GET /api/v1/documents/binder/{binder_id}`
+**בעיה:** יש `documents/client/{id}` ו-`documents/annual-report/{id}` אבל לא לפי binder.
+**AC:**
+- [ ] מחזיר מסמכים המשויכים ל-binder, באותו envelope כמו שאר רשימות המסמכים
+
+### Tax Calendar
+
+#### 14–18. ניהול Tax Calendar (settings)
+**בעיה:** settings הם read-only + bootstrap בלבד. אין יצירה/עדכון/מחיקה של חוקים ו-entries.
+**AC:**
+- [ ] `PATCH /settings/tax-calendar/rules/{rule_id}` — עדכון חוק
+- [ ] `POST /settings/tax-calendar/rules` — יצירת חוק
+- [ ] `DELETE /settings/tax-calendar/rules/{rule_id}` — מחיקה
+- [ ] `PATCH /settings/tax-calendar/entries/{entry_id}` — עדכון entry
+- [ ] `DELETE /settings/tax-calendar/entries/{entry_id}` — מחיקה
+- [ ] בירור 🔍: עדכון חוק — האם משפיע רטרואקטיבית על entries קיימים או רק עתידיים?
+
+### Tasks
+
+#### 19. `GET /api/v1/clients/{client_record_id}/tasks`
+**בעיה:** אין שליפת משימות לפי לקוח — חובה לסנן ידנית.
+**AC:**
+- [ ] מחזיר משימות מסוננות ל-client_record_id, עם pagination אחיד
+
+#### 20. `GET /api/v1/tasks` עם filter לפי ישות
+**בעיה:** אי אפשר לשלוף משימות של VAT work item / דוח שנתי ספציפי.
+**AC:**
+- [ ] תמיכה ב-`?source_domain=&source_id=` כ-query params
+- [ ] בירור 🔍: לאחד עם השמות הקיימים `source_domain`/`source_id` שכבר ב-`TaskResponse`
+
+#### 32–33. Bulk operations ל-tasks
+**AC:**
+- [ ] `POST /tasks/bulk-complete` — השלמה מרובה
+- [ ] `POST /tasks/bulk-assign` — שיוך מחדש מרובה
+
+### Binders
+
+#### 21. `POST /api/v1/binders` + `PATCH /api/v1/binders/{binder_id}`
+**בעיה:** binders פועלים רק דרך transitions — אין POST/PATCH ישיר.
+**AC:**
+- [ ] בירור 🔍: האם המודל הנוכחי (receive-only) מכוון? אם כן — לתעד ולסגור. אם לא — להוסיף POST/PATCH
+
+#### 22. `POST /api/v1/binders/{binder_id}/restore`
+**בעיה:** restore קיים ב-clients אבל לא ב-binders אחרי DELETE.
+**AC:**
+- [ ] משחזר binder מחוק, עקבי עם `clients/{id}/restore`
+
+#### 58. 🔍 `BinderHandoverToClientRequest` — body אופציונלי
+**בעיה:** `anyOf: [schema, null]` — POST ללא body מותר.
+**AC:**
+- [ ] בירור: מכוון? אם כן — לתעד. אם לא — להסיר את ה-null
+
+#### 77. `binders/{id}/intakes/{intake_id}` — יש PATCH אבל אין DELETE
+**בעיה:** אפשר לעדכן intake בודד אבל לא למחוק. אם אפשר להוסיף (receive) ולעדכן — צריך גם להסיר.
+**AC:**
+- [ ] `DELETE /binders/{binder_id}/intakes/{intake_id}` — מחיקת intake בודד
+- [ ] מחזיר `204` + `404` אם לא קיים
+
+### Annual Reports
+
+#### 23. `PATCH /api/v1/annual-reports/{report_id}`
+**בעיה:** אין PATCH ראשי — רק `PATCH /{id}/details`.
+**AC:**
+- [ ] בירור 🔍: האם `/details` מספיק או שצריך wrapper ראשי? להחליט ולתעד
+
+#### 47. 🔍 `status` vs `transition` ב-annual-reports
+**בעיה:** שני endpoints למעבר סטטוס, schemas שונים (`StatusTransitionRequest` vs `StageTransitionRequest`).
+**AC:**
+- [ ] בירור: מה ההבדל? אם עודף — להסיר אחד. אם לא — לתעד את ההבחנה בין status ל-stage
+
+#### 48. 🔍 `GET /annual-reports` vs `GET /clients/{id}/annual-reports`
+**בעיה:** הראשון כבר מסנן לפי `client_record_id`, אז השני מיותר.
+**AC:**
+- [ ] בירור: להסיר את השני או לתעד מדוע נחוצים שניהם
+
+#### 76. `POST /annual-reports/{id}/expenses` ו-`/income` — אין GET-list להורה
+**בעיה:** לשתי הקולקציות יש רק POST — אין GET שמחזיר את שורות ההכנסה/הוצאה. השורות ניתנות ל-PATCH/DELETE, אבל אי אפשר לשלוף את הרשימה בנפרד; היא מגיעה רק מקוננת ב-`AnnualReportDetailResponse` השמן (52 שדות). חוסר עקביות בולט: `annex/{schedule}` כן יש לו GET.
+**AC:**
+- [ ] `GET /annual-reports/{id}/expenses` — מחזיר שורות הוצאה עם envelope אחיד
+- [ ] `GET /annual-reports/{id}/income` — מחזיר שורות הכנסה
+- [ ] מאפשר רענון השורות בלי טעינת הדוח המלא
+
+### Signature Requests
+
+#### 28. `GET /api/v1/signature-requests` — LIST כללי
+**בעיה:** קיים רק `/pending`.
+**AC:**
+- [ ] LIST עם filter על סטטוס (כולל `pending` כמקרה פרטי)
+
+#### 29. `POST /api/v1/signature-requests/{request_id}/cancel` — ישיר
+**בעיה:** cancel קיים רק דרך `/clients/{id}/signature-requests/{id}/cancel`.
+**AC:**
+- [ ] cancel ישיר ללא צורך ב-client context, עקבי עם שאר ה-cancel
+
+### Clients / Users
+
+#### 26–27. Bulk operations ל-clients
+**AC:**
+- [ ] `POST /clients/bulk-patch` — עדכון מרובה, מחזיר סיכום הצלחות/כשלונות
+- [ ] `POST /clients/bulk-delete` — מחיקה/ארכוב מרובה
+
+#### 31. `DELETE /api/v1/users/{user_id}`
+**בעיה:** אין DELETE — רק deactivate.
+**AC:**
+- [ ] בירור 🔍: האם soft delete בלבד מכוון (audit/compliance)? אם כן — לתעד ולסגור
+
+### Reports
+
+#### 49. `GET /reports/annual-reports` — שם מבלבל
+**בעיה:** מחזיר `AnnualReportStatusReportResponse` (דו"ח סטטוס), לא רשימה.
+**AC:**
+- [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
+
+### Response Envelopes / Errors
+
+#### 42. Response envelopes לא עקביים
+**בעיה:** 4 וריאנטים שונים של רשימה.
+**AC:**
+- [ ] `VatWorkItemListResponse` — מוסיף `page`, `page_size`
+- [ ] `VatInvoiceListResponse` — מוסיף `page`, `page_size`, `total`
+- [ ] `BinderIntakeListResponse` — `intakes` → `items`
+- [ ] `CorrespondenceListResponse` — `total_pages` מוסר או מתווסף לכולם (החלטה אחת)
+
+#### 53. אין schema גנרי לשגיאות עסקיות — בוצע חלקית
+**בעיה:** רק `HTTPValidationError` (422) מוגדר. אין תיעוד מלא ל-400/403/409/500.
+**AC:**
+- [x] schema אחיד `ErrorEnvelope { error: { code, message, details, request_id? } }`
+- [ ] משויך ל-responses השגיאה בכל ה-endpoints
+- [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
+
+**בוצע חלקית:** נוסף schema אחיד `ErrorEnvelope`/`ErrorBody` ב-`backend/app/core/exceptions.py`, helperים לתיעוד OpenAPI של `400/401/403/404/409/500`, וטסט `backend/tests/core/test_error_openapi_schema.py` שמוודא שכל error response מתועד משתמש ב-`#/components/schemas/ErrorEnvelope`. בקומיט האחרון תועדו statuses נפוצים ב-`POST /api/v1/charges` וב-`POST /api/v1/charges/{charge_id}/cancel`. עדיין לא בוצע sweep שמוסיף את כל סטטוסי השגיאה הרלוונטיים לכל endpoint.
+
+### Filters / Search / Pagination
+
+#### 50. חיפוש טקסטואלי — 4 שמות שונים
+**בעיה:** `search`, `query`, `client_name`, `client_search` — לאותה פעולה.
+**AC:**
+- [ ] שם אחיד אחד (`search`) בכל ה-endpoints
+- [ ] ה-frontend מעודכן
+
+#### 51. תאריכי טווח — 7 פטרנים
+**בעיה:** `from`/`to`, `from_date`/`to_date`, `date_from`/`date_to`, `issued_after`/`issued_before`, `due_after`/`due_before`, `start_year`/`end_year`, `from_year`/`to_year`.
+**AC:**
+- [ ] פטרן אחיד אחד (`{field}_after`/`{field}_before`) בכל ה-endpoints
+- [ ] ה-frontend מעודכן
+
+#### 52. 🔍 16 endpoints לרשימות ללא filters
+**בעיה:** fetch עיוור.
+**AC:**
+- [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
+
+#### 74. `page_size` max לא עקבי — 100 מול 200
+**בעיה:** 25 endpoints מגבילים ל-100, 16 ל-200, ו-`GET /notifications` ללא max כלל. אין הגיון בחלוקה — `GET /annual-reports`=200 אבל `GET /clients/{id}/annual-reports`=100, לאותו סוג ישות.
+**AC:**
+- [ ] מקסימום אחיד אחד לכל ה-endpoints (להחליט 100 או 200)
+- [ ] `GET /notifications` מקבל max מוגדר
+- [ ] בדיקה: בקשה מעל המקסימום מוחזרת עם `422`
+
+### Type Conflicts
+
+#### 59. 🔍 `created_at` — `date-time` מול `date`
+**בעיה:** כמעט כולם `date-time`, אבל `VatInvoiceResponse` הוא `date`.
+**AC:**
+- [ ] בירור: חשבונית VAT צריכה שעה? להחליט ולאחד.
+
+#### 60. 🔍 `filing_deadline` — 3 טיפוסים
+**בעיה:** `string` ללא format / `date-time` / `date` — לאותו שדה לוגי.
+**AC:**
+- [ ] בירור: מהו הטיפוס הנכון? לאחד בכל 4 ה-schemas.
+
+#### 61. `occurred_at` — אותו שדה, שני טיפוסים (כנראה באג)
+**בעיה:** `CorrespondenceCreateRequest`=`date-time`, `CorrespondenceUpdateRequest`=`string` גולמי.
+**AC:**
+- [ ] לתקן את Update ל-`date-time`.
+
+#### 62. 🔍 `amount` — `decimal` מול `string` גולמי
+**בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` גולמי.
+**AC:**
+- [ ] בירור: האם זה סכום כספי? אם כן — `decimal`.
+
+#### 63. שדות פיננסיים — `string` גולמי ב-Update (כנראה באג)
+**בעיה:** `gross_amount`, `paid_amount`, `expected_amount`, `recognition_rate`, `other_credits` הם `decimal` ב-Create/Response אבל `string` גולמי ב-Update.
+**AC:**
+- [ ] לתקן את Update ל-`decimal` בכל אלה.
+
+#### 64. 🔍 `id` — `integer` מול `string`
+**בעיה:** רוב הישויות `integer`. `WorkQueueItem.id` הוא `string` — **מאושר כמכוון** (יש לו regex `^\w+:\d+$`, composite ID כמו `vat_work_item:42`). נשאר רק `AttentionBoardItem.id` כ-`string` ללא הסבר.
+**AC:**
+- [ ] בירור: האם `AttentionBoardItem.id` גם composite? אם כן — להוסיף regex ולתעד. אם לא — `integer`.
+
+#### 65. 🔍 `counterparty_id` — `string` במקום `integer`
+**בעיה:** ב-VatInvoice schemas.
+**AC:**
+- [ ] בירור: מספר עוסק/ח.פ (string מכוון) או FK פנימי?
+
+#### 66. 🔍 שיעורים כ-`number` במקום `decimal`
+**בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` כ-float.
+**AC:**
+- [ ] בירור: float מקובל לשיעורים, או `decimal` כמו שאר הכספים (סיכון עיגול)?
+
+### Schema / Enum Design
+
+#### 57. inline enum ב-correspondence `order`
+**בעיה:** `['asc','desc']` inline במקום `$ref`.
+**AC:**
+- [ ] enum מוגדר כ-schema נפרד ומופנה אליו
+
+#### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType`
+**בעיה:** שני enums לסיווג הוצאות, 7 ערכים משותפים + ערכים שונים.
+**AC:**
+- [ ] בירור: מה ההבדל ואיפה כל אחד? לאחד או לתעד.
+
+#### 68. `ReminderActionType` — UPPER_CASE חריג
+**בעיה:** היחיד ב-UPPER_CASE מתוך 52 enums (השאר snake_case).
+**AC:**
+- [ ] המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
+
+#### 69. 🔍 `NotificationPageSize` — enum `[25, 50]`
+**בעיה:** pagination מוגבל ל-2 ערכים דרך enum.
+**AC:**
+- [ ] בירור: ההגבלה מכוונת? אם לא — param רגיל עם min/max.
+
+### Cross-System Consistency
+
+#### 70. `client_id` vs `client_record_id`
+**בעיה:** שני path params מעורבבים ב-spec.
+**AC:**
+- [ ] איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
+
+#### 72. `restore` לא עקבי
+**בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.
+**AC:**
+- [ ] restore בכל דומיין עם soft delete (מקושר לפריטים 22, 30).
+
+### Bugs
+
+#### 73. שדות `required` שהם גם `nullable` — 18 שדות (סתירה לוגית)
+**בעיה:** שדה לא יכול להיות גם חובה וגם null. זה מבלבל codegen — ב-TypeScript ייווצר `field: string | null` אך מסומן חובה. כנראה נובע מ-Pydantic models עם `Optional` ללא default.
+**מושפעים:** `VatPeriodRow` (8 שדות: `filed_at`, `period_type`, `final_vat_amount`, `is_overdue`, `submission_deadline`, `statutory_deadline`, `extended_deadline`, `days_until_deadline`), `EntityAuditLogResponse` + `VatAuditLogResponse` (`old_value`, `new_value`, `note`), `TaxCalculationSaveResponse` (`refund_due`, `tax_due`), `TaxCalendarSummaryResponse` (`start_year`, `end_year`).
+**AC:**
+- [ ] לכל שדה: להחליט required (לא-null) או optional (ניתן להיעדר) — ולתקן את ה-Pydantic model בהתאם
+- [ ] codegen מייצר טיפוסים עקביים (אין `required` + `| null` יחד)
+
+#### 75. `period` — regex validation רק ב-1 מתוך 19 schemas
+**בעיה:** השדה `period` (פורמט `YYYY-MM`) מופיע ב-19 schemas, אבל ה-regex `^\d{4}-(0[1-9]|1[0-2])$` קיים רק ב-`AdvancePaymentCreateRequest`. שאר ה-input schemas (`VatWorkItemCreateRequest`, `ChargeCreateRequest`) מקבלים `period` חופשי — אפשר לשלוח `period: "garbage"` ל-VAT work item והוא יתקבל.
+**AC:**
+- [ ] ה-regex מוחל על כל ה-Create/input schemas שמקבלים `period`
+- [ ] עדיף: type משותף (`PeriodStr`) שמרכז את ה-validation במקום אחד
+- [ ] בדיקה: `period` לא חוקי מוחזר עם `422`
+
+---
+
+## בוצע כבר
+
+### Security / Auth
+
+#### 1. Security global default ✅ בוצע
+**בעיה:** ה-`security` הגלובלי ב-spec ריק (`[]`). האבטחה הוגדרה ידנית על כל endpoint. endpoint חדש שנכתב בלי `security` field היה פתוח ללא אימות.
 **AC:**
 - [x] `HTTPBearer` מוגדר כ-`security` ברמת ה-spec הגלובלית
 - [x] endpoints ציבוריים (login, refresh, forgot/reset-password, health, `/sign/{token}`) מוגדרים במפורש כ-`security: []`
@@ -21,169 +363,73 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - `logout` עבר לדרוש אימות (הוסר מה-allowlist + קיבל auth dependency).
 - `openapi.json` יוצא מחדש ו-`check_contract_sync` ירוק. תיעוד: כלל ב-[docs/architecture/security.md](architecture/security.md).
 
-### 2. `PATCH /api/v1/vat/work-items/{item_id}`
-**בעיה:** אין דרך לעדכן work item אחרי יצירה (סטטוס, הערות, שדות פנימיים).
-**AC:**
-- [ ] endpoint מקבל `VatWorkItemUpdateRequest` עם שדות אופציונליים
-- [ ] עדכון חלקי (שדה בודד) לא מאפס שדות אחרים
-- [ ] מחזיר `VatWorkItemResponse` מעודכן + `404` אם לא קיים
+### Pagination / Audit
 
-### 3. `DELETE /api/v1/vat/work-items/{item_id}`
-**בעיה:** אין מחיקת work item.
-**AC:**
-- [ ] מחיקה רכה (soft delete) עקבית עם שאר הדומיינים
-- [ ] מחזיר `204` בהצלחה, `404` אם לא קיים
-- [ ] פריט מחוק לא מופיע ב-LIST כברירת מחדל
-
-### 4. `POST /api/v1/vat/work-items/bulk-transition`
-**בעיה:** אין שינוי סטטוס מרובה — צריך לעבור פריט-פריט.
-**AC:**
-- [ ] מקבל רשימת IDs + transition יעד
-- [ ] מחזיר סיכום הצלחות/כשלונות לכל פריט (כמו `BulkChargeActionResponse`)
-- [ ] transition לא חוקי לפריט בודד לא מפיל את כל ה-batch
-
-### 5. `PATCH /api/v1/charges/{charge_id}`
-**בעיה:** charge שנוצר לא ניתן לעריכה (סכום, תיאור, תאריך).
-**AC:**
-- [ ] עדכון מותר רק בסטטוס `draft` (בירור 🔍: האם לאפשר גם ב-`issued`?)
-- [ ] מחזיר `ChargeResponse` מעודכן + `409` אם הסטטוס לא מאפשר עריכה
-
-### 6. `PATCH /api/v1/notifications/{notification_id}` — mark read/unread
-**בעיה:** אין endpoint לסימון notification כנקרא. ה-UI כנראה עוקף את זה בצד הלקוח.
-**AC:**
-- [ ] מאפשר עדכון סטטוס קריאה
-- [ ] מחזיר ה-notification מעודכן + `404` אם לא קיים
-
-### 7. `POST /api/v1/notifications/mark-all-read`
-**בעיה:** אין סימון גורף.
-**AC:**
-- [ ] מסמן את כל ה-notifications של המשתמש כנקראו
-- [ ] מחזיר מספר הפריטים שעודכנו
-
-### 8. `DELETE /api/v1/notifications/{notification_id}` — dismiss
-**בעיה:** אין הסרה/dismiss.
-**AC:**
-- [ ] מסיר notification מהתצוגה
-- [ ] מחזיר `204` + `404` אם לא קיים
-
-### 9. `PATCH /api/v1/reminders/{reminder_id}`
-**בעיה:** אין עדכון תזכורת (תאריך, טקסט).
-**AC:**
-- [ ] עדכון חלקי של תזכורת בסטטוס `scheduled`
-- [ ] מחזיר `409` אם התזכורת כבר `fired`/`canceled`
-
-### 10. `DELETE /api/v1/reminders/{reminder_id}`
-**בעיה:** אין מחיקה — רק cancel.
-**AC:**
-- [ ] בירור 🔍: האם DELETE נחוץ בנוסף ל-cancel, או ש-cancel מספיק? אם כן — `204` + soft delete
-
-## 🟠 עדיפות בינונית
-
-### 11. `GET /api/v1/documents/client/{client_record_id}/{document_id}`
-**בעיה:** אפשר לרשום, להעלות, למחוק ולהחליף מסמך — אבל אין שליפת מסמך בודד.
-**AC:**
-- [ ] מחזיר metadata של מסמך יחיד + `404`
-
-### 12. `PATCH /api/v1/documents/client/{client_record_id}/{document_id}`
-**בעיה:** אין עדכון metadata (שם, סוג, תגיות) בלי להחליף את הקובץ.
-**AC:**
-- [ ] עדכון metadata בלבד, ללא העלאה מחדש
-- [ ] לא משנה את גרסת הקובץ
-
-### 13. `GET /api/v1/documents/binder/{binder_id}`
-**בעיה:** יש `documents/client/{id}` ו-`documents/annual-report/{id}` אבל לא לפי binder.
-**AC:**
-- [ ] מחזיר מסמכים המשויכים ל-binder, באותו envelope כמו שאר רשימות המסמכים
-
-### 14–18. ניהול Tax Calendar (settings)
-**בעיה:** settings הם read-only + bootstrap בלבד. אין יצירה/עדכון/מחיקה של חוקים ו-entries.
-**AC:**
-- [ ] `PATCH /settings/tax-calendar/rules/{rule_id}` — עדכון חוק
-- [ ] `POST /settings/tax-calendar/rules` — יצירת חוק
-- [ ] `DELETE /settings/tax-calendar/rules/{rule_id}` — מחיקה
-- [ ] `PATCH /settings/tax-calendar/entries/{entry_id}` — עדכון entry
-- [ ] `DELETE /settings/tax-calendar/entries/{entry_id}` — מחיקה
-- [ ] בירור 🔍: עדכון חוק — האם משפיע רטרואקטיבית על entries קיימים או רק עתידיים?
-
-### 19. `GET /api/v1/clients/{client_record_id}/tasks`
-**בעיה:** אין שליפת משימות לפי לקוח — חובה לסנן ידנית.
-**AC:**
-- [ ] מחזיר משימות מסוננות ל-client_record_id, עם pagination אחיד
-
-### 20. `GET /api/v1/tasks` עם filter לפי ישות
-**בעיה:** אי אפשר לשלוף משימות של VAT work item / דוח שנתי ספציפי.
-**AC:**
-- [ ] תמיכה ב-`?source_domain=&source_id=` כ-query params
-- [ ] בירור 🔍: לאחד עם השמות הקיימים `source_domain`/`source_id` שכבר ב-`TaskResponse`
-
-### 21. `POST /api/v1/binders` + `PATCH /api/v1/binders/{binder_id}`
-**בעיה:** binders פועלים רק דרך transitions — אין POST/PATCH ישיר.
-**AC:**
-- [ ] בירור 🔍: האם המודל הנוכחי (receive-only) מכוון? אם כן — לתעד ולסגור. אם לא — להוסיף POST/PATCH
-
-### 22. `POST /api/v1/binders/{binder_id}/restore`
-**בעיה:** restore קיים ב-clients אבל לא ב-binders אחרי DELETE.
-**AC:**
-- [ ] משחזר binder מחוק, עקבי עם `clients/{id}/restore`
-
-### 23. `PATCH /api/v1/annual-reports/{report_id}`
-**בעיה:** אין PATCH ראשי — רק `PATCH /{id}/details`.
-**AC:**
-- [ ] בירור 🔍: האם `/details` מספיק או שצריך wrapper ראשי? להחליט ולתעד
-
-### 24. Pagination — איחוד offset/limit
-**בעיה:** שני endpoints משתמשים ב-`offset`/`limit` במקום `page`/`page_size`.
+#### 24. Pagination — איחוד offset/limit ✅ בוצע
+**בעיה:** שני endpoints השתמשו ב-`offset`/`limit` במקום `page`/`page_size`.
 **AC:**
 - [x] `GET /vat/work-items/{item_id}/audit` עובר ל-`page`/`page_size`
 - [x] `GET /audit/{entity_type}/{entity_id}` עובר ל-`page`/`page_size`
 - [x] ה-response envelope תואם לשאר ה-paginated responses
 
-### 25. 404 responses
-**בעיה:** ~120 endpoints שמקבלים ID param לא מתעדים `404` ב-spec (אף שהקוד מחזיר).
+#### 55. שני audit endpoints עם shapes שונות ✅ בוצע
+**בעיה:** `VatAuditTrailResponse` היה `{items, total}` ו-`EntityAuditTrailResponse` היה `{items, total, limit, offset}`.
+**AC:**
+- [x] envelope אחיד לשני ה-audit endpoints: שניהם מחזירים `items`, `total`, `page`, `page_size`.
+
+### Error / Response Contracts
+
+#### 25. 404 responses ✅ בוצע
+**בעיה:** ~120 endpoints שמקבלים ID param לא תיעדו `404` ב-spec (אף שהקוד מחזיר).
 **AC:**
 - [x] כל endpoint עם path param של ID כולל `404` ב-responses
 - [x] codegen מייצר טיפול ב-404 (דורש הרצת codegen ב-frontend — לא בוצע כאן)
 
-**בוצע:** sweep מלא — כל 125 ה-endpoints עם path param של ID מתעדים כעת `404` עם `ErrorEnvelope` דרך `not_found_response()`. נוסף טסט רגרסיה `backend/tests/core/test_openapi_not_found_docs.py` שדורף על `app.openapi()` ונכשל אם endpoint עם ID param חסר `404` (ללא חריגים — `ALLOWED_NO_404` ריק). חריגים מכוונים: `/reminders/` list+create, `/advance-payments/overview*`, `/clients/conflict/{id_number}` — ללא זהות-ישות אמיתית.
+**בוצע:** sweep מלא — כל 125 ה-endpoints עם path param של ID מתעדים כעת `404` עם `ErrorEnvelope` דרך `not_found_response()`. נוסף טסט רגרסיה `backend/tests/core/test_openapi_not_found_docs.py` שדורס על `app.openapi()` ונכשל אם endpoint עם ID param חסר `404` (ללא חריגים — `ALLOWED_NO_404` ריק). חריגים מכוונים: `/reminders/` list+create, `/advance-payments/overview*`, `/clients/conflict/{id_number}` — ללא זהות-ישות אמיתית.
 
-## 🟡 עדיפות נמוכה
-
-### 26–27. Bulk operations ל-clients
+#### 43. 🔍 metadata נוסף לא עקבי ✅ בוצע
+**בעיה:** `stats`/`counters`/`summary` רק בחלק מה-responses.
 **AC:**
-- [ ] `POST /clients/bulk-patch` — עדכון מרובה, מחזיר סיכום הצלחות/כשלונות
-- [ ] `POST /clients/bulk-delete` — מחיקה/ארכוב מרובה
+- [x] בירור: כל 5 בלוקי ה-metadata (BinderListResponse.counters, ChargeListResponse.stats, ClientRecordListResponse.stats, WorkQueueListResponse.summary, TaxCalendarGroupListResponse.summary) חיוניים למסך ונצרכים ב-UI — אף אחד לא הוסר.
+- [x] מדיניות תועדה ב-[api-contracts.md](architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
 
-### 28. `GET /api/v1/signature-requests` — LIST כללי
-**בעיה:** קיים רק `/pending`.
+#### 44. `sort_order` vs `order` ✅ בוצע
+**בעיה:** שני שמות לאותו param.
+**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
 **AC:**
-- [ ] LIST עם filter על סטטוס (כולל `pending` כמקרה פרטי)
+- [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
+- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות.
+- [x] ה-frontend מעודכן (clients types/contracts/hooks/filters; binders כבר שלח `order`).
 
-### 29. `POST /api/v1/signature-requests/{request_id}/cancel` — ישיר
-**בעיה:** cancel קיים רק דרך `/clients/{id}/signature-requests/{id}/cancel`.
+#### 45. POST מחזיר 200 במקום 201 ✅ בוצע
+**בעיה:** 4 endpoints חשודים כיוצרים משאב ומחזירים 200.
 **AC:**
-- [ ] cancel ישיר ללא צורך ב-client context, עקבי עם שאר ה-cancel
+- [x] בירור לכל endpoint. מסקנה: **כל 4 נשארים 200** — אף אחד לא מחזיר ייצוג של משאב חדש שניתן לאחזר.
 
-### 30. `POST /api/v1/charges/{charge_id}/restore`
+| Endpoint | מצב | יוצר משאב אחזיר? | החלטה | סיבה |
+|---|---|---|---|---|
+| `POST /clients/import` | 200 | לא — דו"ח batch | **200** | מחזיר סיכום `{created, total_rows, errors[]}`; יכול ליצור 0 (כל השורות נכשלות); partial-success; idempotency-guarded; לא ייצוג משאב |
+| `POST /charges/bulk-action` | 200 | לא — פעולה | **200** | פעולה על charges קיימים, idempotent |
+| `POST /annual-reports/{id}/deadline` | 200 | לא — עדכון | **200** | מעדכן deadline על דוח קיים |
+| `POST /auth/forgot-password` | 200 | לא (security-neutral) | **200** | מניעת user enumeration; הלקוח לא צורך משאב |
+
+#### 54. `GET /annual-reports/{id}/charges` — response schema ריק ✅ בוצע
+**בעיה:** מחזיר `{}` במקום schema מוגדר.
 **AC:**
-- [ ] משחזר charge מבוטל/מחוק (בירור 🔍: מאיזה סטטוס ניתן לשחזר?)
+- [x] schema מפורש לתגובה
 
-### 31. `DELETE /api/v1/users/{user_id}`
-**בעיה:** אין DELETE — רק deactivate.
-**AC:**
-- [ ] בירור 🔍: האם soft delete בלבד מכוון (audit/compliance)? אם כן — לתעד ולסגור
+**בוצע:** `GET /api/v1/annual-reports/{report_id}/charges` מצהיר `response_model=PaginatedResponse[ChargeResponse]`, וה-OpenAPI מייצר `PaginatedResponse_ChargeResponse_`.
 
-### 32–33. Bulk operations ל-tasks
-**AC:**
-- [ ] `POST /tasks/bulk-complete` — השלמה מרובה
-- [ ] `POST /tasks/bulk-assign` — שיוך מחדש מרובה
+### DTO / Schema Cleanup
 
-## 🟧 DTOs שמנים ו-Over-fetching
-
-### 34. DTOs שמנים ב-double-duty (list + detail)
-**בעיה:** ארבעה schemas מחזירים את *כל* השדות גם ברשימה. טעינת 50 פריטים = 50× כל השדות, כולל שדות שרלוונטיים רק ל-detail. הפתרון כבר קיים במערכת: `AnnualReportCard` (5 שדות) לצד `AnnualReportDetailResponse` (52).
+#### 34. DTOs שמנים ב-double-duty (list + detail) ✅ בוצע
+**בעיה:** ארבעה schemas החזירו את *כל* השדות גם ברשימה. טעינת 50 פריטים = 50× כל השדות, כולל שדות שרלוונטיים רק ל-detail.
 **מושפעים:**
-- `VatWorkItemResponse` (36 שדות) — רשימה מחזירה `override_justification`, `submission_reference`, `filed_by_name`, `statutory_deadline`, `extended_deadline`
-- `ClientRecordResponse` (27), `ChargeResponse` (23), `NotificationResponse` (24)
+- `VatWorkItemResponse` (36 שדות)
+- `ClientRecordResponse` (27 שדות)
+- `ChargeResponse` (23 שדות)
+- `NotificationResponse` (24 שדות)
+
 **AC:**
 - [x] DTO רזה (`XxxListItem`) לכל אחד מה-4: `VatWorkItemListItem`, `ClientRecordListItem`, `ChargeListItem`, `NotificationListItem`
 - [x] endpoints של LIST עוברים ל-DTO הרזה (vat work-items + grouped + by-client, clients, charges, notifications)
@@ -192,7 +438,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **הושלם** (2026-06-11). חוק contract חדש ב-[architecture/api-contracts.md](architecture/api-contracts.md). תיעוד דומיינים עודכן (vat/charges/clients/notifications). הערה: notifications list שומר `content_snapshot`/`subject_snapshot`/`business_name` כי ה-bell drawer/tab מציגים preview inline.
 
-### 35. 🔍 שדות כפולים חשודים ב-`AnnualReportDetailResponse` ✅ בוצע
+#### 35. 🔍 שדות כפולים חשודים ב-`AnnualReportDetailResponse` ✅ בוצע
 **בעיה:** שלושה זוגות שנראו שרידי מיגרציה — `refund_due`+`tax_refund_amount`, `tax_due`+`tax_due_amount`, `assessment_amount`+`final_balance`.
 **ממצא:** רק זוג אחד אמיתי. `tax_refund_amount`/`tax_due_amount` היו עותקי float לא-מוצגים של עמודות ה-DB הקנוניות `refund_due`/`tax_due`. `assessment_amount` (קלט שומת רשות) ו-`final_balance` (מחושב: `tax_after_credits − advances_paid`) אינם כפילות.
 **AC:**
@@ -200,52 +446,50 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [x] השדות הכפולים הוסרו (לא deprecated — entry-point.md אוסר legacy compat ללא בקשה; השדות לא הוצגו ב-UI)
 - [x] אין שבירה ב-UI (typecheck+lint frontend עוברים; הצריכה היחידה הייתה merge ב-`useReportMutations`)
 
-### 35b. עותקי `tax_refund_amount`/`tax_due_amount` ב-`ReportDetailResponse` (follow-up ל-35) ✅ בוצע
-**בעיה:** אותם עותקי float מתים שהוסרו מ-`AnnualReportDetailResponse` (פריט 35) עדיין קיימים ב-`ReportDetailResponse` — endpoint נפרד `GET/PATCH /annual-reports/{id}/details` (`annual_report_detail.py` + `_enrich_detail_response`).
+#### 35b. עותקי `tax_refund_amount`/`tax_due_amount` ב-`ReportDetailResponse` ✅ בוצע
+**בעיה:** אותם עותקי float מתים שהוסרו מ-`AnnualReportDetailResponse` (פריט 35) עדיין היו קיימים ב-`ReportDetailResponse` — endpoint נפרד `GET/PATCH /annual-reports/{id}/details` (`annual_report_detail.py` + `_enrich_detail_response`).
 **AC:**
 - [x] אומת: ב-frontend השדות הופיעו רק ב-interface `ReportDetailResponse` (`contracts.ts`) וב-`generated.ts` — לא נצרכו בשום קומפוננטה
 - [x] הוסרו מ-`ReportDetailResponse` (`annual_report_detail.py` schema). `_enrich_detail_response` נמחק כולו — מטרתו היחידה הייתה הצבת שני השדות, כך שגם query מיותר ל-DB נחסך
 - [x] ה-frontend manual contract של `ReportDetailResponse` נוקה גם משדות credit-point מחושבים (`credit_points`, `pension_credit_points`, `life_insurance_credit_points`, `tuition_credit_points`) שאינם חוזרים מ-`GET/PATCH /details`; הערכים המחושבים זמינים רק דרך `AnnualReportDetailResponse.tax_calculation`
 - [x] frontend נקי (0 הפניות); generated types + OpenAPI מעודכנים; tests עוברים (105)
 
-### 36. קיבוץ חישובי מס ב-`AnnualReportDetailResponse` ✅ בוצע
+#### 36. קיבוץ חישובי מס ב-`AnnualReportDetailResponse` ✅ בוצע
 **בעיה:** חישובי מס שטוחים מעורבבים עם זהות/סטטוס/מטא-דאטה.
 **AC:**
 - [x] כל פלטי החישוב (11 שדות) מקובצים ל-`tax_calculation` (`AnnualReportTaxCalculationResponse`); קלטי ניכוי שמוזנים ידנית ועמודות outcome נשארו flat
 - [x] ה-frontend מעודכן למבנה החדש (`report.tax_calculation.*`)
 - [x] ה-schema הראשי שטוח-יותר; מבנה היררכי
 
-### 37. 🔍 DTO רזה ל-`AnnualReportResponse` (31 שדות) ברשימה ✅ בוצע
+#### 37. 🔍 DTO רזה ל-`AnnualReportResponse` (31 שדות) ברשימה ✅ בוצע
 **בעיה:** `GET /annual-reports` החזיר 31 שדות לכל פריט. (אין `AnnualReportCard` לדומיין זה — ההפניה המקורית הייתה לדומיין אחר.)
 **AC:**
 - [x] נוצר `AnnualReportListItem` רזה (15 שדות שה-UI באמת מציג); list/overdue/season/client endpoints עברו אליו, detail נשאר `AnnualReportDetailResponse`
 - [x] mapper נפרד `_to_list_items` מדלג על חישוב actions/transitions היקר
 - [x] ה-frontend list contract/types מעודכנים; regression guard מוודא הפרדת list/detail
 
-## 🔵 בעיות DTO ו-Schema
-
-### 38. שמות schemas לא עקביים ✅ בוצע
+#### 38. שמות schemas לא עקביים ✅ בוצע
 **בעיה:** רוב הדומיינים `XxxCreateRequest`, אבל `CreateClientRequest` הפוך, ו-`BinderIntakePatchRequest` חורג.
 **AC:**
 - [x] `CreateClientRequest` → `ClientOnboardingRequest` (היעד `ClientCreateRequest` כבר תפוס ע"י מחלקה אחרת; השם החדש מדויק כי זה composite של client + business)
 - [x] `BinderIntakePatchRequest` → `BinderIntakeUpdateRequest`
 - [x] כל ה-frontend references מעודכנים (ללא alias תאימות)
 
-### 39. Create = Update (8 schemas זהים) ✅ בוצע
-**בעיה:** schemas של Create ו-Update זהים, כך ש-PATCH לא partial בפועל — שולחים את כל השדות כמו PUT.
+#### 39. Create = Update (8 schemas זהים) ✅ בוצע
+**בעיה:** schemas של Create ו-Update היו זהים, כך ש-PATCH לא partial בפועל — שולחים את כל השדות כמו PUT.
 **מושפעים:** AuthorityContact, Correspondence, ExpenseLine, IncomeLine, Task, Business (Create/Update כל אחד).
 **AC:**
 - [x] בכל זוג: Update הופך לכל-שדות-אופציונליים אמיתי (`exclude_unset=True`, הוסר None-dropping פנימי)
 - [x] תיעוד: PATCH עם שדה בודד לא מאפס שאר השדות
 - [x] בדיקה לכל זוג
 
-### 40. 🔍 שדות נסתרים ב-`ClientUpdateRequest` ✅ בוצע
+#### 40. 🔍 שדות נסתרים ב-`ClientUpdateRequest` ✅ בוצע
 **בעיה:** `status`, `annual_revenue`, `advance_rate_updated_at` קיימים ב-Update אבל לא ב-Create.
 **AC:**
 - [x] בירור: `status` + `annual_revenue` נשארים user-editable; `advance_rate_updated_at` הפך server-owned (מתועד ב-[update-request-conventions.md](architecture/update-request-conventions.md))
 - [x] ה-frontend חושף `status`/`annual_revenue`; `advance_rate_updated_at` הוסר מ-update payload (frontend + taxProfile) ונשאר read-only ב-response
 
-### 41. 🔍 UpdateRequest ללא validation ✅ בוצע
+#### 41. 🔍 UpdateRequest ללא validation ✅ בוצע
 **בעיה:** 30 Update schemas ללא `required` ולא הגבלות. ניתן לשלוח PATCH ריק `{}` ולקבל 200.
 **AC:**
 - [x] בירור: PATCH ריק `{}` → **422** (validation ב-Pydantic/FastAPI, לא 400, כדי למנוע כפילות endpoint)
@@ -261,43 +505,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - תיעוד: [docs/architecture/update-request-conventions.md](architecture/update-request-conventions.md) (רשום ב-documentation-map). OpenAPI + frontend `generated.ts` יוצאו מחדש.
 - בדיקות: סוויטת backend מלאה ירוקה; frontend typecheck/lint/build ירוקים.
 
-## 🟣 בעיות Response ו-Envelope
-
-### 42. Response envelopes לא עקביים
-**בעיה:** 4 וריאנטים שונים של רשימה.
-**AC:**
-- [ ] `VatWorkItemListResponse` — מוסיף `page`, `page_size`
-- [ ] `VatInvoiceListResponse` — מוסיף `page`, `page_size`, `total`
-- [ ] `BinderIntakeListResponse` — `intakes` → `items`
-- [ ] `CorrespondenceListResponse` — `total_pages` מוסר או מתווסף לכולם (החלטה אחת)
-
-### 43. 🔍 metadata נוסף לא עקבי ✅ בוצע (מדיניות תועדה)
-**בעיה:** `stats`/`counters`/`summary` רק בחלק מה-responses.
-**AC:**
-- [x] בירור: כל 5 בלוקי ה-metadata (BinderListResponse.counters, ChargeListResponse.stats, ClientRecordListResponse.stats, WorkQueueListResponse.summary, TaxCalendarGroupListResponse.summary) חיוניים למסך ונצרכים ב-UI — אף אחד לא הוסר.
-- [x] מדיניות תועדה ב-[api-contracts.md](architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
-
-### 44. `sort_order` vs `order` ✅ בוצע
-**בעיה:** שני שמות לאותו param.
-**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) שורות 24,27 — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
-**AC:**
-- [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
-- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות.
-- [x] ה-frontend מעודכן (clients types/contracts/hooks/filters; binders כבר שלח `order`).
-
-### 45. POST מחזיר 200 במקום 201 ✅ בוצע (בירור — אף אחד לא משתנה)
-**בעיה:** 4 endpoints חשודים כיוצרים משאב ומחזירים 200.
-**AC:**
-- [x] בירור לכל endpoint. מסקנה: **כל 4 נשארים 200** — אף אחד לא מחזיר ייצוג של משאב חדש שניתן לאחזר.
-
-| Endpoint | מצב | יוצר משאב אחזיר? | החלטה | סיבה |
-|---|---|---|---|---|
-| `POST /clients/import` | 200 | לא — דו"ח batch | **200** | מחזיר סיכום `{created, total_rows, errors[]}`; יכול ליצור 0 (כל השורות נכשלות); partial-success; idempotency-guarded; לא ייצוג משאב |
-| `POST /charges/bulk-action` | 200 | לא — פעולה | **200** | פעולה על charges קיימים, idempotent |
-| `POST /annual-reports/{id}/deadline` | 200 | לא — עדכון | **200** | מעדכן deadline על דוח קיים |
-| `POST /auth/forgot-password` | 200 | לא (security-neutral) | **200** | מניעת user enumeration; הלקוח לא צורך משאב |
-
-### 46. `updated_at` חסר על Response schemas ✅ סגור
+#### 46. `updated_at` חסר על Response schemas ✅ בוצע
 **בעיה:** קיים `created_at` בכל, אבל `updated_at` רק בחלק.
 **מצב:** כל 6 ה-schemas שב-AC מחזיקים כעת `updated_at` אמיתי. לא מזייפים מ-`created_at` (לא ב-runtime ולא ב-migration): העמודה nullable, מתחילה NULL, ומתמלאת רק ב-update אמיתי דרך `onupdate`. כל מודל קיבל עמודה + Alembic migration (0002–0005) + audit של נתיבי העדכון + בדיקות, ו-OpenAPI/`generated.ts` יוצאו מחדש.
 **AC:**
@@ -308,176 +516,9 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [x] `SignatureRequestResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0004. מתעדכן ב-send/sign/decline/cancel/expire/soft-delete. `SignatureAuditEvent` נשאר append-only ללא `updated_at`.
 - [x] `CorrespondenceResponse` — **החלטת דומיין: correspondence הוא mutable**. ה-PATCH path אמיתי ונשאר; נוספה עמודה `updated_at` (nullable, `onupdate=utcnow_aware`) + migration 0005, ה-docstring המיושן ("No updated_at"/immutable) ו-[docs/domains/communications.md](domains/communications.md) תוקנו.
 
-## 🟤 כפילויות ו-Versioning
+### Cross-System Consistency
 
-### 47. 🔍 `status` vs `transition` ב-annual-reports
-**בעיה:** שני endpoints למעבר סטטוס, schemas שונים (`StatusTransitionRequest` vs `StageTransitionRequest`).
+#### 71. `history` vs `audit` ✅ בוצע
+**סטטוס:** `audit` הוא הדפוס הקנוני לנתיבי audit trail; נתיבי binders/annual-reports הועברו ל-`/audit`.
 **AC:**
-- [ ] בירור: מה ההבדל? אם עודף — להסיר אחד. אם לא — לתעד את ההבחנה בין status ל-stage
-
-### 48. 🔍 `GET /annual-reports` vs `GET /clients/{id}/annual-reports`
-**בעיה:** הראשון כבר מסנן לפי `client_record_id`, אז השני מיותר.
-**AC:**
-- [ ] בירור: להסיר את השני או לתעד מדוע נחוצים שניהם
-
-### 49. `GET /reports/annual-reports` — שם מבלבל
-**בעיה:** מחזיר `AnnualReportStatusReportResponse` (דו"ח סטטוס), לא רשימה.
-**AC:**
-- [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
-
-## 🔶 פערי Filter ו-Search
-
-### 50. חיפוש טקסטואלי — 4 שמות שונים
-**בעיה:** `search`, `query`, `client_name`, `client_search` — לאותה פעולה.
-**AC:**
-- [ ] שם אחיד אחד (`search`) בכל ה-endpoints
-- [ ] ה-frontend מעודכן
-
-### 51. תאריכי טווח — 7 פטרנים
-**בעיה:** `from`/`to`, `from_date`/`to_date`, `date_from`/`date_to`, `issued_after`/`issued_before`, `due_after`/`due_before`, `start_year`/`end_year`, `from_year`/`to_year`.
-**AC:**
-- [ ] פטרן אחיד אחד (`{field}_after`/`{field}_before`) בכל ה-endpoints
-- [ ] ה-frontend מעודכן
-
-### 52. 🔍 16 endpoints לרשימות ללא filters
-**בעיה:** fetch עיוור.
-**AC:**
-- [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
-
-## 🔴 Error Schemas
-
-### 53. אין schema גנרי לשגיאות עסקיות
-**בעיה:** רק `HTTPValidationError` (422) מוגדר. אין תיעוד ל-400/403/409/500.
-**AC:**
-- [x] schema אחיד `ErrorEnvelope { error: { code, message, details, request_id? } }`
-- [ ] משויך ל-responses השגיאה בכל ה-endpoints
-- [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
-
-**בוצע חלקית:** נוסף schema אחיד `ErrorEnvelope`/`ErrorBody` ב-`backend/app/core/exceptions.py`, helperים לתיעוד OpenAPI של `400/401/403/404/409/500`, וטסט `backend/tests/core/test_error_openapi_schema.py` שמוודא שכל error response מתועד משתמש ב-`#/components/schemas/ErrorEnvelope`. בקומיט האחרון תועדו statuses נפוצים ב-`POST /api/v1/charges` וב-`POST /api/v1/charges/{charge_id}/cancel`. עדיין לא בוצע sweep שמוסיף את כל סטטוסי השגיאה הרלוונטיים לכל endpoint.
-
-### 54. `GET /annual-reports/{id}/charges` — response schema ריק
-**בעיה:** מחזיר `{}` במקום schema מוגדר.
-**AC:**
-- [x] schema מפורש לתגובה
-
-**בוצע:** `GET /api/v1/annual-reports/{report_id}/charges` מצהיר `response_model=PaginatedResponse[ChargeResponse]`, וה-OpenAPI מייצר `PaginatedResponse_ChargeResponse_`.
-
-## 🔍 ממצאים נוספים
-
-### 55. שני audit endpoints עם shapes שונות ✅ בוצע
-**בעיה:** `VatAuditTrailResponse` היה `{items, total}` ו-`EntityAuditTrailResponse` היה `{items, total, limit, offset}`.
-**AC:**
-- [x] envelope אחיד לשני ה-audit endpoints: שניהם מחזירים `items`, `total`, `page`, `page_size`.
-
-### 56. 🔍 VAT CREATE רק global, לא per-client
-**בעיה:** בניגוד לדומיינים אחרים שיש להם `POST /clients/{id}/X`.
-**AC:**
-- [ ] בירור: להוסיף `POST /vat/clients/{id}/work-items` לעקביות?
-
-### 57. inline enum ב-correspondence `order`
-**בעיה:** `['asc','desc']` inline במקום `$ref`.
-**AC:**
-- [ ] enum מוגדר כ-schema נפרד ומופנה אליו
-
-### 58. 🔍 `BinderHandoverToClientRequest` — body אופציונלי
-**בעיה:** `anyOf: [schema, null]` — POST ללא body מותר.
-**AC:**
-- [ ] בירור: מכוון? אם כן — לתעד. אם לא — להסיר את ה-null
-
-## 🔺 חוסר עקביות בטיפוסים (Type Conflicts)
-
-### 59. 🔍 `created_at` — `date-time` מול `date`
-**בעיה:** כמעט כולם `date-time`, אבל `VatInvoiceResponse` הוא `date`.
-**AC:** בירור: חשבונית VAT צריכה שעה? להחליט ולאחד.
-
-### 60. 🔍 `filing_deadline` — 3 טיפוסים
-**בעיה:** `string` ללא format / `date-time` / `date` — לאותו שדה לוגי.
-**AC:** בירור: מהו הטיפוס הנכון? לאחד בכל 4 ה-schemas.
-
-### 61. `occurred_at` — אותו שדה, שני טיפוסים (כנראה באג)
-**בעיה:** `CorrespondenceCreateRequest`=`date-time`, `CorrespondenceUpdateRequest`=`string` גולמי.
-**AC:** לתקן את Update ל-`date-time`.
-
-### 62. 🔍 `amount` — `decimal` מול `string` גולמי
-**בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` גולמי.
-**AC:** בירור: האם זה סכום כספי? אם כן — `decimal`.
-
-### 63. שדות פיננסיים — `string` גולמי ב-Update (כנראה באג)
-**בעיה:** `gross_amount`, `paid_amount`, `expected_amount`, `recognition_rate`, `other_credits` הם `decimal` ב-Create/Response אבל `string` גולמי ב-Update.
-**AC:** לתקן את Update ל-`decimal` בכל אלה.
-
-### 64. 🔍 `id` — `integer` מול `string`
-**בעיה:** רוב הישויות `integer`. `WorkQueueItem.id` הוא `string` — **מאושר כמכוון** (יש לו regex `^\w+:\d+$`, composite ID כמו `vat_work_item:42`). נשאר רק `AttentionBoardItem.id` כ-`string` ללא הסבר.
-**AC:** בירור: האם `AttentionBoardItem.id` גם composite? אם כן — להוסיף regex ולתעד. אם לא — `integer`.
-
-### 65. 🔍 `counterparty_id` — `string` במקום `integer`
-**בעיה:** ב-VatInvoice schemas.
-**AC:** בירור: מספר עוסק/ח.פ (string מכוון) או FK פנימי?
-
-### 66. 🔍 שיעורים כ-`number` במקום `decimal`
-**בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` כ-float.
-**AC:** בירור: float מקובל לשיעורים, או `decimal` כמו שאר הכספים (סיכון עיגול)?
-
-## 🔻 בעיות עיצוב Schema ו-Enum
-
-### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType`
-**בעיה:** שני enums לסיווג הוצאות, 7 ערכים משותפים + ערכים שונים.
-**AC:** בירור: מה ההבדל ואיפה כל אחד? לאחד או לתעד.
-
-### 68. `ReminderActionType` — UPPER_CASE חריג
-**בעיה:** היחיד ב-UPPER_CASE מתוך 52 enums (השאר snake_case).
-**AC:** המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
-
-### 69. 🔍 `NotificationPageSize` — enum `[25, 50]`
-**בעיה:** pagination מוגבל ל-2 ערכים דרך enum.
-**AC:** בירור: ההגבלה מכוונת? אם לא — param רגיל עם min/max.
-
-## ⚠️ תיקוני עקביות חוצי-מערכת
-
-### 70. `client_id` vs `client_record_id`
-**בעיה:** שני path params מעורבבים ב-spec.
-**AC:** איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
-
-### 71. `history` vs `audit`
-**סטטוס:** בוצע. `audit` הוא הדפוס הקנוני לנתיבי audit trail; נתיבי binders/annual-reports הועברו ל-`/audit`.
-**AC:** בחירת דפוס אחד + יישום בכל הדומיינים.
-
-### 72. `restore` לא עקבי
-**בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.
-**AC:** restore בכל דומיין עם soft delete (מקושר לפריטים 22, 30).
-
-## 🐞 באגים מובהקים (תיקון ישיר, ללא בירור)
-
-### 73. שדות `required` שהם גם `nullable` — 18 שדות (סתירה לוגית)
-**בעיה:** שדה לא יכול להיות גם חובה וגם null. זה מבלבל codegen — ב-TypeScript ייווצר `field: string | null` אך מסומן חובה. כנראה נובע מ-Pydantic models עם `Optional` ללא default.
-**מושפעים:** `VatPeriodRow` (8 שדות: `filed_at`, `period_type`, `final_vat_amount`, `is_overdue`, `submission_deadline`, `statutory_deadline`, `extended_deadline`, `days_until_deadline`), `EntityAuditLogResponse` + `VatAuditLogResponse` (`old_value`, `new_value`, `note`), `TaxCalculationSaveResponse` (`refund_due`, `tax_due`), `TaxCalendarSummaryResponse` (`start_year`, `end_year`).
-**AC:**
-- [ ] לכל שדה: להחליט required (לא-null) או optional (ניתן להיעדר) — ולתקן את ה-Pydantic model בהתאם
-- [ ] codegen מייצר טיפוסים עקביים (אין `required` + `| null` יחד)
-
-### 74. `page_size` max לא עקבי — 100 מול 200
-**בעיה:** 25 endpoints מגבילים ל-100, 16 ל-200, ו-`GET /notifications` ללא max כלל. אין הגיון בחלוקה — `GET /annual-reports`=200 אבל `GET /clients/{id}/annual-reports`=100, לאותו סוג ישות.
-**AC:**
-- [ ] מקסימום אחיד אחד לכל ה-endpoints (להחליט 100 או 200)
-- [ ] `GET /notifications` מקבל max מוגדר
-- [ ] בדיקה: בקשה מעל המקסימום מוחזרת עם `422`
-
-### 75. `period` — regex validation רק ב-1 מתוך 19 schemas
-**בעיה:** השדה `period` (פורמט `YYYY-MM`) מופיע ב-19 schemas, אבל ה-regex `^\d{4}-(0[1-9]|1[0-2])$` קיים רק ב-`AdvancePaymentCreateRequest`. שאר ה-input schemas (`VatWorkItemCreateRequest`, `ChargeCreateRequest`) מקבלים `period` חופשי — אפשר לשלוח `period: "garbage"` ל-VAT work item והוא יתקבל.
-**AC:**
-- [ ] ה-regex מוחל על כל ה-Create/input schemas שמקבלים `period`
-- [ ] עדיף: type משותף (`PeriodStr`) שמרכז את ה-validation במקום אחד
-- [ ] בדיקה: `period` לא חוקי מוחזר עם `422`
-
-### 76. `POST /annual-reports/{id}/expenses` ו-`/income` — אין GET-list להורה
-**בעיה:** לשתי הקולקציות יש רק POST — אין GET שמחזיר את שורות ההכנסה/הוצאה. השורות ניתנות ל-PATCH/DELETE, אבל אי אפשר לשלוף את הרשימה בנפרד; היא מגיעה רק מקוננת ב-`AnnualReportDetailResponse` השמן (52 שדות). חוסר עקביות בולט: `annex/{schedule}` כן יש לו GET.
-**AC:**
-- [ ] `GET /annual-reports/{id}/expenses` — מחזיר שורות הוצאה עם envelope אחיד
-- [ ] `GET /annual-reports/{id}/income` — מחזיר שורות הכנסה
-- [ ] מאפשר רענון השורות בלי טעינת הדוח המלא
-
-### 77. `binders/{id}/intakes/{intake_id}` — יש PATCH אבל אין DELETE
-**בעיה:** אפשר לעדכן intake בודד אבל לא למחוק. אם אפשר להוסיף (receive) ולעדכן — צריך גם להסיר.
-**AC:**
-- [ ] `DELETE /binders/{binder_id}/intakes/{intake_id}` — מחיקת intake בודד
-- [ ] מחזיר `204` + `404` אם לא קיים
+- [x] בחירת דפוס אחד + יישום בכל הדומיינים.
