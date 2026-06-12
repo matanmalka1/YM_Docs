@@ -208,22 +208,29 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Response Envelopes / Errors
 
-#### 42. Response envelopes לא עקביים
+#### 42. Response envelopes לא עקביים ✅ בוצע
 **בעיה:** 4 וריאנטים שונים של רשימה.
+**החלטה:** הסטנדרט הוא `PaginatedResponse[T]` = `{items, page, page_size, total}` לפי [api-contracts.md](architecture/api-contracts.md). `total_pages` **מוסר** (נגזר מ-`total/page_size`, מחושב בצד לקוח); aliases אסורים (ADR 0001 / entry-point.md).
 **AC:**
-- [ ] `VatWorkItemListResponse` — מוסיף `page`, `page_size`
-- [ ] `VatInvoiceListResponse` — מוסיף `page`, `page_size`, `total`
-- [ ] `BinderIntakeListResponse` — `intakes` → `items`
-- [ ] `CorrespondenceListResponse` — `total_pages` מוסר או מתווסף לכולם (החלטה אחת)
+- [x] `VatWorkItemListResponse` — `items/total/page/page_size` (guard: `backend/tests/vat/test_vat_list_envelope_schema.py`)
+- [x] `VatInvoiceListResponse` — `items/total/page/page_size` (collection child bounded; envelope לעקביות; guard באותו קובץ)
+- [x] `BinderIntakeListResponse` — בוטל; `GET /binders/{id}/intakes` מחזיר `PaginatedResponse[BinderIntakeResponse]` עם `items`
+- [x] `CorrespondenceListResponse` — `total_pages` הוסר; envelope תקני (guard: `backend/tests/communications/test_correspondence_schemas.py`)
 
-#### 53. אין schema גנרי לשגיאות עסקיות — בוצע חלקית
+**בוצע:** הנירמול עצמו נחת בקומיט `a0c0ee9a fix(api): make list response envelopes consistent (#42)` (backend + `openapi.json` + frontend `generated.ts` + הצרכן `BinderIntakesSection.tsx` קורא `data.items`). בסבב הסגירה נוסף guard schema-level חסר ל-VAT (binder/correspondence כבר היו מכוסים).
+
+#### 53. אין schema גנרי לשגיאות עסקיות ✅ בוצע
 **בעיה:** רק `HTTPValidationError` (422) מוגדר. אין תיעוד מלא ל-400/403/409/500.
 **AC:**
 - [x] schema אחיד `ErrorEnvelope { error: { code, message, details, request_id? } }`
-- [ ] משויך ל-responses השגיאה בכל ה-endpoints
+- [x] משויך ל-responses השגיאה בכל ה-endpoints
 - [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
 
-**בוצע חלקית:** נוסף schema אחיד `ErrorEnvelope`/`ErrorBody` ב-`backend/app/core/exceptions.py`, helperים לתיעוד OpenAPI של `400/401/403/404/409/500`, וטסט `backend/tests/core/test_error_openapi_schema.py` שמוודא שכל error response מתועד משתמש ב-`#/components/schemas/ErrorEnvelope`. בקומיט האחרון תועדו statuses נפוצים ב-`POST /api/v1/charges` וב-`POST /api/v1/charges/{charge_id}/cancel`. עדיין לא בוצע sweep שמוסיף את כל סטטוסי השגיאה הרלוונטיים לכל endpoint.
+**בוצע (sweep מלא):** המטריצה הקנונית של סטטוס-שגיאה לכל endpoint תועדה ב-[architecture/error-doc-matrix.md](architecture/error-doc-matrix.md) (נגזרה מ-raise sites אמיתיים, מאומתת מול `exception_handlers.py`). מנגנון כפול:
+- **`401`/`403` מוזרקים גלובלית** ב-`build_openapi` ([app/core/openapi.py](../backend/app/core/openapi.py)): `401` לכל op שאינו public (לפי `public_endpoints.py`); `403` לכל op עם dependency של `require_role(...)` (זוהה דרך הליכה על `route.dependant`). 188/201 ה-ops הם role-gated. שני ה-ops הלא-public היחידים ללא `require_role` (`GET /auth/me`, `POST /auth/logout`) לא מגיעים ל-`ForbiddenError` בשירות.
+- **`400`/`404`/`409`/`500` מתועדים per-route** דרך ה-helpers מ-`core/openapi_responses.py`. `404` כבר נסחף (פריט 25). `500` מתועד רק ב-`DOCUMENT.UPLOAD_FAILED` (upload/replace); export-ים של excel/PDF נשארים ללא 500 מתועד (env `ImportError`, לא חוזה עסקי).
+- **בדיקות רגרסיה:** `test_openapi_auth_error_docs.py` (הזרקת 401/403 + exclusion ל-public + רפרנס ל-`ErrorEnvelope`), `test_error_doc_coverage_matrix.py` (כל op מתעד בדיוק את ה-400/409/500 מהמטריצה — אין חסר ואין עודף), בנוסף ל-`test_error_openapi_schema.py` הקיים.
+- `openapi.json` + frontend `generated.ts` יוצאו מחדש; backend scoped suite + frontend typecheck/lint/format/test ירוקים.
 
 ### Filters / Search / Pagination
 

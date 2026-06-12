@@ -45,6 +45,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/architecture/api-contract-standard.md` — worked API examples (non-normative; defers to `api-contracts.md`).
 - `docs/architecture/update-request-conventions.md` — PATCH/`*UpdateRequest` conventions: empty-PATCH 422, unknown-field rejection, explicit-null semantics, single-payload exceptions, `ClientUpdateRequest` field ownership (non-normative; defers to `api-contracts.md`).
 - `docs/architecture/error-codes.md` — registry of `DOMAIN.REASON` error-code namespaces + status mapping (non-normative).
+- `docs/architecture/error-doc-matrix.md` — per-endpoint OpenAPI error-status documentation matrix (#53), with raise-site evidence (non-normative; defers to `api-contracts.md`).
 - `docs/architecture/database.md` ★ — database modeling rules.
 - `docs/architecture/migrations.md` ★ — schema migration rules.
 - `docs/architecture/security.md` ★ — auth, token, and security rules.

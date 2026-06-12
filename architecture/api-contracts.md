@@ -45,7 +45,7 @@ Source of truth: mandatory
 - Standard application error responses may include `error.request_id` when a request ID is available.
 - `error.code` is stable and machine-readable; clients must match on `error.code`, not translated message text.
 - Domain error codes use the `DOMAIN.REASON` pattern, such as `BINDER.NOT_FOUND` or `AUTH.INVALID_REFRESH_TOKEN`.
-- Documented OpenAPI responses for application errors must reference the shared `ErrorEnvelope` schema; backend routers should use the shared response-doc helpers from `app/core/exceptions.py` for 400, 401, 403, 404, 409, and 500 responses.
+- Documented OpenAPI responses for application errors must reference the shared `ErrorEnvelope` schema; backend routers should use the shared response-doc helpers from `app/core/openapi_responses.py` for 400, 401, 403, 404, 409, and 500 responses.
 - Frontend code that needs backend error details must parse the standard envelope through the shared error utility and must not read endpoint-specific response shapes directly.
 - SlowAPI rate-limit responses must use the standard error envelope with a rate-limit error code.
 - Validation errors must expose enough field/form detail for frontend display without endpoint-specific parsing.

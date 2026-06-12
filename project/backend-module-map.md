@@ -42,7 +42,8 @@ Key top-level files:
 | `app/router_registry.py` | `register_routers(app)` for mounting domain routers |
 | `app/model_registry.py` | Imports ORM model modules for SQLAlchemy mapper setup and Alembic autogenerate |
 | `app/users/api/deps.py` | `get_current_user`, `require_role()`, `CurrentUser`, and `DBSession` aliases |
-| `app/core/exceptions.py` | Application exception classes and standard error response builder |
+| `app/core/exceptions.py` | Application exception classes and runtime error-envelope builders |
+| `app/core/openapi_responses.py` | Shared OpenAPI `responses=` helpers for documented error responses |
 | `app/core/exception_handlers.py` | FastAPI handlers for application, validation, and unexpected exceptions |
 | `app/core/logging_config.py` | Structured logging formatter, request stats, and request summary logging |
 | `app/core/api_types.py` | Shared API types such as `ApiDateTime`, `ApiDecimal`, and `PaginatedResponse` |
