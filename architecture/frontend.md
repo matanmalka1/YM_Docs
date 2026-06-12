@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - Frontend architecture rules that apply across frontend features.
 - Frontend ownership boundaries for UI, API, state, schemas, and feature modules.
 
 This file must not contain:
+
 - Product screen specs, domain behavior, backend implementation rules, or API contract definitions.
 
 Source of truth: mandatory
@@ -15,6 +18,7 @@ Source of truth: mandatory
 - Shared UI must not import feature APIs, React Query feature hooks, or product-specific business logic.
 - Shared layout must live in `src/components/layout/`.
 - Shared cross-feature widgets must live in `src/components/shared/`.
+- Conditional `className` composition must use the shared `cn()` helper from `src/utils/utils.ts`; that helper intentionally wraps `clsx` with `tailwind-merge`, so `clsx` is a direct frontend dependency.
 - Server data must use React Query.
 - Zustand must be limited to auth/session state unless an explicit ADR says otherwise.
 - HTTP calls must go through the shared Axios client.
