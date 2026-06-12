@@ -234,11 +234,15 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Filters / Search / Pagination
 
-#### 50. חיפוש טקסטואלי — 4 שמות שונים
+#### 50. חיפוש טקסטואלי — 4 שמות שונים ✅ בוצע
 **בעיה:** `search`, `query`, `client_name`, `client_search` — לאותה פעולה.
 **AC:**
-- [ ] שם אחיד אחד (`search`) בכל ה-endpoints
-- [ ] ה-frontend מעודכן
+- [x] שם אחיד אחד (`search`) בכל ה-endpoints הרלוונטיים לחיפוש הגלובלי
+- [x] ה-frontend מעודכן
+
+**בוצע:** `GET /api/v1/search` נורמל ל-`search` כפרמטר הטקסטואלי הרחב היחיד, ונוספה תמיכה ב-`client_id` לסינון מדויק לפי לקוח. `query` ו-`client_name` הוסרו מחוזה ה-search ולא מופיעים יותר ב-OpenAPI עבור endpoint זה. חיפוש לפי שם לקוח לא הוסר: הקלדה בתיבת החיפוש הראשית עדיין נשלחת כ-`search` וממשיכה להתאים רשומות לקוח לפי שם/זהות דרך מימוש החיפוש הקיים. סינון מתקדם לפי לקוח עבר ל-client picker ששולח `client_id`, וה-autocomplete עצמו מחפש לקוחות דרך `GET /clients?search=...`.
+
+**בדיקות/חוזה:** נוספו בדיקות ל-`/search?search=<client name>`, ל-`search + client_id` במסמכים, למניעת זליגת מסמכים בין לקוחות, ול-OpenAPI שמוודא ש-`search`/`client_id` קיימים ו-`query`/`client_name`/`client_search` אינם קיימים ב-`/api/v1/search`. `openapi.json` ו-`frontend/src/types/generated.ts` חודשו.
 
 #### 51. תאריכי טווח — 7 פטרנים
 **בעיה:** `from`/`to`, `from_date`/`to_date`, `date_from`/`date_to`, `issued_after`/`issued_before`, `due_after`/`due_before`, `start_year`/`end_year`, `from_year`/`to_year`.
