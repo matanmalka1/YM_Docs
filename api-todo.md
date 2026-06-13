@@ -5,7 +5,15 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ---
 
-## פתוח / לביצוע
+## תמונת מצב
+
+- **פתוח לביצוע:** פריטים עם AC לא מסומן וללא ✅.
+- **דורש החלטה:** פריטים עם 🔍 לפני שינוי חוזה או מימוש.
+- **בוצע:** פריטים עם ✅ ו-AC מסומן, כולל פריטי חוזה רוחביים שהועברו מהחלק הפתוח.
+
+---
+
+## פתוח / לביצוע - דומיינים
 
 ### VAT
 
@@ -206,6 +214,10 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
 
+---
+
+## בוצע כבר - חוזה API רוחבי
+
 ### Response Envelopes / Errors
 
 #### 42. Response envelopes לא עקביים ✅ בוצע
@@ -244,18 +256,13 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 **בדיקות/חוזה:** נוספו בדיקות ל-`/search?search=<client name>`, ל-`search + client_id` במסמכים, למניעת זליגת מסמכים בין לקוחות, ול-OpenAPI שמוודא ש-`search`/`client_id` קיימים ו-`query`/`client_name`/`client_search` אינם קיימים ב-`/api/v1/search`. `openapi.json` ו-`frontend/src/types/generated.ts` חודשו.
 
-#### 51. תאריכי טווח — 7 פטרנים
+#### 51. תאריכי טווח — 7 פטרנים ✅ בוצע
 **בעיה:** `from`/`to`, `from_date`/`to_date`, `date_from`/`date_to`, `issued_after`/`issued_before`, `due_after`/`due_before`, `start_year`/`end_year`, `from_year`/`to_year`.
 **AC:**
 - [x] פטרן אחיד אחד (`{field}_after`/`{field}_before`) בכל ה-endpoints
 - [x] ה-frontend מעודכן
 
 **בוצע:** טווחי תאריכים/שנים נורמלו ל-`{field}_after`/`{field}_before`: user audit logs עברו ל-`created_after`/`created_before`; tax-calendar bootstrap/summary עברו ל-`tax_year_after`/`tax_year_before`; ותיעוד הדומיינים עודכן עבור communications/notifications/users/tax-calendar.
-
-#### 52. 🔍 16 endpoints לרשימות ללא filters
-**בעיה:** fetch עיוור.
-**AC:**
-- [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
 
 #### 74. `page_size` max לא עקבי — 100 מול 200 ✅ בוצע
 **בעיה:** 25 endpoints מגבילים ל-100, 16 ל-200, ו-`GET /notifications` ללא max כלל. אין הגיון בחלוקה — `GET /annual-reports`=200 אבל `GET /clients/{id}/annual-reports`=100, לאותו סוג ישות.
@@ -267,6 +274,22 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בוצע:** נוסף `app/core/pagination.py` עם `MAX_PAGE_SIZE = 200` ו-`DEFAULT_PAGE_SIZE = 50`, וכל פרמטרי `page_size` ב-routes הציבוריים עברו ל-`le=MAX_PAGE_SIZE` תוך שמירה על ברירות המחדל הקיימות. `GET /api/v1/notifications` עבר מ-enum של `25 | 50` לוולידציה מספרית `1..200` עם default `25`. חוזה ה-API עודכן כך שברירת המחדל הסטנדרטית נשארת לפי endpoint, והמקסימום האחיד הוא `200`.
 
 **בדיקות/חוזה:** נוספה בדיקת חוזה ממוקדת ל-pagination ב-`tests/core/api/test_pagination_contract.py`, ועודכנו בדיקות קיימות שהצפינו את הגבולות הישנים. `openapi.json` חודש ונסרק: כל 44 פרמטרי `page_size` מתועדים עם `minimum: 1` ו-`maximum: 200`; notifications מתועד עם `default: 25`.
+
+#### 69. `NotificationPageSize` — enum `[25, 50]` ✅ בוצע
+**בעיה:** pagination הוגבל ל-2 ערכים דרך enum.
+**AC:**
+- [x] ההגבלה הוסרה במסגרת פריט 74: `GET /api/v1/notifications` משתמש ב-`page_size` מספרי עם `minimum: 1`, `maximum: 200`, `default: 25`.
+
+---
+
+## פתוח / לביצוע - חוזה API רוחבי
+
+### Filters / Search / Pagination
+
+#### 52. 🔍 16 endpoints לרשימות ללא filters
+**בעיה:** fetch עיוור.
+**AC:**
+- [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
 
 ### Type Conflicts
 
@@ -327,11 +350,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
 
-#### 69. 🔍 `NotificationPageSize` — enum `[25, 50]`
-**בעיה:** pagination מוגבל ל-2 ערכים דרך enum.
-**AC:**
-- [ ] בירור: ההגבלה מכוונת? אם לא — param רגיל עם min/max.
-
 ### Cross-System Consistency
 
 #### 70. `client_id` vs `client_record_id`
@@ -362,7 +380,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ---
 
-## בוצע כבר
+## בוצע כבר - שאר הפריטים
 
 ### Security / Auth
 
