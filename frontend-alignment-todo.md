@@ -74,21 +74,20 @@ _Frontend gaps vs backend API | June 2026_
 
 **Priority:** Medium
 
-**Backend:** `PATCH /api/v1/vat/work-items/{item_id}` — accepts `VatWorkItemUpdateRequest { assigned_to?, pending_materials_note? }`, returns `VatWorkItemResponse`. Filed items return 409.
+**Backend:** `PATCH /api/v1/vat/work-items/{item_id}` — accepts `VatWorkItemUpdateRequest { assigned_to?, pending_materials_note? }`, returns `VatWorkItemResponse`. Filed items return `400 VAT.FILED_IMMUTABLE`.
 
-**Gap:** `vatReportsApi` in `frontend/src/features/vatReports/api/vatReports.api.ts` has no `updateWorkItem` method. Cannot update `assigned_to` or `pending_materials_note` from the frontend.
+**Current state (2026-06-13):** The frontend contract and API method are implemented. The payload type requires at least one patchable field, matching the backend's non-empty PATCH behavior. No edit UI consumes this method yet, so an exported mutation hook is intentionally not shipped as dead code.
 
 **AC:**
-- [ ] `contracts.ts` adds:
+- [x] `contracts.ts` adds:
   ```ts
-  export interface UpdateVatWorkItemPayload {
-    assigned_to?: number | null
-    pending_materials_note?: string | null
-  }
+  export type UpdateVatWorkItemPayload =
+    | { assigned_to: number | null; pending_materials_note?: string | null }
+    | { assigned_to?: number | null; pending_materials_note: string | null }
   ```
-- [ ] `vatReportsApi.updateWorkItem(id: number, payload: UpdateVatWorkItemPayload): Promise<VatWorkItemResponse>` is added, calling `PATCH /api/v1/vat/work-items/{id}` with the payload.
-- [ ] A React Query mutation hook `useUpdateVatWorkItem()` is added in the vatReports hooks (or the existing hooks file, wherever other VAT mutations live), invalidating the work item detail and list queries on success.
-- [ ] TypeScript compiles with no errors.
+- [x] `vatReportsApi.updateWorkItem(id: number, payload: UpdateVatWorkItemPayload): Promise<VatWorkItemResponse>` is added, calling `PATCH /api/v1/vat/work-items/{id}` with the payload.
+- [ ] Add the mutation hook together with the first edit UI consumer, including targeted invalidation and pending/error feedback.
+- [x] TypeScript compiles with no errors.
 
 ---
 
@@ -96,46 +95,46 @@ _Frontend gaps vs backend API | June 2026_
 
 **Priority:** Medium
 
-**Backend:** `DELETE /api/v1/vat/work-items/{item_id}` — soft delete; returns 204. Only non-filed items can be deleted; filed items return 409.
+**Backend:** `DELETE /api/v1/vat/work-items/{item_id}` — soft delete; returns 204. Only non-filed items can be deleted; filed items return `400 VAT.FILED_IMMUTABLE`.
 
-**Gap:** `vatReportsApi` has no `deleteWorkItem` method. Cannot soft-delete VAT work items from the frontend.
+**Current state (2026-06-13):** The API method is implemented. No delete UI consumes it yet, so an exported mutation hook is intentionally not shipped as dead code.
 
 **AC:**
-- [ ] `vatReportsApi.deleteWorkItem(id: number): Promise<void>` is added, calling `DELETE /api/v1/vat/work-items/{id}`.
-- [ ] A React Query mutation hook `useDeleteVatWorkItem()` is added, invalidating the list query on success.
-- [ ] TypeScript compiles with no errors.
+- [x] `vatReportsApi.deleteWorkItem(id: number): Promise<void>` is added, calling `DELETE /api/v1/vat/work-items/{id}`.
+- [ ] Add the mutation hook together with the first delete UI consumer, including confirmation, pending/error feedback, and targeted cache removal/invalidation.
+- [x] TypeScript compiles with no errors.
 
 ---
 
-### F-05 · Correspondence — `CorrespondenceEntry` missing `updated_at` field
+### F-05 · Correspondence — `CorrespondenceEntry` missing `updated_at` field ✅ Resolved
 
 **Priority:** Medium
 
 **Backend:** `CorrespondenceResponse` includes `updated_at: datetime | null` (added in api-todo.md item #46; migration 0005 deployed).
 
-**Gap:** `CorrespondenceEntry` in `frontend/src/features/correspondence/api/contracts.ts` does not include `updated_at`. The field is returned by the API but the frontend type drops it silently.
+**Resolution (2026-06-13):** `CorrespondenceEntry` now preserves the nullable ISO datetime returned by the API.
 
 **File:** `frontend/src/features/correspondence/api/contracts.ts`
 
 **AC:**
-- [ ] `CorrespondenceEntry` adds `updated_at: string | null` (ISO 8601 datetime string, nullable because it is null until first PATCH).
-- [ ] Any component that displays correspondence detail can access `updated_at` without a TypeScript error.
-- [ ] TypeScript compiles with no errors.
+- [x] `CorrespondenceEntry` adds `updated_at: string | null` (ISO 8601 datetime string, nullable because it is null until first PATCH).
+- [x] Any component that displays correspondence detail can access `updated_at` without a TypeScript error.
+- [x] TypeScript compiles with no errors.
 
 ---
 
-### F-06 · Correspondence — list endpoint missing filter params
+### F-06 · Correspondence — list endpoint missing filter params ✅ Resolved
 
 **Priority:** Medium
 
 **Backend:** `GET /api/v1/clients/{id}/correspondence` supports query params: `correspondence_type`, `contact_id`, `occurred_after`, `occurred_before`, `order` (in addition to `page`, `page_size`, `business_id`).
 
-**Gap:** `correspondenceApi.list` in `frontend/src/features/correspondence/api/correspondence.api.ts` only passes `{ page, page_size, business_id }`. Five filter/sort params are never sent, making server-side filtering impossible from the frontend.
+**Resolution (2026-06-13):** The feature-local list contract includes all backend filters and `correspondenceApi.list()` forwards them through the shared query serializer.
 
 **File:** `frontend/src/features/correspondence/api/correspondence.api.ts`
 
 **AC:**
-- [ ] `contracts.ts` adds (or exports) a `ListCorrespondenceParams` interface:
+- [x] `contracts.ts` adds and exports a `ListCorrespondenceParams` interface:
   ```ts
   export interface ListCorrespondenceParams {
     page?: number
@@ -148,9 +147,9 @@ _Frontend gaps vs backend API | June 2026_
     order?: 'asc' | 'desc'
   }
   ```
-- [ ] `correspondenceApi.list(clientId, params?: ListCorrespondenceParams)` signature is updated to accept and forward all fields via `toQueryParams(params)` (same pattern as other API clients in the codebase).
-- [ ] No client-side filtering that duplicates these server params is added; filtering must be server-driven.
-- [ ] TypeScript compiles with no errors.
+- [x] `correspondenceApi.list(clientId, params?: ListCorrespondenceParams)` accepts and forwards all fields via `toQueryParams(params)`.
+- [x] No duplicate client-side filtering was added; filtering remains server-driven.
+- [x] TypeScript compiles with no errors.
 
 ---
 
@@ -174,22 +173,22 @@ _Frontend gaps vs backend API | June 2026_
 
 ---
 
-### F-08 · Audit — server-side filters for entity audit trails
+### F-08 · Audit — server-side filters for entity audit trails ✅ Resolved
 
 **Priority:** Medium
 
 **Backend:** `GET /api/v1/audit/{entity_type}/{entity_id}` supports `action`, `user_id`, `created_after`, and `created_before`.
 
-**Gap:** `EntityAuditTrailParams` only contains pagination, and `EntityAuditTrailSection` has no action, user, or date-range filtering.
+**Resolution (2026-06-13):** The frontend contract and query hook forward all supported filters. The shared audit section exposes action, actor, and date-range controls; stores entity-scoped filter and page state in the URL; validates URL action/user/page values; resets pagination on filter changes; and sends filtering to the backend.
 
 **Files:** `frontend/src/features/audit/api/contracts.ts`, `frontend/src/features/audit/api/audit.api.ts`, `frontend/src/features/audit/components/EntityAuditTrailSection.tsx`
 
 **AC:**
-- [ ] `EntityAuditTrailParams` adds `action`, `user_id`, `created_after`, and `created_before`.
-- [ ] The audit trail UI adds an action selector, user picker, and date range wired to those parameters.
-- [ ] Filter state is stored in the URL so it survives refresh and can be shared.
-- [ ] Filtering is server-driven, not applied in memory to the current page.
-- [ ] TypeScript compiles with no errors.
+- [x] `EntityAuditTrailParams` adds `action`, `user_id`, `created_after`, and `created_before`.
+- [x] The audit trail UI adds an action selector, user picker, and date range wired to those parameters.
+- [x] Filter and pagination state are stored in entity-scoped URL parameters.
+- [x] Filtering is server-driven, not applied in memory to the current page.
+- [x] TypeScript compiles with no errors.
 
 ---
 
