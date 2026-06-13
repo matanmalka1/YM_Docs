@@ -7,14 +7,14 @@
 | Metric | Count |
 |--------|-------|
 | Total backend endpoints | 199 |
-| Complete | 190 |
+| Complete | 193 |
 | Missing frontend | 4 |
 | API-only partial | 2 |
-| UI partial | 3 |
+| UI partial | 0 |
 | Stale/broken | 12 |
 | Needs review | 0 |
 | High severity | 4 |
-| Medium severity | 5 |
+| Medium severity | 2 |
 | Low confidence | 0 |
 
 ## Top High-Severity Findings
@@ -36,9 +36,6 @@
 | high | high | reminders | POST | `/api/v1/reminders/{reminder_id}/cancel` | Missing Frontend | Create frontend API wrapper |
 | medium | medium | invoices | GET | `/api/v1/invoices/charge/{charge_id}` | API-Only Partial | Connect API hook to a page or component |
 | medium | medium | invoices | POST | `/api/v1/invoices` | API-Only Partial | Connect API hook to a page or component |
-| medium | medium | clients | DELETE | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
-| medium | medium | clients | GET | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
-| medium | medium | clients | PATCH | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
 | info | high | advance_payments | DELETE | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Complete | None |
 | info | high | advance_payments | GET | `/api/v1/advance-payments/overview` | Complete | None |
 | info | high | advance_payments | GET | `/api/v1/advance-payments/overview/batches` | Complete | None |
@@ -131,12 +128,15 @@
 | info | high | charges | POST | `/api/v1/charges/{charge_id}/cancel` | Complete | None |
 | info | high | charges | POST | `/api/v1/charges/{charge_id}/issue` | Complete | None |
 | info | high | charges | POST | `/api/v1/charges/{charge_id}/mark-paid` | Complete | None |
+| info | high | clients | DELETE | `/api/v1/clients/{client_record_id}` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients/conflict/{id_number}` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients/export` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients/sidebar` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients/template` | Complete | None |
+| info | high | clients | GET | `/api/v1/clients/{client_record_id}` | Complete | None |
 | info | high | clients | GET | `/api/v1/clients/{client_record_id}/status-card` | Complete | None |
+| info | high | clients | PATCH | `/api/v1/clients/{client_record_id}` | Complete | None |
 | info | high | clients | POST | `/api/v1/clients` | Complete | None |
 | info | high | clients | POST | `/api/v1/clients/import` | Complete | None |
 | info | high | clients | POST | `/api/v1/clients/preview-impact` | Complete | None |
@@ -244,7 +244,7 @@
 | `/tax/reports` | frontend/src/components/layout/Navbar/Navbar.constants.ts | 51 | Review manually; heuristic confidence is low |
 | `/tax/reports/{param}` | frontend/src/features/annualReports/hooks/useAnnualReportsPage.ts | 53 | Review manually; heuristic confidence is low |
 | `/tax/vat` | frontend/src/components/layout/Navbar/Navbar.constants.ts | 49 | Review manually; heuristic confidence is low |
-| `/tax/vat/{param}` | frontend/src/features/binders/hooks/useReceiveBinderDrawer.ts | 245 | Review manually; heuristic confidence is low |
+| `/tax/vat/{param}` | frontend/src/features/binders/hooks/useReceiveBinderDrawer.ts | 244 | Review manually; heuristic confidence is low |
 | `/{param}` | frontend/src/features/signatureRequests/utils.ts | 11 | Remove or update stale frontend endpoint call |
 
 ## TODO / Mock / Placeholder Findings
@@ -329,7 +329,7 @@ _No drift signals found._
 | binders_operations | ✓ |   |   |   |   |   |   |   |   |   |
 | businesses | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   |
 | charges | ✓ | ✓ | ✓ |   | ✓ |   |   |   |   |   |
-| clients | ✓ | ~ | ✓ | ~ | ~ |   |   |   |   |   |
+| clients | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   |
 | clients_binders | ✓ |   |   |   |   |   |   |   |   |   |
 | correspondence | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   |
 | dashboard_overview | ✓ |   |   |   |   |   |   |   |   |   |
@@ -365,7 +365,7 @@ API endpoint strings in frontend with no backend match.
 - `/tax/reports` — frontend/src/components/layout/Navbar/Navbar.constants.ts:51
 - `/tax/reports/${id}` — frontend/src/features/annualReports/hooks/useAnnualReportsPage.ts:53
 - `/tax/vat` — frontend/src/components/layout/Navbar/Navbar.constants.ts:49
-- `/tax/vat/${existing.id}` — frontend/src/features/binders/hooks/useReceiveBinderDrawer.ts:245
+- `/tax/vat/${existing.id}` — frontend/src/features/binders/hooks/useReceiveBinderDrawer.ts:244
 - `/${hint}` — frontend/src/features/signatureRequests/utils.ts:11
 
 ## Warnings and Scanner Limitations
