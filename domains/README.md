@@ -11,6 +11,8 @@ Source of truth: reference
 
 Canonical, code-verified docs — one per backend domain. Authoring template + rules: `docs/workflow/domain-docs-authoring.md`. Code findings surfaced during authoring live in each domain doc's `Known issues` section.
 
+For terminology disambiguation (e.g. `client_id` vs `client_record_id`, AuditTrail vs Timeline), see `docs/project/glossary.md` — a pointer index, not a behavior source of truth.
+
 ## Tax chain
 
 - [advance-payments](advance-payments.md) — periodic income-tax prepayments (מקדמות), status, amounts, turnover snapshots.

@@ -21,6 +21,8 @@ Mandatory starting point. Read this before changing any code or documentation.
 3. `docs/agent/source-of-truth.md`
 4. `docs/project/documentation-map.md`
 
+Reference (not mandatory): `docs/project/glossary.md` — terminology disambiguation, e.g. `client_id` vs `client_record_id`.
+
 ## Read before, by change type
 
 ### Backend
