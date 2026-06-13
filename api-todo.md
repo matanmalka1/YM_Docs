@@ -408,25 +408,41 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] restore בכל דומיין עם soft delete (מקושר לפריטים 22, 30).
 
-### Bugs
-
-#### 73. שדות `required` שהם גם `nullable` — 18 שדות (סתירה לוגית)
-**בעיה:** שדה לא יכול להיות גם חובה וגם null. זה מבלבל codegen — ב-TypeScript ייווצר `field: string | null` אך מסומן חובה. כנראה נובע מ-Pydantic models עם `Optional` ללא default.
-**מושפעים:** `VatPeriodRow` (8 שדות: `filed_at`, `period_type`, `final_vat_amount`, `is_overdue`, `submission_deadline`, `statutory_deadline`, `extended_deadline`, `days_until_deadline`), `EntityAuditLogResponse` + `VatAuditLogResponse` (`old_value`, `new_value`, `note`), `TaxCalculationSaveResponse` (`refund_due`, `tax_due`), `TaxCalendarSummaryResponse` (`start_year`, `end_year`).
-**AC:**
-- [ ] לכל שדה: להחליט required (לא-null) או optional (ניתן להיעדר) — ולתקן את ה-Pydantic model בהתאם
-- [ ] codegen מייצר טיפוסים עקביים (אין `required` + `| null` יחד)
-
-#### 75. `period` — regex validation רק ב-1 מתוך 19 schemas
-**בעיה:** השדה `period` (פורמט `YYYY-MM`) מופיע ב-19 schemas, אבל ה-regex `^\d{4}-(0[1-9]|1[0-2])$` קיים רק ב-`AdvancePaymentCreateRequest`. שאר ה-input schemas (`VatWorkItemCreateRequest`, `ChargeCreateRequest`) מקבלים `period` חופשי — אפשר לשלוח `period: "garbage"` ל-VAT work item והוא יתקבל.
-**AC:**
-- [ ] ה-regex מוחל על כל ה-Create/input schemas שמקבלים `period`
-- [ ] עדיף: type משותף (`PeriodStr`) שמרכז את ה-validation במקום אחד
-- [ ] בדיקה: `period` לא חוקי מוחזר עם `422`
-
 ---
 
 ## בוצע כבר - שאר הפריטים
+
+### Bugs
+
+#### 73. שדות `required` שהם גם `nullable` ✅ בוצע
+**בעיה:** שדה לא יכול להיות גם חובה וגם null. זה מבלבל codegen.
+**AC:**
+- [x] לכל שדה: הוחלט required (לא-null) או optional (ניתן להיעדר) — ותוקן ה-Pydantic model
+- [x] codegen מייצר טיפוסים עקביים (אין `required` + `| null` יחד)
+
+**מה בוצע:**
+- `VatPeriodRow` — 8 שדות (`period_type`, `final_vat_amount`, `filed_at`, `submission_deadline`, `statutory_deadline`, `extended_deadline`, `days_until_deadline`, `is_overdue`): optional nullable (`= None`) — תקופות לא מוגשות חסרות אותם לגיטימית.
+- `EntityAuditLogResponse` + `VatAuditLogResponse` — `old_value`, `new_value`, `note`: optional nullable — audit entries של create/delete אינן כוללות ערכים.
+- `TaxCalculationSaveResponse` — `tax_due`, `refund_due`: optional nullable — ניתן לשמור צד אחד בלבד.
+- `TaxCalendarSummaryResponse` — `tax_year_after`, `tax_year_before`: optional nullable — נשלחים `None` כאשר query params לא סופקו.
+- OpenAPI נוצר מחדש: אפס קונפליקטים required+nullable בכל הסכמות המושפעות.
+- Frontend contract עודכן: `VatPeriodRow.period_type` תוקן ל-`VatType | null`.
+
+#### 75. `period` — regex validation ✅ בוצע
+**בעיה:** ה-regex `^\d{4}-(0[1-9]|1[0-2])$` היה קיים רק ב-`AdvancePaymentCreateRequest`.
+**AC:**
+- [x] ה-regex מוחל על כל ה-Create/input schemas שמקבלים `period`
+- [x] type משותף (`PeriodStr`) ב-`app/core/api_types.py` מרכז את ה-validation
+- [x] בדיקה: `period` לא חוקי מוחזר עם `422`
+
+**מה בוצע:**
+- `PeriodStr` + `PERIOD_PATTERN` נוספו ל-[app/core/api_types.py](../backend/app/core/api_types.py).
+- `VatWorkItemCreateRequest` — inline `field_validator` הוסר ומוחלף ב-`PeriodStr`.
+- `ChargeCreateRequest` — inline `field_validator` + `PERIOD_REGEX` הוסרו ומוחלפים ב-`PeriodStr | None`.
+- `AdvancePaymentCreateRequest` — `Field(..., pattern=...)` מוחלף ב-`PeriodStr`.
+- OpenAPI מראה `pattern` על כל שלוש הסכמות.
+- Frontend: `PERIOD_PATTERN` נוסף ל-`src/constants/periodOptions.constants.ts`; `charges/constants.ts` re-export; `vatReports/schemas/workItem.schema.ts` משתמש בקבוע המשותף.
+- בדיקות: 15 unit tests ל-`PeriodStr` + 6+1 HTTP integration tests ל-advance payments.
 
 ### Security / Auth
 
