@@ -125,7 +125,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 
 ## Error codes
 
-Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/architecture/error-codes.md`.
+Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-codes.md`.
 
 | Code | HTTP | Raised when |
 |------|------|-------------|

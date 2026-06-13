@@ -71,7 +71,7 @@ This module defines no SQLAlchemy/Python enum for notes. The real scoped discrim
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

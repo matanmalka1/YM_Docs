@@ -72,7 +72,7 @@ The audit module raises these `AUDIT.*` codes:
 - `AUDIT.INVALID_ENTITY_TYPE` for unsupported read targets. Source: `backend/app/audit/services/audit_trail_service.py:35-37`.
 - `AUDIT.ENTITY_NOT_FOUND` when the requested entity id does not exist for the validated type. Source: `backend/app/audit/services/audit_trail_service.py:50-53`.
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 

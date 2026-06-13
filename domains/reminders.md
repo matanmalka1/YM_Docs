@@ -106,7 +106,7 @@ Request/response schema notes:
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

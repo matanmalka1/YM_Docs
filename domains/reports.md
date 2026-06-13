@@ -145,7 +145,7 @@ VAT period type values come from `VatWorkItem.period_type` (vat-reports domain).
 
 This domain does not define `REPORTS.REASON` error codes. The export endpoint raises raw `HTTPException` (HTTP 500) for missing export libraries and unexpected export failures (`reports_export_service.py:38,43`). All other errors propagate from dependency domains via their own error envelopes.
 
-See `docs/architecture/error-codes.md` for the global error envelope format.
+See `docs/backend/error-codes.md` for the global error envelope format.
 
 ## Known issues
 

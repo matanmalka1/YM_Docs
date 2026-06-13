@@ -220,7 +220,7 @@ Every lifecycle and capacity transition writes one `BinderLifecycleLog` row per 
 
 Cite: `backend/app/binders/services/messages.py`, `backend/app/binders/services/binder_lifecycle_service.py`
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | When raised |
 |------|-------------|

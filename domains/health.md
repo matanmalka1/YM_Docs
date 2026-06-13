@@ -47,7 +47,7 @@ Health does not define Python enum classes, but it does enforce these exact lite
 
 ## Error codes
 
-No `HEALTH.*` domain error codes are raised inside `backend/app/health`; `rg -n 'HEALTH\\.|health\\.' backend/app/health` returns only imports, symbols, and route/schema names. Health returns explicit payloads instead of the app error envelope. Error-code registry: `docs/architecture/error-codes.md`.
+No `HEALTH.*` domain error codes are raised inside `backend/app/health`; `rg -n 'HEALTH\\.|health\\.' backend/app/health` returns only imports, symbols, and route/schema names. Health returns explicit payloads instead of the app error envelope. Error-code registry: `docs/backend/error-codes.md`.
 
 ## Decisions (preserved)
 

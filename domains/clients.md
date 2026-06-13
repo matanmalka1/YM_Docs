@@ -216,7 +216,7 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

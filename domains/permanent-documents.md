@@ -126,7 +126,7 @@ Source: `backend/app/documents/permanent_documents/services/permanent_document_s
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | HTTP | Raised when |
 |------|------|-------------|

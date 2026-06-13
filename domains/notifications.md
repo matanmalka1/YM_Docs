@@ -137,7 +137,7 @@ Trigger labels and domain labels used in list responses are defined in `TRIGGER_
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

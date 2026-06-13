@@ -169,7 +169,7 @@ Source: `backend/app/signature_requests/services/`
 
 ## Error codes
 
-Source: `backend/app/signature_requests/services/`, `docs/architecture/error-codes.md`.
+Source: `backend/app/signature_requests/services/`, `docs/backend/error-codes.md`.
 
 | Code | HTTP | When raised |
 |------|------|-------------|
@@ -181,7 +181,7 @@ Source: `backend/app/signature_requests/services/`, `docs/architecture/error-cod
 | `CLIENT_RECORD.NOT_FOUND` | 404 | `client_record_id` not found at create or list |
 | `BUSINESS.NOT_FOUND` | 404 | `business_id` not found at create |
 
-All codes follow `DOMAIN.REASON` format. Registry: `docs/architecture/error-codes.md`.
+All codes follow `DOMAIN.REASON` format. Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 

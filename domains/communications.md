@@ -88,7 +88,7 @@ Source: `backend/app/communications/services/correspondence_service.py`.
 | `CLIENT.NOT_FOUND` | service `_get_client_record_or_raise` | `client_record_id` does not exist |
 | `BUSINESS.NOT_FOUND` | service / `business_guards.assert_business_belongs_to_legal_entity` | `business_id` not found or belongs to a different legal entity |
 
-Error envelope format: `docs/architecture/error-codes.md`.
+Error envelope format: `docs/backend/error-codes.md`.
 
 ## Known issues
 

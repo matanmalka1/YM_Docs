@@ -134,9 +134,9 @@ Future / planned:
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
-The annual reports namespace is registered as `ANNUAL_REPORT` in `docs/architecture/error-codes.md:43`. Codes raised by this module include:
+The annual reports namespace is registered as `ANNUAL_REPORT` in `docs/backend/error-codes.md:43`. Codes raised by this module include:
 
 - `ANNUAL_REPORT.NOT_FOUND`
 - `ANNUAL_REPORT.INVALID_STATUS`

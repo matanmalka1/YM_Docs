@@ -59,7 +59,7 @@ Returned `SearchResult.result_type` values are `client` and `binder`, as emitted
 
 ## Error codes
 
-No `SEARCH.*` domain error codes are raised inside `backend/app/search`; `rg -n 'SEARCH\\.|search\\.' backend/app/search` returns only imports and symbol names. Search relies on shared auth/validation errors and the global error-envelope rules in `docs/architecture/api-contracts.md`. Error-code registry: `docs/architecture/error-codes.md`.
+No `SEARCH.*` domain error codes are raised inside `backend/app/search`; `rg -n 'SEARCH\\.|search\\.' backend/app/search` returns only imports and symbol names. Search relies on shared auth/validation errors and the global error-envelope rules in `docs/architecture/api-contracts.md`. Error-code registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 

@@ -118,7 +118,7 @@ Other VAT enums:
 
 ## Error codes
 
-The `VAT.REASON` codes this domain raises. Registry: `docs/architecture/error-codes.md`.
+The `VAT.REASON` codes this domain raises. Registry: `docs/backend/error-codes.md`.
 
 | Code | Status mapping | Raised when |
 |------|----------------|-------------|

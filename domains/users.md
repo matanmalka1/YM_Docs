@@ -164,7 +164,7 @@ Source: `backend/app/users/models/password_reset_token.py:12`
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | HTTP | Raised when |
 |------|------|-------------|

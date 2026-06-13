@@ -122,7 +122,7 @@ Source: `backend/app/charges/schemas/charge.py:81-84`.
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

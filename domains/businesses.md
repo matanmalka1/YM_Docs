@@ -130,7 +130,7 @@ Sources: `backend/app/businesses/services/business_service.py`, `business_guards
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | HTTP | Raised by |
 |------|------|-----------|

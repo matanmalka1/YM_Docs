@@ -62,7 +62,7 @@ Invoice defines no local enums. Attachment depends on `ChargeStatus.ISSUED` from
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|

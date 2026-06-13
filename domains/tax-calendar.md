@@ -122,7 +122,7 @@ There is no dedicated status enum in this domain. Grouped status is derived from
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 | Code | HTTP | Raised when |
 |------|------|-------------|

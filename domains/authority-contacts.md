@@ -74,7 +74,7 @@ Source: `backend/app/authority_contacts/models/authority_contact.py:48–72`.
 | `CLIENT.NOT_FOUND` | `client_record_id` does not exist (create, list) |
 | `AUTHORITY_CONTACT.NOT_FOUND` | `contact_id` not found or already soft-deleted (get, update, delete) |
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 

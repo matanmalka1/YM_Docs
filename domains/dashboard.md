@@ -154,7 +154,7 @@ Dashboard itself defines no enums. It references enums from other domains:
 
 No `DASHBOARD.*` error codes are raised in the live service layer.
 
-Error envelope format: `docs/architecture/error-codes.md`.
+Error envelope format: `docs/backend/error-codes.md`.
 
 ## Known issues
 

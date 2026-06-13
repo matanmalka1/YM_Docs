@@ -128,7 +128,7 @@ The queue does not define its own persisted lifecycle statuses. Instead it maps 
 
 ## Error codes
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 This module raises no `WORK_QUEUE.*` domain error codes. The route is read-only and relies on:
 

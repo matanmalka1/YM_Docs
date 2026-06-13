@@ -150,7 +150,7 @@ All rules sourced from `backend/app/timeline/services/timeline_service.py` unles
 |------|------|-----------|
 | `TIMELINE.CLIENT_NOT_FOUND` | 404 | `client_record_id` does not match any active client record |
 
-Registry: `docs/architecture/error-codes.md`.
+Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 
