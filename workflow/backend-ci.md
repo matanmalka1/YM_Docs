@@ -58,7 +58,9 @@ The roundtrip is what catches broken `downgrade()` functions. It already caught 
 
 The head-divergence check (`alembic heads` must show exactly one head) needs no database and runs first.
 
-After the roundtrip the job runs `alembic check`, which autogenerates against the live SQLAlchemy metadata and fails if a model was changed without a matching migration. Note: `alembic/env.py` does not set `compare_type`, so column-type-only changes are not caught — added/dropped tables and columns are.
+After the roundtrip the job runs `alembic check`, which autogenerates against the live SQLAlchemy metadata and fails if a model was changed without a matching migration. `alembic/env.py` sets `compare_type=True`, so column-type changes are caught alongside added/dropped tables and columns.
+
+`compare_server_default` is intentionally **not** enabled: `client_records.office_client_number` carries a `nextval()` server default in the migration but not on the model — the model omits it so SQLite test DDL (`create_all`) does not emit `CREATE SEQUENCE`. Enabling the flag would flag that intentional asymmetry on every run.
 
 ---
 
@@ -113,8 +115,7 @@ cd backend
 ./.venv/bin/ruff check .
 ./.venv/bin/ruff format --check .
 
-# typecheck (pyright + pytest-cov are not in requirements; install ad hoc)
-./.venv/bin/pip install pyright pytest-cov
+# typecheck
 ./.venv/bin/pyright
 
 # tests (+ coverage)

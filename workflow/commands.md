@@ -37,6 +37,24 @@ Run the full backend test suite:
 JWT_SECRET=test-secret ./.venv/bin/python -m pytest -q
 ```
 
+Backend quality checks (individual):
+
+```bash
+./.venv/bin/ruff check .           # lint
+./.venv/bin/ruff format --check .  # formatting check
+./.venv/bin/pyright                # type/import/name checks
+./.venv/bin/vulture                # unused code candidates
+```
+
+Backend fix commands:
+
+```bash
+./.venv/bin/ruff check . --fix     # autofix supported lint findings
+./.venv/bin/ruff format .          # apply formatting
+```
+
+`pyright` and `vulture` do not provide safe automatic project fixes; review and edit reported findings manually.
+
 Seed backend development data:
 
 ```bash
