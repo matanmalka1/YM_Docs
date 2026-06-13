@@ -4,7 +4,7 @@
 
 GitHub Actions workflow in `YM_Backend` that runs on every pull request and every push to `main`.
 
-Three parallel jobs gate code quality, tests, and database migrations.
+Five parallel jobs gate code quality, types, tests, schema sync, and database migrations.
 
 Current mode: **run-but-don't-block** — results are reported but not yet enforced as required status checks. See [Making it a hard gate](#making-it-a-hard-gate).
 
@@ -23,20 +23,22 @@ The migrations job in particular catches a class of bug that local SQLite testin
 ```
 push to main / pull_request
      ↓
-  ┌──────────┬──────────┬─────────────────┐
-  │  lint    │  test    │   migrations    │
-  └──────────┴──────────┴─────────────────┘
-     │            │              │
-  ruff check   pytest      Postgres 17 service
-  ruff format  (SQLite     + alembic roundtrip
-   --check      in-memory)  (upgrade→downgrade→upgrade)
+  ┌────────┬──────────┬───────────┬──────────────┬─────────────────┐
+  │  lint  │ typecheck│   test    │ openapi-sync │   migrations    │
+  └────────┴──────────┴───────────┴──────────────┴─────────────────┘
+     │         │           │             │               │
+  ruff      pyright     pytest      check_contract   Postgres 17 service
+  check     (lenient)   + coverage   _sync.py        + alembic roundtrip
+  format                (SQLite)    (no DB)          + alembic check
 ```
 
 | Job | Runs | Notes |
 |-----|------|-------|
 | **lint** | `ruff check .` + `ruff format --check .` | Installs only ruff (fast). `alembic/` is excluded per `pyproject.toml`. |
-| **test** | `pytest` | Tests use in-memory SQLite and set `APP_ENV=test` themselves; `JWT_SECRET` is the only required env. |
-| **migrations** | head-divergence check + Postgres roundtrip | Real Postgres 17 service (matches Neon in production). |
+| **typecheck** | `pyright` | Lenient — `pyrightconfig.json` disables most `report*` checks, so it catches undefined names / bad imports / syntax, not strict typing. `--pythonpath` bypasses the config's absolute local `venvPath`. |
+| **test** | `pytest --cov=app` | In-memory SQLite; sets `APP_ENV=test` itself; `JWT_SECRET` is the only required env. Coverage is reported, not enforced. |
+| **openapi-sync** | `check_contract_sync.py` | Ensures committed `openapi.json` matches the app. No DB. See [Why openapi-sync matters](#why-openapi-sync-matters). |
+| **migrations** | head-divergence + Postgres roundtrip + `alembic check` | Real Postgres 17 service (matches Neon in production). |
 
 ---
 
@@ -56,6 +58,24 @@ The roundtrip is what catches broken `downgrade()` functions. It already caught 
 
 The head-divergence check (`alembic heads` must show exactly one head) needs no database and runs first.
 
+After the roundtrip the job runs `alembic check`, which autogenerates against the live SQLAlchemy metadata and fails if a model was changed without a matching migration. Note: `alembic/env.py` does not set `compare_type`, so column-type-only changes are not caught — added/dropped tables and columns are.
+
+---
+
+## Why openapi-sync matters
+
+The frontend [api-drift](api-drift-ci.md) check pulls from the **committed** `openapi.json`, not from a freshly generated one. So if a backend schema changes but `openapi.json` is not regenerated and committed, the frontend drift check passes against a stale file — drift slips past both repos.
+
+The `openapi-sync` job runs `scripts/tooling/check_contract_sync.py`, which regenerates the schema from the live app and compares it to the committed `openapi.json`. It fails if they differ. No database is needed.
+
+Fix when it fails:
+
+```bash
+cd backend
+APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json
+# commit the updated openapi.json
+```
+
 ---
 
 ## Key files
@@ -64,6 +84,8 @@ The head-divergence check (`alembic heads` must show exactly one head) needs no 
 |------|------|
 | `backend/.github/workflows/ci.yml` | the workflow |
 | `backend/pyproject.toml` | ruff config; `target-version = "py314"`; `alembic` excluded from lint |
+| `backend/pyrightconfig.json` | pyright config; absolute local `venvPath` (bypassed in CI via `--pythonpath`); most `report*` checks disabled |
+| `backend/scripts/tooling/check_contract_sync.py` | compares committed `openapi.json` to the live app |
 | `backend/pytest.ini` | pytest config (SQLite, `APP_ENV=test`) |
 | `backend/alembic/versions/*` | migrations validated by the roundtrip |
 | `backend/app/config.py` | `APP_ENV=test` bypasses the localhost `DATABASE_URL` guard so CI can point alembic at the Postgres service |
@@ -91,16 +113,24 @@ cd backend
 ./.venv/bin/ruff check .
 ./.venv/bin/ruff format --check .
 
-# tests
-APP_ENV=test JWT_SECRET=x ./.venv/bin/pytest
+# typecheck (pyright + pytest-cov are not in requirements; install ad hoc)
+./.venv/bin/pip install pyright pytest-cov
+./.venv/bin/pyright
 
-# migration roundtrip against a local Postgres
+# tests (+ coverage)
+APP_ENV=test JWT_SECRET=x ./.venv/bin/pytest --cov=app --cov-report=term-missing
+
+# openapi.json in sync with the app
+APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.check_contract_sync
+
+# migration roundtrip + alembic check against a local Postgres
 createdb ci_roundtrip_check
 export APP_ENV=test JWT_SECRET=x
 export DATABASE_URL="postgresql+psycopg2://$(whoami)@localhost:5432/ci_roundtrip_check"
 ./.venv/bin/alembic upgrade head
 ./.venv/bin/alembic downgrade base
 ./.venv/bin/alembic upgrade head    # must succeed
+./.venv/bin/alembic check           # models match migrations
 dropdb ci_roundtrip_check
 ```
 
@@ -126,7 +156,7 @@ Postgres enum types are standalone objects; `drop_table` does not remove them.
 The workflow runs but does not block merges yet. To enforce:
 
 1. GitHub → repo **Settings → Branches → Branch protection rules** for `main`.
-2. Require status checks: `lint`, `test`, `migrations`.
+2. Require status checks: `lint`, `typecheck`, `test`, `openapi-sync`, `migrations`.
 
 After that, a red job blocks merge.
 
