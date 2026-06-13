@@ -60,7 +60,7 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 | periods_open | int | Computed: periods_expected − periods_filed |
 | on_time_count | int | Filed items where filed_at.date() ≤ due_date_effective |
 | late_count | int | Filed items where filed_at.date() > due_date_effective |
-| compliance_rate | float | Percentage: periods_filed / periods_expected × 100 |
+| compliance_rate | ApiDecimal | Percentage: periods_filed / periods_expected × 100 |
 
 **VatComplianceStalePendingResponse** (`schemas.py:26`): `client_record_id`, `client_name`, `period`, `days_pending`. Stale threshold: `VAT_STALE_PENDING_DAYS = 30` (`constants.py:7`).
 
@@ -73,17 +73,17 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 | client_record_id | int | |
 | office_client_number | int \| None | From ClientRecord |
 | client_name | str | Resolved from LegalEntity.official_name; falls back to `"לקוח #{id}"` if legal entity missing |
-| total_expected | float | |
-| total_paid | float | |
+| total_expected | ApiDecimal | |
+| total_paid | ApiDecimal | |
 | overdue_count | int | |
-| gap | float | total_expected − total_paid |
+| gap | ApiDecimal | total_expected − total_paid |
 
 ### AnnualReportStatusReportResponse (`schemas.py:74`)
 `tax_year`, `total`, `statuses: list[AnnualReportStatusGroupResponse]`.
 
 **AnnualReportStatusGroupResponse** (`schemas.py:68`): `status: AnnualReportStatus`, `count`, `clients: list[AnnualReportStatusClientResponse]`. Only statuses with at least one client are included in the response.
 
-**AnnualReportStatusClientResponse** (`schemas.py:60`): `client_record_id`, `client_name`, `form_type: PrimaryAnnualReportForm | None`, `filing_deadline: date | None`, `days_until_deadline: int | None`.
+**AnnualReportStatusClientResponse** (`schemas.py:60`): `client_record_id`, `client_name`, `form_type: PrimaryAnnualReportForm | None`, `filing_deadline: ApiDateTime | None`, `days_until_deadline: int | None`.
 
 ### AgingReportResponse (`schemas.py:100`)
 `report_date`, `total_outstanding`, `items: list[AgingReportItemResponse]`, `summary: AgingReportSummaryResponse`, `total`, `page`, `page_size`.

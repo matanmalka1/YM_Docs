@@ -68,7 +68,7 @@ Dashboard has **no database tables**. All output is assembled from repositories 
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | str | Composite key `"{source_type}:{source_id}"` |
+| `id` | str | Composite key `"{source_type}:{source_id}"`, regex `^\w+:\d+$` |
 | `source_type` | str | WorkQueueSourceType value |
 | `source_id` | int | ID in the originating domain |
 | `title` | str | Work-queue item title |
@@ -76,7 +76,7 @@ Dashboard has **no database tables**. All output is assembled from repositories 
 | `due_date` | date \| None | |
 | `days_delta` | int | `(due_date - today).days`; 0 if no due_date |
 | `reason` | str \| None | Hebrew reason string per source type |
-| `amount` | str \| None | ILS-formatted; charge items only |
+| `amount` | ApiDecimal \| None | Raw charge amount for charge items only; frontend formats as ILS |
 | `urgency` | str | WorkQueueUrgency value |
 | `href` | str | Deep-link path in the frontend |
 

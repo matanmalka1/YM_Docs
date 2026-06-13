@@ -33,7 +33,7 @@ Router: `backend/app/businesses/api/client_status_card_router.py`
 
    **b. Annual report card** (`_annual_report_card`):
    - `AnnualReportRepository.get_by_client_record_year(client_record_id, resolved_year)` — single row.
-   - Returns: status, form_type, filing_deadline (string), refund_due, tax_due.
+   - Returns: status, form_type, filing_deadline (`ApiDateTime | None`), refund_due, tax_due.
    - If no report: returns empty card.
 
    **c. Charges card** (`_charges_card`):
