@@ -255,12 +255,16 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
 
-#### 74. `page_size` max לא עקבי — 100 מול 200
+#### 74. `page_size` max לא עקבי — 100 מול 200 ✅ בוצע
 **בעיה:** 25 endpoints מגבילים ל-100, 16 ל-200, ו-`GET /notifications` ללא max כלל. אין הגיון בחלוקה — `GET /annual-reports`=200 אבל `GET /clients/{id}/annual-reports`=100, לאותו סוג ישות.
 **AC:**
-- [ ] מקסימום אחיד אחד לכל ה-endpoints (להחליט 100 או 200)
-- [ ] `GET /notifications` מקבל max מוגדר
-- [ ] בדיקה: בקשה מעל המקסימום מוחזרת עם `422`
+- [x] מקסימום אחיד אחד לכל ה-endpoints: `200`
+- [x] `GET /notifications` מקבל max מוגדר
+- [x] בדיקה: בקשה מעל המקסימום מוחזרת עם `422`
+
+**בוצע:** נוסף `app/core/pagination.py` עם `MAX_PAGE_SIZE = 200` ו-`DEFAULT_PAGE_SIZE = 50`, וכל פרמטרי `page_size` ב-routes הציבוריים עברו ל-`le=MAX_PAGE_SIZE` תוך שמירה על ברירות המחדל הקיימות. `GET /api/v1/notifications` עבר מ-enum של `25 | 50` לוולידציה מספרית `1..200` עם default `25`. חוזה ה-API עודכן כך שברירת המחדל הסטנדרטית נשארת לפי endpoint, והמקסימום האחיד הוא `200`.
+
+**בדיקות/חוזה:** נוספה בדיקת חוזה ממוקדת ל-pagination ב-`tests/core/api/test_pagination_contract.py`, ועודכנו בדיקות קיימות שהצפינו את הגבולות הישנים. `openapi.json` חודש ונסרק: כל 44 פרמטרי `page_size` מתועדים עם `minimum: 1` ו-`maximum: 200`; notifications מתועד עם `default: 25`.
 
 ### Type Conflicts
 

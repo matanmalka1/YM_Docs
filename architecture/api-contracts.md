@@ -22,7 +22,7 @@ Source of truth: mandatory
 - Business action endpoints may use verbs only for real domain commands or transitions.
 - `GET` endpoints must not change state.
 - Standard list endpoints must support `page`, `page_size`, `sort_by`, and `order`.
-- Standard paginated list endpoints should default to `page=1` and `page_size=20`, with page size capped at 100 unless an owning contract says otherwise.
+- Standard paginated list endpoints should default to `page=1` and `page_size=20`, with page size capped at 200 unless an owning contract says otherwise.
 - New list endpoints must not introduce aliases such as `limit`, `offset`, `per_page`, `sort_dir`, or `order_by`.
 - Existing list endpoints that still use aliases such as `sort_dir` or `sort_order` should migrate callers to `order` and then remove the old names.
 - Filters must be query parameters with stable `snake_case` names.
