@@ -142,12 +142,7 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-### Previously tracked findings resolved:
-
-- **F-026** (was F-022) — Wrong error code on business-not-found: fixed; now raises `PERMANENT_DOCUMENTS.BUSINESS_NOT_FOUND`. Resolved 2026-06-04.
-- **F-027** (was F-023) — `CLIENT_SCOPE_TYPES` not enforced: fixed; `upload_document` now raises `PERMANENT_DOCUMENTS.CLIENT_SCOPE_VIOLATION` (422) when `id_copy`, `power_of_attorney`, or `engagement_agreement` is submitted with a `business_id`. Resolved 2026-06-04.
-- **F-028** (was F-024) — IDOR on delete/replace: fixed by restructuring routes to `DELETE /api/v1/documents/client/{client_record_id}/{document_id}` and `PUT /api/v1/documents/client/{client_record_id}/{document_id}/replace`; service uses `get_by_id_and_client_record` — document mutation without proving client scope returns 404. Resolved 2026-06-04.
-- **F-042** — IDOR on download-url read path: fixed by moving route to `GET /api/v1/documents/client/{client_record_id}/{document_id}/download-url`; service `get_download_url` now takes `client_record_id` and fetches via `get_by_id_and_client_record` — presigned URL without proving client scope returns 404. Resolved 2026-06-05.
+No open known issues.
 
 ## Decisions (preserved)
 

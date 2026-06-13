@@ -76,7 +76,7 @@ Registry: `docs/architecture/error-codes.md`.
 
 ## Known issues
 
-No audit-specific code discrepancy was confirmed inside `backend/app/audit` during this authoring pass. Shared conceptual docs are stale-prone, but the only relevant one used here (`backend/docs/history-vs-timeline.md`) was treated as reference only, not as current implementation authority.
+No open known issues.
 
 ## Decisions (preserved)
 
