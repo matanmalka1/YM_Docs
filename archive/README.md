@@ -11,6 +11,9 @@ Source of truth: reference
 
 - `actions-legacy.md` — historical `backend/app/actions/README.md` content before canonical docs migration.
 - `invoice-legacy.md` — historical `backend/app/invoice/README.md` content before canonical docs migration.
+- `migration-phases.md` — historical backend domain migration execution plan. Replaced by
+  `docs/project/backend-module-map.md` for current package inventory and `docs/domains/*` for
+  canonical domain behavior; archived because the structural migration is complete.
 
 Archived docs are historical only.
 

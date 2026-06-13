@@ -1,7 +1,11 @@
 # Migration Phases
 
-Execution plan for moving the backend toward the target domain structure defined in
-`target-domains-v1.md`, sequenced per the priorities in `domain-migration-map.md`.
+> Archived historical document. The active backend structure reference is
+> `docs/project/backend-module-map.md`; canonical domain behavior lives in `docs/domains/*`.
+> Do not use this file as a source of truth for current architecture decisions.
+
+Historical execution plan for moving the backend toward the target domain structure defined in
+`target-domains-v1.md`.
 
 > **Status — COMPLETE (2026-06-10).** Phases 0–7 are merged into `main`; full suite green
 > (`1211 passed`). Phase 8 is deferred by design (trigger-gated — see bottom of this file);
@@ -53,9 +57,8 @@ Execution plan for moving the backend toward the target domain structure defined
 
 ## Phase 0 — Documentation (DONE)
 
-Target structure (`target-domains-v1.md`), the domain-to-folder mapping
-(`domain-migration-map.md`), and this phased plan (`migration-phases.md`) are written and
-checked in. No code touched.
+Target structure (`target-domains-v1.md`) and this phased plan (`migration-phases.md`) are
+written and checked in. No code touched.
 
 ---
 
@@ -163,7 +166,7 @@ reachable over HTTP like every other domain. Phase 7.5 later renamed the package
 `app/invoices/`.
 
 ### Why
-`domain-migration-map.md` marks invoices P1 specifically because the router layer is missing.
+Invoices were prioritized because the router layer was missing.
 `InvoiceService.attach_invoice_to_charge` exists and is unit-tested
 (`tests/invoices/service/test_invoice_service_rules.py`) but has no endpoint and is not in
 `router_registry.py`. Before Phase 2, `tests/invoices/api/` existed but was empty, confirming
@@ -211,7 +214,7 @@ Moves:
 ### Why
 `target-domains-v1.md` defines Alerts as a distinct domain (internal signals from business
 rules), explicitly separate from Dashboard (pure read model) and Notifications (outbound).
-`domain-migration-map.md` marks it `extract` from `dashboard/`. The only consumer today is
+The planned action was to extract it from `dashboard/`. The only consumer today is
 `dashboard_overview_service.py`, so the blast radius is small.
 
 ### Files moved
@@ -255,7 +258,7 @@ Moves (flat → `services/`):
 - `app/actions/vat_report_actions.py` → `app/actions/services/vat_report_actions.py`
 
 ### Why
-`domain-migration-map.md` marks actions `restructure: flat → vertical slice`.
+Actions were planned as a flat-to-vertical-slice restructure.
 `target-domains-v1.md` defines Actions as an application layer that centralizes command
 definitions per domain. The flat layout is inconsistent with every other package.
 
@@ -308,8 +311,8 @@ Moves:
 
 ### Why
 `target-domains-v1.md` defines Documents as the parent domain that "replaces
-permanent_documents as parent domain", with `permanent_documents/` as a child.
-`domain-migration-map.md` marks it `create parent + move`.
+permanent_documents as parent domain", with `permanent_documents/` as a child. The planned
+action was to create the parent package and move the child package under it.
 
 ### Files moved
 Whole `app/permanent_documents/` tree, including:
@@ -354,8 +357,8 @@ Scaffolded the `app/contacts/` package (`api/`, `models/`, `repositories/`, `sch
 
 ### Why
 `target-domains-v1.md` defines a Contacts domain (client people contacts, distinct from
-Authority Contacts). `domain-migration-map.md` marks it P1 `create/extract` with the caveat
-"check if any code exists in clients/".
+Authority Contacts). The planned action was to create or extract it after checking whether
+any client-contact code existed in `clients/`.
 
 **Research result:** there is **no client `Contact` model anywhere**. The only contact-like
 code is `authority_contacts/` (a separate target domain), `legal_entities/models/person.py`
@@ -446,8 +449,7 @@ Each rename PR updated, for its package:
 
 ## Phase 8 — Deferred Domains
 
-Domains marked P3 / `defer` in `domain-migration-map.md`. Do **not** execute speculatively;
-each has an explicit trigger.
+Deferred domains. Do **not** execute speculatively; each has an explicit trigger.
 
 ### national_insurance
 - **Current state:** lives inside `app/annual_reports/services/ni_engine.py` (plus

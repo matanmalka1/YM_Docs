@@ -432,7 +432,7 @@ Missing docs:
 Recommended future structure:
 
 - Canonical: `docs/domains/legal-entities.md`
-- Reference: `docs/architecture/migration-phases.md`
+- Reference: `docs/archive/migration-phases.md` (historical only)
 - Archive: —
 
 Notes:
