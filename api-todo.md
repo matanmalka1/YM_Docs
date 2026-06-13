@@ -349,52 +349,52 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Type Conflicts
 
-#### 59. 🔍 `created_at` — `date-time` מול `date`
+#### 59. `created_at` — `date-time` מול `date` ✅ בוצע
 **בעיה:** כמעט כולם `date-time`, אבל `VatInvoiceResponse` הוא `date`.
 **AC:**
-- [ ] בירור: חשבונית VAT צריכה שעה? להחליט ולאחד.
+- [x] הוחלט: `created_at` הוא timestamp מערכתי, לא תאריך מסמך. `VatInvoice.created_at` ו-`VatInvoiceResponse.created_at` אוחדו ל-`date-time` / `ApiDateTime`; `invoice_date` נשאר `date`.
 
-#### 60. 🔍 `filing_deadline` — 3 טיפוסים
+#### 60. `filing_deadline` — 3 טיפוסים ✅ בוצע
 **בעיה:** `string` ללא format / `date-time` / `date` — לאותו שדה לוגי.
 **AC:**
-- [ ] בירור: מהו הטיפוס הנכון? לאחד בכל 4 ה-schemas.
+- [x] הוחלט: כל שדה API בשם `filing_deadline` הוא `ApiDateTime | None`. תצוגת תאריך בלבד מתבצעת ב-frontend או בשדה נפרד עתידי, לא באותו שם.
 
-#### 62. 🔍 `amount` — `decimal` מול `string` גולמי
+#### 62. `amount` — `decimal` מול `string` גולמי ✅ בוצע
 **בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` גולמי.
 **AC:**
-- [ ] בירור: האם זה סכום כספי? אם כן — `decimal`.
+- [x] `AttentionBoardItem.amount` הוא `ApiDecimal | None`; פורמט ₪ עבר ל-frontend.
 
-#### 64. 🔍 `id` — `integer` מול `string`
+#### 64. `id` — `integer` מול `string` ✅ בוצע
 **בעיה:** רוב הישויות `integer`. `WorkQueueItem.id` הוא `string` — **מאושר כמכוון** (יש לו regex `^\w+:\d+$`, composite ID כמו `vat_work_item:42`). נשאר רק `AttentionBoardItem.id` כ-`string` ללא הסבר.
 **AC:**
-- [ ] בירור: האם `AttentionBoardItem.id` גם composite? אם כן — להוסיף regex ולתעד. אם לא — `integer`.
+- [x] `AttentionBoardItem.id` גם composite; נוסף regex ותיעוד כמו `WorkQueueItem.id`.
 
-#### 65. 🔍 `counterparty_id` — `string` במקום `integer`
+#### 65. `counterparty_id` — `string` במקום `integer` ✅ בוצע
 **בעיה:** ב-VatInvoice schemas.
 **AC:**
-- [ ] בירור: מספר עוסק/ח.פ (string מכוון) או FK פנימי?
+- [x] הוחלט: מזהה חיצוני של הצד הנגדי (עוסק/ת"ז/דרכון/זר), לא FK פנימי. נשאר `string` ונוסף תיאור schema.
 
-#### 66. 🔍 שיעורים כ-`number` במקום `decimal`
+#### 66. שיעורים כ-`number` במקום `decimal` ✅ בוצע
 **בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` כ-float.
 **AC:**
-- [ ] בירור: float מקובל לשיעורים, או `decimal` כמו שאר הכספים (סיכון עיגול)?
+- [x] הוחלט: שיעורים/אחוזים/נקודות זיכוי בחוזה API משתמשים ב-`ApiDecimal`; ה-frontend ממיר למספר רק לצורכי תצוגה.
 
 ### Schema / Enum Design
 
 #### 57. inline enum ב-correspondence `order`
 **בעיה:** `['asc','desc']` inline במקום `$ref`.
 **AC:**
-- [ ] enum מוגדר כ-schema נפרד ומופנה אליו
+- [x] enum מוגדר כ-schema נפרד ומופנה אליו
 
 #### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType`
 **בעיה:** שני enums לסיווג הוצאות, 7 ערכים משותפים + ערכים שונים.
 **AC:**
-- [ ] בירור: מה ההבדל ואיפה כל אחד? לאחד או לתעד.
+- [x] בירור: מה ההבדל ואיפה כל אחד? לאחד או לתעד.
 
 #### 68. `ReminderActionType` — UPPER_CASE חריג
 **בעיה:** היחיד ב-UPPER_CASE מתוך 52 enums (השאר snake_case).
 **AC:**
-- [ ] המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
+- [x] המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
 
 ### Cross-System Consistency
 
