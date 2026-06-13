@@ -21,7 +21,7 @@ Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` o
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | /api/v1/signature-requests | Create and immediately send a signature request |
-| GET | /api/v1/signature-requests/pending | List all `pending_signature` requests (paginated) |
+| GET | /api/v1/signature-requests/pending | List all `pending_signature` requests; paginated, filterable by `client_record_id`, `request_type`, `signer_email`, `created_after`/`created_before`, `expires_before` (date). Ordered by `sent_at asc nulls_last, id asc`. No generic `status` filter (route is pending-only) |
 | GET | /api/v1/signature-requests/{request_id} | Get request details + embedded audit trail |
 | POST | /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel | Cancel a pending request within its owning client scope |
 | GET | /api/v1/clients/{client_record_id}/signature-requests | List all requests for a client record (paginated, filterable by status) |

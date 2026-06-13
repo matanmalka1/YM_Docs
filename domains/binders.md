@@ -19,7 +19,7 @@ Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` o
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | /api/v1/binders | List active binders with filters, sorting, pagination |
-| GET | /api/v1/binders/open | List binders not yet handed over |
+| GET | /api/v1/binders/open | List binders not yet handed over; paginated, filterable by `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `created_after`/`created_before` (date). Ordered by `period_start desc, id desc` |
 | GET | /api/v1/binders/{binder_id} | Get single binder by ID |
 | DELETE | /api/v1/binders/{binder_id} | Soft-delete binder (ADVISOR only) |
 | POST | /api/v1/binders/receive | Receive material (find or create binder + intake) |

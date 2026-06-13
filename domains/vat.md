@@ -35,7 +35,7 @@ All paths exist in `backend/openapi.json` (`backend/openapi.json:9757`, `backend
 | `GET` | `/api/v1/vat/clients/{client_record_id}/period-options` | Return valid period options for a client |
 | `GET` | `/api/v1/vat/work-items/status-summary` | Count work items by status |
 | `GET` | `/api/v1/vat/work-items/{item_id}` | Get one enriched work item (full `VatWorkItemResponse`) |
-| `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items (thin `VatWorkItemListItem`) |
+| `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items (thin `VatWorkItemListItem`); paginated (default `page_size=200`), filterable by `year`, `period`, `status`, `assigned_to`, `due_after`/`due_before` (date, vs `due_date_effective`). Ordered by `period desc, id desc` |
 | `GET` | `/api/v1/vat/work-items` | List work items across clients (thin `VatWorkItemListItem`) |
 | `GET` | `/api/v1/vat/work-items/{item_id}/audit` | Get audit trail for a work item |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/summary` | Get client-level VAT period and annual aggregates |

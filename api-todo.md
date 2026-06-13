@@ -203,6 +203,33 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
 
+### Frontend Wiring (המשך ל-#52)
+
+ה-backend של #52 הושלם: הפילטרים החדשים קיימים בשרת וב-OpenAPI, ו-`frontend/src/types/generated.ts` חודש (typecheck ירוק). אף מסך עדיין לא **שולח** את הפרמטרים החדשים — כל הקריאות נשארו `page`/`page_size` בלבד. השינוי additive ו-optional, ולכן אין שבירה. הפריטים הבאים מחווטים את ה-UI לפי צורך תפעולי אמיתי.
+
+#### 78. חיווט binders/open ל-`getOpenBinders`
+**בעיה:** `BindersFiltersBar` (query/binder_number/location_status/year) קיים ומחובר לרשימת ה-binders הראשית בלבד; מסך ה-open binders שולף בלי פילטרים למרות שהשרת תומך בהם.
+**מיקום:** `frontend/src/features/binders/api/binders.api.ts:85` (`getOpenBinders`), צרכן `BindersFiltersBar`.
+**AC:**
+- [ ] `getOpenBinders` מקבל ושולח `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `created_after`, `created_before`.
+- [ ] סרגל הפילטרים של open binders מחווט לפרמטרים האלה ושומר state ב-URL (refresh/share).
+- [ ] אין סינון client-side in-memory שנשאר על מה שעבר לשרת.
+
+#### 79. סינון server-side ל-audit trail
+**בעיה:** `EntityAuditTrailSection` מציג את כל רשומות ה-audit; אין סינון לפי action/user, וה-fetch לא ממונף את `action`/`user_id`/`created_after`/`created_before` החדשים.
+**מיקום:** `frontend/src/features/audit/api/audit.api.ts:7` (`getEntityAuditTrail`), טייפ `EntityAuditTrailParams`, צרכן `EntityAuditTrailSection`.
+**AC:**
+- [ ] `EntityAuditTrailParams` מורחב ל-`action`, `user_id`, `created_after`, `created_before`.
+- [ ] נוסף UI סינון (action dropdown / user picker / טווח תאריכים) המחווט לפרמטרים, עם state ב-URL.
+- [ ] הסינון רץ בשרת (לא client-side על דף בודד).
+
+#### 80. ניצול filters ב-vat client work-items
+**בעיה:** `listByClient` שולף את כל work-items של הלקוח בלי פרמטרים; השרת תומך עכשיו ב-`year`/`period`/`status`/`assigned_to`/`due_after`/`due_before`. כרגע `VatClientSummaryPanel` משתמש ב-summary endpoint, וה-list endpoint תת-מנוצל.
+**מיקום:** `frontend/src/features/vatReports/api/vatReports.api.ts:121` (`listByClient`).
+**AC:**
+- [ ] 🔍 בירור: האם מסך הלקוח צריך טבלה מסוננת (year/period/status/assigned_to/due range) או שה-summary panel מספיק? אם אין צורך — לתעד ולסגור בלי שינוי UI.
+- [ ] אם נדרש: `listByClient` מקבל ושולח את הפילטרים, עם UI ו-state ב-URL.
+
 ---
 
 ## בוצע כבר - חוזה API רוחבי
@@ -252,6 +279,19 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [x] ה-frontend מעודכן
 
 **בוצע:** טווחי תאריכים/שנים נורמלו ל-`{field}_after`/`{field}_before`: user audit logs עברו ל-`created_after`/`created_before`; tax-calendar bootstrap/summary עברו ל-`tax_year_after`/`tax_year_before`; ותיעוד הדומיינים עודכן עבור communications/notifications/users/tax-calendar.
+
+#### 52. 16 endpoints לרשימות ללא filters ✅ בוצע
+**בעיה:** fetch עיוור ברשימות תפעוליות שעלולות לגדול.
+**AC:**
+- [x] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
+
+**בוצע:** אחרי בירור, נוספו filters רק לרשימות שבהן יש צורך תפעולי בסינון בתוך queue/ציר אירועים גדל:
+- `GET /api/v1/binders/open` — `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `created_after`, `created_before`; הרשימה נשארת open-only ולא מחזירה `handed_over`.
+- `GET /api/v1/signature-requests/pending` — `client_record_id`, `request_type`, `signer_email`, `created_after`, `created_before`, `expires_before`.
+- `GET /api/v1/vat/clients/{client_record_id}/work-items` — `year`, `period`, `status`, `assigned_to`, `due_after`, `due_before`.
+- `GET /api/v1/audit/{entity_type}/{entity_id}` — `action`, `user_id`, `created_after`, `created_before`.
+
+הוחלט שאין צורך ב-filters נוספים עבור `GET /api/v1/clients/{client_record_id}/annual-reports` ו-`GET /api/v1/clients/{client_record_id}/businesses`: אלו רשימות child שכבר scoped ללקוח יחיד, קטנות יחסית, והצורך שנמצא עבורן הוא יציבות/דטרמיניזם ולא סינון. לכן עודכן רק מיון יציב: annual reports לפי `tax_year desc, id desc`; businesses לפי `opened_at asc, id asc`.
 
 #### 74. `page_size` max לא עקבי — 100 מול 200 ✅ בוצע
 **בעיה:** 25 endpoints מגבילים ל-100, 16 ל-200, ו-`GET /notifications` ללא max כלל. אין הגיון בחלוקה — `GET /annual-reports`=200 אבל `GET /clients/{id}/annual-reports`=100, לאותו סוג ישות.
@@ -306,13 +346,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 ---
 
 ## פתוח / לביצוע - חוזה API רוחבי
-
-### Filters / Search / Pagination
-
-#### 52. 🔍 16 endpoints לרשימות ללא filters
-**בעיה:** fetch עיוור.
-**AC:**
-- [ ] בירור לכל אחד מאלה שעלולים לגדול: `GET /binders/open`, `/signature-requests/pending`, `/clients/{id}/annual-reports`, `/vat/clients/{id}/work-items`, `/clients/{id}/businesses`, `/audit/{entity_type}/{entity_id}` — האם צריך filters?
 
 ### Type Conflicts
 
