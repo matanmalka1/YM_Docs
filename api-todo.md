@@ -311,6 +311,16 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Type Conflicts
 
+#### 59. `created_at` — `date-time` מול `date` ✅ בוצע
+**בעיה:** כמעט כולם `date-time`, אבל `VatInvoiceResponse` היה `date`.
+**AC:**
+- [x] הוחלט: `created_at` הוא timestamp מערכתי, לא תאריך מסמך. `VatInvoice.created_at` ו-`VatInvoiceResponse.created_at` אוחדו ל-`date-time` / `ApiDateTime`; `invoice_date` נשאר `date`.
+
+#### 60. `filing_deadline` — 3 טיפוסים ✅ בוצע
+**בעיה:** `string` ללא format / `date-time` / `date` — לאותו שדה לוגי.
+**AC:**
+- [x] הוחלט: כל שדה API בשם `filing_deadline` הוא `ApiDateTime | None`. תצוגת תאריך בלבד מתבצעת ב-frontend או בשדה נפרד עתידי, לא באותו שם.
+
 #### 61. `occurred_at` — אותו שדה, שני טיפוסים ✅ בוצע
 **בעיה:** `CorrespondenceCreateRequest`=`date-time`, `CorrespondenceUpdateRequest`=`string` גולמי.
 **AC:**
@@ -324,6 +334,11 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - `backend/tests/communications/test_correspondence_schemas.py` — בדיקות ל-`CorrespondenceUpdateRequest` עבור `occurred_at` (null אסור, omission הוא partial, future date נדחה).
 - `backend/tests/communications/api/test_correspondence_update_delete.py` — PATCH חלקי לא מאפס `occurred_at`.
 - `backend/openapi.json` — `CorrespondenceUpdateRequest.properties.occurred_at.anyOf[0].format = "date-time"`.
+
+#### 62. `amount` — `decimal` מול `string` גולמי ✅ בוצע
+**בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` היה גולמי.
+**AC:**
+- [x] `AttentionBoardItem.amount` הוא `ApiDecimal | None`; פורמט ₪ עבר ל-frontend.
 
 #### 63. שדות פיננסיים — `string` גולמי ב-Update ✅ בוצע
 **בעיה:** `gross_amount`, `paid_amount`, `expected_amount`, `recognition_rate`, `other_credits` הם `decimal` ב-Create/Response אבל `string` גולמי ב-Update.
@@ -343,27 +358,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - `backend/tests/core/test_update_request_conventions.py` — כל ה-Update schemas הרלוונטיים כלולים ב-guard של `NonEmptyUpdateMixin`; `recognition_rate` נבדק גם כ-non-nullable.
 - `backend/openapi.json` — ארבעת ה-Update schemas הנ"ל מציגים `format: decimal` עבור השדות.
 
----
-
-## פתוח / לביצוע - חוזה API רוחבי
-
-### Type Conflicts
-
-#### 59. `created_at` — `date-time` מול `date` ✅ בוצע
-**בעיה:** כמעט כולם `date-time`, אבל `VatInvoiceResponse` הוא `date`.
-**AC:**
-- [x] הוחלט: `created_at` הוא timestamp מערכתי, לא תאריך מסמך. `VatInvoice.created_at` ו-`VatInvoiceResponse.created_at` אוחדו ל-`date-time` / `ApiDateTime`; `invoice_date` נשאר `date`.
-
-#### 60. `filing_deadline` — 3 טיפוסים ✅ בוצע
-**בעיה:** `string` ללא format / `date-time` / `date` — לאותו שדה לוגי.
-**AC:**
-- [x] הוחלט: כל שדה API בשם `filing_deadline` הוא `ApiDateTime | None`. תצוגת תאריך בלבד מתבצעת ב-frontend או בשדה נפרד עתידי, לא באותו שם.
-
-#### 62. `amount` — `decimal` מול `string` גולמי ✅ בוצע
-**בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` גולמי.
-**AC:**
-- [x] `AttentionBoardItem.amount` הוא `ApiDecimal | None`; פורמט ₪ עבר ל-frontend.
-
 #### 64. `id` — `integer` מול `string` ✅ בוצע
 **בעיה:** רוב הישויות `integer`. `WorkQueueItem.id` הוא `string` — **מאושר כמכוון** (יש לו regex `^\w+:\d+$`, composite ID כמו `vat_work_item:42`). נשאר רק `AttentionBoardItem.id` כ-`string` ללא הסבר.
 **AC:**
@@ -375,33 +369,39 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [x] הוחלט: מזהה חיצוני של הצד הנגדי (עוסק/ת"ז/דרכון/זר), לא FK פנימי. נשאר `string` ונוסף תיאור schema.
 
 #### 66. שיעורים כ-`number` במקום `decimal` ✅ בוצע
-**בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` כ-float.
+**בעיה:** `collection_rate`, `completion_rate`, `compliance_rate`, `effective_rate`, `credit_points`, `rate` היו כ-float.
 **AC:**
 - [x] הוחלט: שיעורים/אחוזים/נקודות זיכוי בחוזה API משתמשים ב-`ApiDecimal`; ה-frontend ממיר למספר רק לצורכי תצוגה.
 
 ### Schema / Enum Design
 
-#### 57. inline enum ב-correspondence `order`
+#### 57. inline enum ב-correspondence `order` ✅ בוצע
 **בעיה:** `['asc','desc']` inline במקום `$ref`.
 **AC:**
 - [x] enum מוגדר כ-schema נפרד ומופנה אליו
 
-#### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType`
+#### 67. 🔍 `ExpenseCategory` vs `ExpenseCategoryType` ✅ בוצע
 **בעיה:** שני enums לסיווג הוצאות, 7 ערכים משותפים + ערכים שונים.
 **AC:**
 - [x] בירור: מה ההבדל ואיפה כל אחד? לאחד או לתעד.
 
-#### 68. `ReminderActionType` — UPPER_CASE חריג
+#### 68. `ReminderActionType` — UPPER_CASE חריג ✅ בוצע
 **בעיה:** היחיד ב-UPPER_CASE מתוך 52 enums (השאר snake_case).
 **AC:**
 - [x] המרה ל-`snake_case` (`create_task` וכו') + עדכון frontend.
 
 ### Cross-System Consistency
 
-#### 70. `client_id` vs `client_record_id`
+#### 70. `client_id` vs `client_record_id` ✅ בוצע
 **בעיה:** שני path params מעורבבים ב-spec.
 **AC:**
 - [x] איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
+
+---
+
+## פתוח / לביצוע - חוזה API רוחבי
+
+### Cross-System Consistency
 
 #### 72. `restore` לא עקבי
 **בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.
