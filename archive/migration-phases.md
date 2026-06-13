@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A historical backend domain migration execution plan (structural migration complete).
+
+This file must not contain:
+- Active architecture decisions or canonical domain behavior (see `docs/project/backend-module-map.md` and `docs/domains/*`).
+
+Source of truth: historical (non-canonical)
+
 # Migration Phases
 
 > Archived historical document. The active backend structure reference is

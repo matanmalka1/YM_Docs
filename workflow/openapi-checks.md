@@ -10,7 +10,7 @@ Source of truth: reference
 # OpenAPI Checks
 
 - Use OpenAPI checks when API request/response contracts, routes, schemas, or auth behavior change.
-- For backend-to-frontend schema drift detection, see `docs/workflow/api-drift-ci.md`.
+- For backend-to-frontend schema drift detection, see `docs/frontend/api-drift-ci.md`.
 - Start the backend with the repo virtualenv before inspecting docs:
 
 ```bash

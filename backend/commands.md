@@ -66,4 +66,3 @@ Export backend OpenAPI for contract review:
 ```bash
 APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json
 ```
-</content>

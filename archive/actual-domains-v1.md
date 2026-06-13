@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A historical generated scan of `backend/app/` as it existed when written.
+
+This file must not contain:
+- Active inventory or canonical domain behavior (see `docs/project/backend-module-map.md` and `docs/domains/*`).
+
+Source of truth: historical (non-canonical)
+
 # Actual CRM Domains (v1)
 
 > Generated from a scan of `backend/app/` as it exists today.

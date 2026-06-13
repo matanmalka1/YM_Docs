@@ -35,15 +35,11 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
 
-## Architecture (technical source of truth)
+## Architecture (cross-stack boundary)
 
 - `docs/architecture/api-contracts.md` ★ — binding public API contract rules.
 - `docs/architecture/api-contract-standard.md` — worked API examples (non-normative; defers to `api-contracts.md`).
 - `docs/architecture/update-request-conventions.md` — PATCH/`*UpdateRequest` conventions: empty-PATCH 422, unknown-field rejection, explicit-null semantics, single-payload exceptions, `ClientUpdateRequest` field ownership (non-normative; defers to `api-contracts.md`).
-- `docs/architecture/error-codes.md` — registry of `DOMAIN.REASON` error-code namespaces + status mapping (non-normative).
-- `docs/architecture/error-doc-matrix.md` — per-endpoint OpenAPI error-status documentation matrix (#53), with raise-site evidence (non-normative; defers to `api-contracts.md`).
-- `docs/architecture/database.md` ★ — database modeling rules.
-- `docs/architecture/migrations.md` ★ — schema migration rules.
 - `docs/architecture/security.md` ★ — auth, token, and security rules.
 - `docs/architecture/observability.md` ★ — logging and observability rules.
 
@@ -56,12 +52,15 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/workflow/domain-docs-authoring.md` ★ — reusable template + parallel rules for writing canonical per-domain docs.
 - `docs/workflow/git.md` ★ — git workflow rules.
 - `docs/workflow/openapi-checks.md` — OpenAPI check usage.
-- `docs/workflow/api-drift-ci.md` — GitHub Actions drift check for backend OpenAPI vs frontend generated type baseline.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
 
 ## Backend
 
 - `docs/backend/architecture.md` ★ — backend layering and structure rules.
+- `docs/backend/database.md` ★ — backend database modeling and persistence rules.
+- `docs/backend/migrations.md` ★ — backend schema migration rules.
+- `docs/backend/error-codes.md` — backend-owned registry of `DOMAIN.REASON` error-code namespaces + status mapping (non-normative; defers to `docs/architecture/api-contracts.md`).
+- `docs/backend/error-doc-matrix.md` — backend-owned per-endpoint OpenAPI error-status documentation matrix (#53), with raise-site evidence (non-normative; defers to `docs/architecture/api-contracts.md`).
 - `docs/backend/testing.md` ★ — backend testing rules.
 - `docs/backend/commands.md` ★ — backend commands.
 - `docs/backend/ci.md` — GitHub Actions backend CI: ruff lint, pyright, pytest+coverage, openapi.json sync, alembic migration roundtrip + check against Postgres 17.
@@ -73,9 +72,11 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/frontend/ui-guidelines.md` ★ — mandatory UI composition, Hebrew/RTL, accessibility, responsive, and interaction rules.
 - `docs/frontend/testing.md` ★ — frontend testing rules.
 - `docs/frontend/commands.md` ★ — frontend commands.
+- `docs/frontend/api-drift-ci.md` — frontend GitHub Actions drift check against the backend OpenAPI baseline.
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
-- `docs/frontend-alignment-todo.md` — temporary frontend/backend alignment backlog; not an architecture source of truth.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
+
+(`docs/frontend-alignment-todo.md` is listed under "Tracking & backlog" below.)
 
 ## Agent
 
@@ -86,6 +87,8 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 ## ADR (override all docs when relevant)
 
+ADRs are accepted architecture decisions. They have the highest precedence when current. Although each ADR is labeled `Source of truth: historical` (it records a decision made at a point in time), an ADR remains **binding** unless explicitly superseded by a newer ADR or a current mandatory doc. "Historical" describes the record, not reduced authority.
+
 - `docs/adr/0001-no-legacy-compatibility.md` — no legacy compatibility by default.
 - `docs/adr/0002-router-service-repository.md` — router/service/repository layering.
 - `docs/adr/0003-no-hidden-fallbacks.md` — no hidden fallbacks.
@@ -94,6 +97,17 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 ## Archive (historical only, not source of truth)
 
 - `docs/archive/README.md` — index of retired/historical docs.
+
+## Tracking & backlog (not source of truth)
+
+These are active working backlogs, not canonical product behavior. Do not treat them as source of truth for how the system behaves; canonical behavior lives in `docs/domains/*` and the architecture docs.
+
+- `docs/api-todo.md` — active backend/API alignment backlog; tracking only.
+- `docs/frontend-alignment-todo.md` — active frontend/backend alignment backlog; tracking only.
+
+## Performance (reference artifacts)
+
+- `docs/performance/list-dto-payloads.md` — performance reference artifact (measured list-DTO payload reduction); not a source of truth.
 
 ## Domains (canonical)
 

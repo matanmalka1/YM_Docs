@@ -11,4 +11,3 @@ Source of truth: reference
 
 - Backend commands: `docs/backend/commands.md`.
 - Frontend commands: `docs/frontend/commands.md`.
-</content>

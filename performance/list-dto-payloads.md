@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A reference performance artifact: measured list-DTO payload reduction (Task 34).
+
+This file must not contain:
+- Canonical API contract rules (see `docs/architecture/api-contracts.md`) or domain behavior.
+
+Source of truth: reference (performance artifact; not a source of truth)
+
 # LIST DTO payload reduction
 
 Task 34 — split fat double-duty DTOs into thin list DTOs (LIST) and the

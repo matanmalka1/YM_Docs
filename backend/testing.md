@@ -32,4 +32,3 @@ Source of truth: mandatory
 - Backend test files should live under `tests/<domain>/service/` or `tests/<domain>/api/` where practical.
 - Test functions should use `test_<what>_<condition>` names; private setup helpers inside test files should be prefixed with `_`.
 - Backend per-file test coverage should stay at or above 90%; monitor for regressions in CI.
-</content>

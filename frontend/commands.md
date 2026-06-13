@@ -51,5 +51,4 @@ Regenerate the frontend API drift baseline after exporting OpenAPI:
 npm run gen:types
 ```
 
-See `docs/workflow/api-drift-ci.md` for how the CI uses this generated file.
-</content>
+See `docs/frontend/api-drift-ci.md` for how the CI uses this generated file.

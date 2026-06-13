@@ -21,7 +21,7 @@ Source of truth: mandatory
 - SQL echo must remain disabled; SQL visibility must go through configured logging.
 - Application schema must not be managed with `Base.metadata.create_all()`.
 - `Base.metadata.create_all()` is allowed only for isolated test databases.
-- Schema changes must go through Alembic; see `docs/architecture/migrations.md`.
+- Schema changes must go through Alembic; see `docs/backend/migrations.md`.
 - Derived UX state must be computed in services unless a specific ADR requires persistence.
 - Soft-delete behavior must be explicit and consistently filtered where applicable.
 - Soft-deletable models use `deleted_at` and may use `deleted_by`; repositories must explicitly exclude deleted rows where relevant.

@@ -16,6 +16,12 @@ Source of truth: reference
 
 # Domain Docs Inventory
 
+> **⚠️ Historical / pre-migration inventory — do not use for source-of-truth decisions.**
+> This file captured documentation ownership *before* the per-domain docs migration. Many "likely source of truth" entries below still point to `backend/app/<domain>/README.md` files that are now pointer-only.
+> - Canonical domain behavior now lives in `docs/domains/*.md`.
+> - Canonical documentation ownership and precedence live in `docs/project/documentation-map.md`.
+> Use this file only as historical context. Do not use it to decide which file currently owns a rule.
+
 ## Summary
 
 - Total docs found: 30 canonical domain docs in `docs/domains/`, 16 `backend/docs/` domain/spec files, 2 binder/domain-model satellite docs, and 3 frontend docs (`DESIGN.md`, `memory/MEMORY.md`, `components/ui/table/README.md`). The frontend has no per-feature domain docs despite 30 feature directories.

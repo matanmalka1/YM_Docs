@@ -11,4 +11,3 @@ Source of truth: reference
 
 - Backend testing rules: `docs/backend/testing.md`.
 - Frontend testing rules: `docs/frontend/testing.md`.
-</content>

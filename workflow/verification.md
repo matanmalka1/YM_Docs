@@ -17,7 +17,7 @@ How to run tests and checks: `docs/workflow/testing.md`. How to check API/OpenAP
 
 - [ ] Code compiles / typechecks.
 - [ ] Relevant tests pass (see `docs/workflow/testing.md`).
-- [ ] API contract checked when an endpoint or schema changed (see `docs/workflow/openapi-checks.md`; CI drift baseline details in `docs/workflow/api-drift-ci.md`).
+- [ ] API contract checked when an endpoint or schema changed (see `docs/workflow/openapi-checks.md`; CI drift baseline details in `docs/frontend/api-drift-ci.md`).
 - [ ] Migration generated and reviewed when the DB schema changed.
 - [ ] Frontend flow checked in a browser when UI changed, or final response explains why not.
 - [ ] Docs updated when behavior, rules, API, or DB changed (see below).

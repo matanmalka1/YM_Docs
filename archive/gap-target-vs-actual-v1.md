@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A historical target-vs-actual domain gap analysis and build-order plan.
+
+This file must not contain:
+- Active architecture guidance or canonical domain behavior (see `docs/domains/*` and `docs/project/backend-module-map.md`). Note: this file references a `target-domains-v1.md` that no longer exists in this repo.
+
+Source of truth: historical (non-canonical)
+
 # Gap Analysis — Target vs Actual (v1)
 
 > Compares `target-domains-v1.md` (planned 30 domains + actions) against

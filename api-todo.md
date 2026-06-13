@@ -250,7 +250,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 - [x] משויך ל-responses השגיאה בכל ה-endpoints
 - [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
 
-**בוצע (sweep מלא):** המטריצה הקנונית של סטטוס-שגיאה לכל endpoint תועדה ב-[architecture/error-doc-matrix.md](architecture/error-doc-matrix.md) (נגזרה מ-raise sites אמיתיים, מאומתת מול `exception_handlers.py`). מנגנון כפול:
+**בוצע (sweep מלא):** המטריצה הקנונית של סטטוס-שגיאה לכל endpoint תועדה ב-[backend/error-doc-matrix.md](backend/error-doc-matrix.md) (נגזרה מ-raise sites אמיתיים, מאומתת מול `exception_handlers.py`). מנגנון כפול:
 - **`401`/`403` מוזרקים גלובלית** ב-`build_openapi` ([app/core/openapi.py](../backend/app/core/openapi.py)): `401` לכל op שאינו public (לפי `public_endpoints.py`); `403` לכל op עם dependency של `require_role(...)` (זוהה דרך הליכה על `route.dependant`). 188/201 ה-ops הם role-gated. שני ה-ops הלא-public היחידים ללא `require_role` (`GET /auth/me`, `POST /auth/logout`) לא מגיעים ל-`ForbiddenError` בשירות.
 - **`400`/`404`/`409`/`500` מתועדים per-route** דרך ה-helpers מ-`core/openapi_responses.py`. `404` כבר נסחף (פריט 25). `500` מתועד רק ב-`DOCUMENT.UPLOAD_FAILED` (upload/replace); export-ים של excel/PDF נשארים ללא 500 מתועד (env `ImportError`, לא חוזה עסקי).
 - **בדיקות רגרסיה:** `test_openapi_auth_error_docs.py` (הזרקת 401/403 + exclusion ל-public + רפרנס ל-`ErrorEnvelope`), `test_error_doc_coverage_matrix.py` (כל op מתעד בדיוק את ה-400/409/500 מהמטריצה — אין חסר ואין עודף), בנוסף ל-`test_error_openapi_schema.py` הקיים.

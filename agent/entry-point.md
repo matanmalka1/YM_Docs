@@ -26,6 +26,8 @@ Mandatory starting point. Read this before changing any code or documentation.
 ### Backend
 
 - **Backend change** → `docs/backend/architecture.md`
+- **DB / migration change** → `docs/backend/database.md` + `docs/backend/migrations.md`
+- **Backend error-code / OpenAPI error-doc change** → `docs/backend/error-codes.md` + `docs/backend/error-doc-matrix.md`
 - **Backend tests / verification** (before finishing) → `docs/backend/testing.md` + `docs/workflow/verification.md`
 
 ### Frontend
@@ -37,7 +39,6 @@ Mandatory starting point. Read this before changing any code or documentation.
 ### Cross-cutting (both stacks)
 
 - **API contract change** → `docs/architecture/api-contracts.md` (binding); `docs/architecture/api-contract-standard.md` for worked examples
-- **DB / migration change** → `docs/architecture/database.md` + `docs/architecture/migrations.md`
 - **Auth / security change** → `docs/architecture/security.md`
 - **Observability change** (logs, tracing, error reporting) → `docs/architecture/observability.md`
 

@@ -33,4 +33,3 @@ Source of truth: mandatory
   shared UI, routing, auth, or cross-feature behavior changed.
 - If frontend test coverage or required browser tooling is missing for an area, report that honestly
   instead of inventing test results.
-</content>

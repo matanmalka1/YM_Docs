@@ -49,7 +49,7 @@ Two agents run this in parallel, each on a **different** domain. The template be
    - Model + fields: `{MODULE}/models/`. List real columns, nullability, and FKs.
    - Enums/statuses: `{MODULE}/models/*enum*` or model files.
    - Domain rules/invariants: `{MODULE}/services/`.
-   - Error codes: grep `"{DOMAIN_UPPER}\\."` in `{MODULE}`; reference `docs/architecture/error-codes.md`.
+   - Error codes: grep `"{DOMAIN_UPPER}\\."` in `{MODULE}`; reference `docs/backend/error-codes.md`.
 2. **Preserve domain decisions (hybrid).** From `{LEGACY_PATHS}` and `backend/docs/domain_decisions_v3.md`, keep decisions/rationale that are still true. Drop anything contradicted by code. Mark anything not yet implemented as `Future / planned`.
 3. **Verify every claim.** For each non-obvious fact, confirm against a `path:line`. Endpoints must exist in `backend/openapi.json`. Do not invent behavior. Before writing, skim existing domain docs for recurring Known issues patterns and check whether your domain has the same (see Known issues patterns below).
 4. **Write** `docs/domains/{DOMAIN}.md` using the skeleton below.
@@ -71,7 +71,7 @@ If a legacy file has nothing worth keeping, just replace its body with the point
 
 ## Link convention
 
-All cross-doc links use a **single** `docs/` prefix (relative to the docs repo root), e.g. `docs/architecture/error-codes.md`, `docs/archive/{DOMAIN}-legacy.md`. Never write `docs/...` — that is the monorepo-root vantage and breaks the project convention used by `documentation-map.md` and every existing doc. The only files that legitimately use `docs/...` are the pointer files outside the docs repo (`backend/docs/**`, root/backend `CLAUDE.md`).
+All cross-doc links use a **single** `docs/` prefix (relative to the docs repo root), e.g. `docs/backend/error-codes.md`, `docs/archive/{DOMAIN}-legacy.md`. Never write `docs/...` — that is the monorepo-root vantage and breaks the project convention used by `documentation-map.md` and every existing doc. The only files that legitimately use `docs/...` are the pointer files outside the docs repo (`backend/docs/**`, root/backend `CLAUDE.md`).
 
 ## Canonical doc skeleton
 
@@ -118,7 +118,7 @@ Bullet the rules actually enforced in services. Cite `services/...`. Mark anythi
 
 ## Error codes
 
-The `DOMAIN.REASON` codes this domain raises. Registry: `docs/architecture/error-codes.md`.
+The `DOMAIN.REASON` codes this domain raises. Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 

@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A reference description of the frontend API-drift detection CI workflow.
+
+This file must not contain:
+- Canonical API contract rules (see `docs/architecture/api-contracts.md`) or OpenAPI workflow steps (see `docs/workflow/openapi-checks.md`).
+
+Source of truth: reference
+
 # API Drift Detection — CI
 
 ## What it is

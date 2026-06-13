@@ -9,7 +9,7 @@ Source of truth: mandatory
 
 # Local Environment
 
-- Backend local work must use the backend repo virtualenv; see `docs/workflow/commands.md` for the canonical commands.
+- Backend local work must use the backend repo virtualenv; see `docs/backend/commands.md` for the canonical commands.
 - Backend local environment variables live in `.env.development`, which must not be committed.
 - `DATABASE_URL` and `JWT_SECRET` are required for backend development.
 - `CORS_ALLOWED_ORIGINS` defaults to localhost and 127.0.0.1 development ports.
@@ -20,7 +20,7 @@ Source of truth: mandatory
 - Backend tests default to SQLite, local filesystem storage, and text logs.
 - In development and test, local storage is exposed at `/local-storage/*`.
 - Production must not expose local filesystem storage; files are served from Cloudflare R2.
-- Frontend local development must use `npm run dev` from `frontend/`.
+- Frontend local development must use `npm run dev` from `frontend/`; see `docs/frontend/commands.md`.
 - The frontend API base defaults to the local backend unless `VITE_API_BASE_URL` overrides it.
 - Local environment changes must not require production secrets.
 - Local development and test storage must not write outside project-owned local storage paths unless explicitly approved.

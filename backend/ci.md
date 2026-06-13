@@ -1,3 +1,12 @@
+## Scope
+This file owns only:
+- A reference description of the backend GitHub Actions CI workflow (jobs, what they catch, gating mode).
+
+This file must not contain:
+- Canonical backend architecture, testing, or migration rules (see `docs/backend/architecture.md`, `docs/backend/testing.md`, `docs/backend/migrations.md`).
+
+Source of truth: reference
+
 # Backend CI
 
 ## What it is
@@ -66,7 +75,7 @@ After the roundtrip the job runs `alembic check`, which autogenerates against th
 
 ## Why openapi-sync matters
 
-The frontend [api-drift](../workflow/api-drift-ci.md) check pulls from the **committed** `openapi.json`, not from a freshly generated one. So if a backend schema changes but `openapi.json` is not regenerated and committed, the frontend drift check passes against a stale file — drift slips past both repos.
+The frontend [api-drift](../frontend/api-drift-ci.md) check pulls from the **committed** `openapi.json`, not from a freshly generated one. So if a backend schema changes but `openapi.json` is not regenerated and committed, the frontend drift check passes against a stale file — drift slips past both repos.
 
 The `openapi-sync` job runs `scripts/tooling/check_contract_sync.py`, which regenerates the schema from the live app and compares it to the committed `openapi.json`. It fails if they differ. No database is needed.
 
@@ -102,7 +111,7 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 | `JWT_SECRET` | `ci-test-only` | Required for app import; value is throwaway. |
 | `DATABASE_URL` | `postgresql+psycopg2://postgres:postgres@localhost:5432/binder_crm` | Migrations job only — points alembic at the Postgres service. Scheme must be `+psycopg2` (the installed driver). |
 
-Python is pinned to `3.14` across all jobs, matching the backend target and the frontend [api-drift](../workflow/api-drift-ci.md) job.
+Python is pinned to `3.14` across all jobs, matching the backend target and the frontend [api-drift](../frontend/api-drift-ci.md) job.
 
 ---
 
@@ -165,4 +174,4 @@ After that, a red job blocks merge.
 
 ## Related
 
-- [api-drift-ci.md](../workflow/api-drift-ci.md) — the frontend-side CI that guards backend→frontend schema drift.
+- [api-drift-ci.md](../frontend/api-drift-ci.md) — the frontend-side CI that guards backend→frontend schema drift.
