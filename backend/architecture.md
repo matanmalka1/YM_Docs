@@ -1,9 +1,12 @@
 ## Scope
+
 This file owns only:
+
 - Backend architecture rules that apply across backend domains.
 - Layer responsibility and backend code ownership boundaries.
 
 This file must not contain:
+
 - Product/domain behavior, API contract details, migration commands, or frontend architecture rules.
 
 Source of truth: mandatory

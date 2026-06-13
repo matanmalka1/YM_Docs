@@ -23,21 +23,30 @@ Mandatory starting point. Read this before changing any code or documentation.
 
 ## Read before, by change type
 
-- **Backend change** → `docs/architecture/backend.md`
-- **Frontend change** → `docs/architecture/frontend.md` + `docs/frontend/page-structure.md`
+### Backend
+
+- **Backend change** → `docs/backend/architecture.md`
+- **Backend tests / verification** (before finishing) → `docs/backend/testing.md` + `docs/workflow/verification.md`
+
+### Frontend
+
+- **Frontend change** → `docs/frontend/architecture.md` + `docs/frontend/page-structure.md`
 - **Frontend UI / styling / interaction change** → also read `docs/frontend/ui-guidelines.md`
+- **Frontend tests / verification** (before finishing) → `docs/frontend/testing.md` + `docs/workflow/verification.md`
+
+### Cross-cutting (both stacks)
+
 - **API contract change** → `docs/architecture/api-contracts.md` (binding); `docs/architecture/api-contract-standard.md` for worked examples
 - **DB / migration change** → `docs/architecture/database.md` + `docs/architecture/migrations.md`
 - **Auth / security change** → `docs/architecture/security.md`
 - **Observability change** (logs, tracing, error reporting) → `docs/architecture/observability.md`
-- **Tests / verification** (before finishing) → `docs/workflow/testing.md` + `docs/workflow/verification.md`
 
 ## Conflict priority
 
 When sources disagree, the higher item wins:
 
 1. ADRs (`docs/adr/*`)
-2. Architecture docs (`docs/architecture/*`)
+2. Architecture docs (`docs/architecture/*`, `docs/backend/*`, `docs/frontend/*`)
 3. Workflow docs (`docs/workflow/*`)
 4. Project docs (`docs/project/*`)
 5. Existing code

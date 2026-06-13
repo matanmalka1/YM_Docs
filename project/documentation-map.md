@@ -37,8 +37,6 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 ## Architecture (technical source of truth)
 
-- `docs/architecture/backend.md` ★ — backend layering and structure rules.
-- `docs/architecture/frontend.md` ★ — frontend architecture rules.
 - `docs/architecture/api-contracts.md` ★ — binding public API contract rules.
 - `docs/architecture/api-contract-standard.md` — worked API examples (non-normative; defers to `api-contracts.md`).
 - `docs/architecture/update-request-conventions.md` — PATCH/`*UpdateRequest` conventions: empty-PATCH 422, unknown-field rejection, explicit-null semantics, single-payload exceptions, `ClientUpdateRequest` field ownership (non-normative; defers to `api-contracts.md`).
@@ -51,21 +49,30 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 ## Workflow
 
-- `docs/workflow/commands.md` ★ — standard project commands.
+- `docs/workflow/commands.md` — pointer to backend/frontend command references.
 - `docs/workflow/local-env.md` ★ — local environment setup.
-- `docs/workflow/testing.md` ★ — testing rules.
+- `docs/workflow/testing.md` — pointer to backend/frontend testing rules.
 - `docs/workflow/verification.md` ★ — change verification rules.
 - `docs/workflow/domain-docs-authoring.md` ★ — reusable template + parallel rules for writing canonical per-domain docs.
 - `docs/workflow/git.md` ★ — git workflow rules.
 - `docs/workflow/openapi-checks.md` — OpenAPI check usage.
 - `docs/workflow/api-drift-ci.md` — GitHub Actions drift check for backend OpenAPI vs frontend generated type baseline.
-- `docs/workflow/backend-ci.md` — GitHub Actions backend CI: ruff lint, pyright, pytest+coverage, openapi.json sync, alembic migration roundtrip + check against Postgres 17.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
+
+## Backend
+
+- `docs/backend/architecture.md` ★ — backend layering and structure rules.
+- `docs/backend/testing.md` ★ — backend testing rules.
+- `docs/backend/commands.md` ★ — backend commands.
+- `docs/backend/ci.md` — GitHub Actions backend CI: ruff lint, pyright, pytest+coverage, openapi.json sync, alembic migration roundtrip + check against Postgres 17.
 
 ## Frontend
 
+- `docs/frontend/architecture.md` ★ — frontend architecture rules.
 - `docs/frontend/page-structure.md` ★ — mandatory page, hook, component, API-layer, and URL-state structure.
 - `docs/frontend/ui-guidelines.md` ★ — mandatory UI composition, Hebrew/RTL, accessibility, responsive, and interaction rules.
+- `docs/frontend/testing.md` ★ — frontend testing rules.
+- `docs/frontend/commands.md` ★ — frontend commands.
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
 - `docs/frontend-alignment-todo.md` — temporary frontend/backend alignment backlog; not an architecture source of truth.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.

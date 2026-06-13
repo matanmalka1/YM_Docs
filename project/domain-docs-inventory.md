@@ -729,7 +729,7 @@ The following require product-owner or code-verification input:
 3. VAT: Are the legacy status concepts (`refund_pending`, `refund_approved`, `zero_report`) dropped permanently or planned future work? The code currently shows none of them.
 4. Reminders and Tax Calendar: Should the current (incomplete) state be documented now, or after the domains are finished?
 5. Naming: Should the `history-map.md` convention (`AuditTrail` / `StatusHistory` / `Timeline` / explicit `ReportHistory`) be adopted for future docs and code?
-6. Out of scope but flagged (architecture, not domain): `backend/ARCHITECTURE.md` overlaps `docs/architecture/backend.md`, and `backend/docs/api-contract-standard.md` overlaps `docs/architecture/api-contracts.md`. Should these be reduced to pointers to the canonical architecture layer?
+6. Out of scope but flagged (architecture, not domain): `backend/ARCHITECTURE.md` overlaps `docs/backend/architecture.md`, and `backend/docs/api-contract-standard.md` overlaps `docs/architecture/api-contracts.md`. Should these be reduced to pointers to the canonical architecture layer?
 
 ## Proposed Next Phase
 
