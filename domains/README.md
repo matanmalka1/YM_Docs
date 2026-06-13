@@ -9,7 +9,7 @@ Source of truth: reference
 
 # Domain Docs Index
 
-Canonical, code-verified docs — one per backend domain. Authoring template + rules: `docs/workflow/domain-docs-authoring.md`. Status tracker: `docs/project/domain-docs-plan.md`. Code findings surfaced during authoring live in each domain doc's `Known issues` section.
+Canonical, code-verified docs — one per backend domain. Authoring template + rules: `docs/workflow/domain-docs-authoring.md`. Code findings surfaced during authoring live in each domain doc's `Known issues` section.
 
 ## Tax chain
 

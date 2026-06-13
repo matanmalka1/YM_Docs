@@ -22,8 +22,8 @@ Statuses are documented by two mechanisms — do not duplicate:
 
 - **`401` and `403` — injected globally in `app/core/openapi.py` (`build_openapi`)**, NOT per-route:
   - `401`: every non-public operation (public set = `app/core/public_endpoints.py`, 11 ops).
-  - `403`: every operation whose route has a `require_role(...)` dependency (detected by walking `route.dependant` and checking the dependency callable's `__requires_role__` marker). **188 of 201 ops are role-gated.**
-  - The only two non-public ops WITHOUT `require_role` are `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`; neither reaches a service `ForbiddenError`, so **no per-route `forbidden_response()` is needed anywhere.**
+  - `403`: every operation whose route has a `require_role(...)` dependency (detected by walking `route.dependant` and checking the dependency callable's `__requires_role__` marker). **186 of 201 ops are role-gated.**
+  - The non-public ops WITHOUT detected `require_role` are `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, `GET /api/v1/reminders/{reminder_id}`, and `POST /api/v1/reminders/{reminder_id}/cancel`; none currently documents a per-route `forbidden_response()`.
 - **`400`, `404`, `409`, `500` — documented per-route** via the `responses=` helpers in `app/core/openapi_responses.py`:
   - `404`: already swept (ID-param rule, guarded by `tests/core/test_openapi_not_found_docs.py`). Not re-listed here unless new.
   - `400` / `409` / `500`: added by the #53 sweep per the table below.

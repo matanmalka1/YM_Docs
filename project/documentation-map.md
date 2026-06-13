@@ -34,8 +34,6 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/backend-module-map.md` — where backend modules live.
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
-- `docs/project/domain-docs-plan.md` — ownership split + status tracker for the canonical per-domain docs migration.
-- `docs/project/annual-reports-todo.md` — reference tracker for unresolved annual-report financial-lines audit follow-ups.
 
 ## Architecture (technical source of truth)
 

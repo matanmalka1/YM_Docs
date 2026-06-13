@@ -57,9 +57,11 @@ Routed domains have an `api/` router and are mounted under `/api/v1/*`:
 
 `advance_payments`, `annual_reports`, `audit`, `authority_contacts`, `binders`, `businesses`, `charges`, `clients`, `communications`, `dashboard`, `documents/permanent_documents`, `health`, `invoices`, `notes`, `notifications`, `reminders`, `reports`, `search`, `signature_requests`, `tasks`, `tax_calendar`, `timeline`, `users`, `vat`, `work_queue`
 
-Internal-only domains have no HTTP router. Some have a full backend layer stack; others currently expose only the layers needed by callers:
+Internal-only packages have no HTTP router. Some have a full backend layer stack; others currently expose only the layers needed by callers:
 
-`alerts`, `contacts`, `documents`, `legal_entities`
+`contacts`, `documents`, `legal_entities`
+
+`alerts` is a logical domain documented in `docs/domains/alerts.md`; it has no `app/alerts/` package. The current attention-board calculation lives in `app/dashboard/services/dashboard_attention_service.py`.
 
 Cross-cutting packages do not follow the domain layer structure:
 
@@ -96,6 +98,5 @@ app/binders/api/
 |-- binders_receive_return.py
 |-- binders_operations.py
 |-- binders_audit.py
-|-- binders_reminders.py
 `-- client_binders_router.py
 ```
