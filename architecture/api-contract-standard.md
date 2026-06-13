@@ -101,8 +101,8 @@ Filter rules (query params, stable snake_case names, filter before pagination) l
 client_record_id
 business_id
 status
-date_from
-date_to
+created_after
+created_before
 query
 ```
 

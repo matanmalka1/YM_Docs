@@ -247,8 +247,10 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 #### 51. תאריכי טווח — 7 פטרנים
 **בעיה:** `from`/`to`, `from_date`/`to_date`, `date_from`/`date_to`, `issued_after`/`issued_before`, `due_after`/`due_before`, `start_year`/`end_year`, `from_year`/`to_year`.
 **AC:**
-- [ ] פטרן אחיד אחד (`{field}_after`/`{field}_before`) בכל ה-endpoints
-- [ ] ה-frontend מעודכן
+- [x] פטרן אחיד אחד (`{field}_after`/`{field}_before`) בכל ה-endpoints
+- [x] ה-frontend מעודכן
+
+**בוצע:** טווחי תאריכים/שנים נורמלו ל-`{field}_after`/`{field}_before`: user audit logs עברו ל-`created_after`/`created_before`; tax-calendar bootstrap/summary עברו ל-`tax_year_after`/`tax_year_before`; ותיעוד הדומיינים עודכן עבור communications/notifications/users/tax-calendar.
 
 #### 52. 🔍 16 endpoints לרשימות ללא filters
 **בעיה:** fetch עיוור.

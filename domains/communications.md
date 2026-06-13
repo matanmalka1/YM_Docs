@@ -26,7 +26,7 @@ Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` (
 
 All paths confirmed in `backend/openapi.json`.
 
-**List query parameters:** `page` (default 1), `page_size` (default 20, max 100), `business_id`, `correspondence_type`, `contact_id`, `from_date`, `to_date`, `order` (`asc`|`desc`, default `desc`).
+**List query parameters:** `page` (default 1), `page_size` (default 20, max 100), `business_id`, `correspondence_type`, `contact_id`, `occurred_after`, `occurred_before`, `order` (`asc`|`desc`, default `desc`).
 
 Router prefix `/clients` is declared in `backend/app/communications/api/correspondence.py:23` and mounted under `/api/v1` by `backend/app/router_registry.py`.
 

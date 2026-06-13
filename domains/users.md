@@ -35,7 +35,7 @@ All paths exist in `backend/openapi.json`.
 |--------|------|---------|
 | POST | /api/v1/users | Create user |
 | GET | /api/v1/users | List users (paginated; filters: is_active, search) |
-| GET | /api/v1/users/audit-logs | List audit log entries (paginated; filters: action, target_user_id, actor_user_id, email, from, to) |
+| GET | /api/v1/users/audit-logs | List audit log entries (paginated; filters: action, target_user_id, actor_user_id, email, created_after, created_before) |
 | GET | /api/v1/users/{user_id} | Get single user |
 | PATCH | /api/v1/users/{user_id} | Partial update (full_name, phone, role, email) |
 | POST | /api/v1/users/{user_id}/activate | Activate user |
@@ -197,7 +197,7 @@ No open known issues.
 
 ## Resolved issues
 
-- **F-041 / F-users-001** (2026-06-05): `GET /api/v1/users/audit-logs` accepted reversed `from`/`to` range and silently returned empty results. Fixed: inline guard in `users_audit.py` raises `AppError("USER.INVALID_DATE_RANGE", 400)` when `from_ts > to_ts`.
+- **F-041 / F-users-001** (2026-06-05): `GET /api/v1/users/audit-logs` accepted reversed date ranges and silently returned empty results. Fixed: inline guard in `users_audit.py` raises `AppError("USER.INVALID_DATE_RANGE", 400)` when `created_after > created_before`.
 
 ## Future / planned
 

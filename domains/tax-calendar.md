@@ -118,7 +118,7 @@ There is no dedicated status enum in this domain. Grouped status is derived from
 - **Mismatched existing links are rejected.** If a business object already has a different `tax_calendar_entry_id`, materialization raises `TAX_CALENDAR.LINK_CONFLICT`. (`materialization_service.py:215-222`)
 - **Grouped calendar aggregation keys by regulatory period, not by due date.** Listing starts from `TaxCalendarEntry` rows, then attaches linked business objects per entry id. Overdue counts use each linked object's effective due date (`due_date_effective` or `filing_deadline`), not the shared regulatory date, while grouping stays anchored on the entry. (`backend/app/tax_calendar/services/grouped_service.py:75-132`, `188-212`)
 - **Settings summary expects 37 generated entries per year.** Expected breakdown is 12 monthly VAT, 6 bi-monthly VAT, 12 monthly advance-payment, 6 bi-monthly advance-payment, and 1 annual report; summary/bootstrap warnings surface missing counts or registry-fallback years. (`backend/app/tax_calendar/services/settings_calendar_service.py:14-22`, `38-93`; `backend/app/tax_calendar/services/bootstrap.py:19-21`, `101-123`)
-- **Year-range validation happens at the API edge.** Settings routes reject `start_year > end_year` with HTTP 400 before calling services. (`backend/app/tax_calendar/api/settings.py:17-23`, `39-45`, `53-59`, `67-74`)
+- **Year-range validation happens at the API edge.** Settings routes reject `tax_year_after > tax_year_before` with HTTP 400 before calling services. (`backend/app/tax_calendar/api/settings.py:17-23`, `39-45`, `53-59`, `67-74`)
 
 ## Error codes
 

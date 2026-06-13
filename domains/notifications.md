@@ -113,7 +113,7 @@ Trigger labels and domain labels used in list responses are defined in `TRIGGER_
 
 ## Domain rules & invariants
 
-- `GET /api/v1/notifications` accepts the filter set `client_record_id`, `business_id`, `status`, `trigger`, `channel`, `triggered_by`, `date_from`, `date_to`, then sorts by `created_at DESC` and paginates with total count from the repository (`backend/app/notifications/api/notifications.py:40-72`, `backend/app/notifications/repositories/notification_repository.py:103-150`).
+- `GET /api/v1/notifications` accepts the filter set `client_record_id`, `business_id`, `status`, `trigger`, `channel`, `triggered_by`, `created_after`, `created_before`, then sorts by `created_at DESC` and paginates with total count from the repository (`backend/app/notifications/api/notifications.py:40-72`, `backend/app/notifications/repositories/notification_repository.py:103-150`).
 - `GET /api/v1/notifications/summary` returns one aggregate summary for the optional `client_record_id` / `business_id` filter. It is not a batched per-client summary endpoint for sidebar navigation (`backend/app/notifications/api/notifications.py:74-81`, `backend/app/notifications/services/notification_service.py:105-114`).
 - `page_size` is intentionally restricted to `25` or `50`; the query contract publishes those values as an enum (`backend/app/notifications/api/notifications.py:28-30,51-52`).
 - Manual preview/send reject the auto-only trigger `binder_ready_for_handover`. Annual-report triggers require `entity_id`; `invoice_issued`, `payment_reminder`, `vat_documents_reminder`, `signature_request_sent`, and `signature_request_reminder` also require `entity_id` (`backend/app/notifications/services/notification_send_service.py:20-43,114-124,192-203`).
