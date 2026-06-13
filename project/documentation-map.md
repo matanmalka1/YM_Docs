@@ -61,6 +61,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/workflow/git.md` ★ — git workflow rules.
 - `docs/workflow/openapi-checks.md` — OpenAPI check usage.
 - `docs/workflow/api-drift-ci.md` — GitHub Actions drift check for backend OpenAPI vs frontend generated type baseline.
+- `docs/workflow/backend-ci.md` — GitHub Actions backend CI: ruff lint, pytest, alembic migration roundtrip against Postgres 17.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
 
 ## Agent
