@@ -125,12 +125,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] מחזיר משימות מסוננות ל-client_record_id, עם pagination אחיד
 
-#### 20. `GET /api/v1/tasks` עם filter לפי ישות
-**בעיה:** אי אפשר לשלוף משימות של VAT work item / דוח שנתי ספציפי.
-**AC:**
-- [ ] תמיכה ב-`?source_domain=&source_id=` כ-query params
-- [ ] בירור 🔍: לאחד עם השמות הקיימים `source_domain`/`source_id` שכבר ב-`TaskResponse`
-
 #### 32–33. Bulk operations ל-tasks
 **AC:**
 - [ ] `POST /tasks/bulk-complete` — השלמה מרובה
@@ -165,11 +159,6 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** אין PATCH ראשי — רק `PATCH /{id}/details`.
 **AC:**
 - [ ] בירור 🔍: האם `/details` מספיק או שצריך wrapper ראשי? להחליט ולתעד
-
-#### 47. 🔍 `status` vs `transition` ב-annual-reports
-**בעיה:** שני endpoints למעבר סטטוס, schemas שונים (`StatusTransitionRequest` vs `StageTransitionRequest`).
-**AC:**
-- [ ] בירור: מה ההבדל? אם עודף — להסיר אחד. אם לא — לתעד את ההבחנה בין status ל-stage
 
 #### 48. 🔍 `GET /annual-reports` vs `GET /clients/{id}/annual-reports`
 **בעיה:** הראשון כבר מסנן לפי `client_record_id`, אז השני מיותר.
@@ -280,6 +269,40 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [x] ההגבלה הוסרה במסגרת פריט 74: `GET /api/v1/notifications` משתמש ב-`page_size` מספרי עם `minimum: 1`, `maximum: 200`, `default: 25`.
 
+### Type Conflicts
+
+#### 61. `occurred_at` — אותו שדה, שני טיפוסים ✅ בוצע
+**בעיה:** `CorrespondenceCreateRequest`=`date-time`, `CorrespondenceUpdateRequest`=`string` גולמי.
+**AC:**
+- [x] `CorrespondenceUpdateRequest.occurred_at` משתמש ב-`ApiDateTime` / `datetime`
+- [x] OpenAPI מייצר `format: date-time`
+- [x] בדיקות schema/API קיימות מאמתות עדכון חלקי ושימור `occurred_at`
+
+**בוצע:** אומת בקוד:
+- `backend/app/communications/schemas/correspondence.py` — `CorrespondenceUpdateRequest.occurred_at: ApiDateTime | None = None`, עם validator שמקבל `datetime | None`.
+- `backend/app/communications/services/correspondence_service.py` ו-`backend/app/communications/repositories/correspondence_repository.py` — `occurred_at` מטופל כ-`datetime` ב-create/update/list filters.
+- `backend/tests/communications/test_correspondence_schemas.py` — בדיקות ל-`CorrespondenceUpdateRequest` עבור `occurred_at` (null אסור, omission הוא partial, future date נדחה).
+- `backend/tests/communications/api/test_correspondence_update_delete.py` — PATCH חלקי לא מאפס `occurred_at`.
+- `backend/openapi.json` — `CorrespondenceUpdateRequest.properties.occurred_at.anyOf[0].format = "date-time"`.
+
+#### 63. שדות פיננסיים — `string` גולמי ב-Update ✅ בוצע
+**בעיה:** `gross_amount`, `paid_amount`, `expected_amount`, `recognition_rate`, `other_credits` הם `decimal` ב-Create/Response אבל `string` גולמי ב-Update.
+**AC:**
+- [x] `VatInvoiceUpdateRequest.gross_amount` משתמש ב-`ApiDecimal`
+- [x] `AdvancePaymentUpdateRequest.paid_amount` ו-`expected_amount` משתמשים ב-`ApiDecimal`
+- [x] `ExpenseLineUpdateRequest.recognition_rate` משתמש ב-`ApiDecimal`
+- [x] `AnnualReportDetailUpdateRequest.other_credits` משתמש ב-`ApiDecimal`
+- [x] OpenAPI מייצר לכל השדות `type: string`, `format: decimal`
+
+**בוצע:** אומת בקוד:
+- `backend/app/vat/schemas/vat_invoice_update.py` — `gross_amount: ApiDecimal | None`.
+- `backend/app/advance_payments/schemas/advance_payment.py` — `AdvancePaymentUpdateRequest.paid_amount` ו-`expected_amount` הם `ApiDecimal | None`.
+- `backend/app/annual_reports/schemas/annual_report_financials.py` — `ExpenseLineUpdateRequest.recognition_rate: ApiDecimal | None`.
+- `backend/app/annual_reports/schemas/annual_report_detail.py` — `AnnualReportDetailUpdateRequest.other_credits: ApiDecimal | None`.
+- `backend/tests/core/test_api_types.py` — guard ל-OpenAPI decimal serialization/contract.
+- `backend/tests/core/test_update_request_conventions.py` — כל ה-Update schemas הרלוונטיים כלולים ב-guard של `NonEmptyUpdateMixin`; `recognition_rate` נבדק גם כ-non-nullable.
+- `backend/openapi.json` — ארבעת ה-Update schemas הנ"ל מציגים `format: decimal` עבור השדות.
+
 ---
 
 ## פתוח / לביצוע - חוזה API רוחבי
@@ -303,20 +326,10 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] בירור: מהו הטיפוס הנכון? לאחד בכל 4 ה-schemas.
 
-#### 61. `occurred_at` — אותו שדה, שני טיפוסים (כנראה באג)
-**בעיה:** `CorrespondenceCreateRequest`=`date-time`, `CorrespondenceUpdateRequest`=`string` גולמי.
-**AC:**
-- [ ] לתקן את Update ל-`date-time`.
-
 #### 62. 🔍 `amount` — `decimal` מול `string` גולמי
 **בעיה:** רוב המקומות `decimal`, `AttentionBoardItem` גולמי.
 **AC:**
 - [ ] בירור: האם זה סכום כספי? אם כן — `decimal`.
-
-#### 63. שדות פיננסיים — `string` גולמי ב-Update (כנראה באג)
-**בעיה:** `gross_amount`, `paid_amount`, `expected_amount`, `recognition_rate`, `other_credits` הם `decimal` ב-Create/Response אבל `string` גולמי ב-Update.
-**AC:**
-- [ ] לתקן את Update ל-`decimal` בכל אלה.
 
 #### 64. 🔍 `id` — `integer` מול `string`
 **בעיה:** רוב הישויות `integer`. `WorkQueueItem.id` הוא `string` — **מאושר כמכוון** (יש לו regex `^\w+:\d+$`, composite ID כמו `vat_work_item:42`). נשאר רק `AttentionBoardItem.id` כ-`string` ללא הסבר.
@@ -411,6 +424,39 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **בעיה:** `VatAuditTrailResponse` היה `{items, total}` ו-`EntityAuditTrailResponse` היה `{items, total, limit, offset}`.
 **AC:**
 - [x] envelope אחיד לשני ה-audit endpoints: שניהם מחזירים `items`, `total`, `page`, `page_size`.
+
+### Tasks
+
+#### 20. `GET /api/v1/tasks` עם filter לפי ישות ✅ בוצע
+**בעיה:** אי אפשר לשלוף משימות של VAT work item / דוח שנתי ספציפי.
+**AC:**
+- [x] תמיכה ב-`?source_domain=&source_id=` כ-query params
+- [x] השמות הקיימים `source_domain`/`source_id` נשארו השמות הקנוניים, זהים ל-`TaskResponse`
+
+**בוצע:** אומת בקוד:
+- `backend/app/tasks/api/routes.py` — `list_tasks()` מקבל `source_domain: WorkQueueSourceType | None = Query(None)` ו-`source_id: int | None = Query(None)` ומעביר אותם לשירות.
+- `backend/app/tasks/schemas/task.py` — `TaskResponse` מחזיר `source_domain` ו-`source_id` באותם שמות.
+- `backend/app/tasks/services/task_service.py` — `TaskService.list()` מקבל ומעביר את שני ה-filters.
+- `backend/app/tasks/repositories/task_repository.py` — `_apply_filters()` מוסיף `Task.source_domain == source_domain` ו-`Task.source_id == source_id`; `list_active()` מחזיר רק non-deleted עם pagination.
+- `backend/tests/tasks/test_task_service.py` — `test_list_filter_by_source_domain` מאמת שה-list מסנן לפי source domain.
+- `backend/tests/tasks/test_task_api.py` — create/update tests מאמתים את contract של `source_domain`/`source_id` ואת החזרת השדות ב-response.
+- `backend/openapi.json` — `GET /api/v1/tasks` מתעד `source_domain` ו-`source_id` כ-query params.
+
+### Annual Reports
+
+#### 47. 🔍 `status` vs `transition` ב-annual-reports ✅ בוצע
+**בעיה:** שני endpoints למעבר סטטוס, schemas שונים (`StatusTransitionRequest` vs `StageTransitionRequest`).
+**AC:**
+- [x] ההבחנה תועדה: `transition` הוא stage shortcut שממופה ל-status; `status` הוא מעבר סטטוס ישיר.
+- [x] הקוד מממש את ההבחנה דרך `STAGE_TO_STATUS` וקריאה ל-`transition_status()`.
+
+**בוצע:** אומת בקוד ובתיעוד:
+- `docs/flows/02-annual-report-status-transition.md` — מתעד ש-stage transitions ממופים ל-status דרך `STAGE_TO_STATUS`, ו-`transition_stage()` קורא ל-`transition_status()`.
+- `backend/app/annual_reports/api/annual_report_stage_transition.py` — `POST /annual-reports/{report_id}/transition` מקבל `StageTransitionRequest`.
+- `backend/app/annual_reports/api/annual_report_status.py` — `POST /annual-reports/{report_id}/status` מקבל `StatusTransitionRequest`.
+- `backend/app/annual_reports/services/constants.py` — `STAGE_TO_STATUS` מגדיר את מפת stage→status.
+- `backend/app/annual_reports/services/status_service.py` — `transition_stage()` ממפה `to_stage` ל-status וקורא ל-`transition_status()`.
+- `backend/tests/annual_reports/api/test_annual_report_stage_transition.py` — בדיקת API ל-stage transition.
 
 ### Error / Response Contracts
 
