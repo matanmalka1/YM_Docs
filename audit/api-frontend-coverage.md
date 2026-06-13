@@ -8,21 +8,19 @@
 |--------|-------|
 | Total backend endpoints | 199 |
 | Complete | 190 |
-| Missing frontend | 6 |
-| API-only partial | 0 |
+| Missing frontend | 4 |
+| API-only partial | 2 |
 | UI partial | 3 |
 | Stale/broken | 12 |
 | Needs review | 0 |
-| High severity | 6 |
-| Medium severity | 3 |
+| High severity | 4 |
+| Medium severity | 5 |
 | Low confidence | 0 |
 
 ## Top High-Severity Findings
 
 | Domain | Method | Path | Status | Action |
 |--------|--------|------|--------|--------|
-| invoices | GET | `/api/v1/invoices/charge/{charge_id}` | Missing Frontend | Create frontend API wrapper |
-| invoices | POST | `/api/v1/invoices` | Missing Frontend | Create frontend API wrapper |
 | reminders | GET | `/api/v1/reminders/` | Missing Frontend | Create frontend API wrapper |
 | reminders | GET | `/api/v1/reminders/{reminder_id}` | Missing Frontend | Create frontend API wrapper |
 | reminders | POST | `/api/v1/reminders/` | Missing Frontend | Create frontend API wrapper |
@@ -32,12 +30,12 @@
 
 | Sev | Conf | Domain | Method | Path | Status | Recommended Action |
 |-----|------|--------|--------|------|--------|-------------------|
-| high | high | invoices | GET | `/api/v1/invoices/charge/{charge_id}` | Missing Frontend | Create frontend API wrapper |
-| high | high | invoices | POST | `/api/v1/invoices` | Missing Frontend | Create frontend API wrapper |
 | high | high | reminders | GET | `/api/v1/reminders/` | Missing Frontend | Create frontend API wrapper |
 | high | high | reminders | GET | `/api/v1/reminders/{reminder_id}` | Missing Frontend | Create frontend API wrapper |
 | high | high | reminders | POST | `/api/v1/reminders/` | Missing Frontend | Create frontend API wrapper |
 | high | high | reminders | POST | `/api/v1/reminders/{reminder_id}/cancel` | Missing Frontend | Create frontend API wrapper |
+| medium | medium | invoices | GET | `/api/v1/invoices/charge/{charge_id}` | API-Only Partial | Connect API hook to a page or component |
+| medium | medium | invoices | POST | `/api/v1/invoices` | API-Only Partial | Connect API hook to a page or component |
 | medium | medium | clients | DELETE | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
 | medium | medium | clients | GET | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
 | medium | medium | clients | PATCH | `/api/v1/clients/{client_record_id}` | UI Partial | Replace mock/placeholder UI with live data |
@@ -336,7 +334,7 @@ _No drift signals found._
 | correspondence | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   |
 | dashboard_overview | ✓ |   |   |   |   |   |   |   |   |   |
 | dashboard_tax |   | ✓ |   |   |   |   |   |   |   |   |
-| invoices |   | ✗ | ✗ |   |   |   |   |   |   |   |
+| invoices |   | ~ | ~ |   |   |   |   |   |   |   |
 | notes | ✓ |   | ✓ | ✓ | ✓ |   |   |   |   |   |
 | notifications | ✓ | ✓ | ✓ |   |   |   |   |   |   |   |
 | permanent_documents | ✓ | ✓ | ✓ | ✓ | ✓ |   |   |   |   |   |

@@ -6,66 +6,17 @@
   },
   "counts": {
     "total_backend": 199,
-    "missing_frontend": 6,
-    "severity_high": 6,
+    "missing_frontend": 4,
+    "severity_high": 4,
+    "api_only_partial": 2,
+    "severity_medium": 5,
     "ui_partial": 3,
-    "severity_medium": 3,
     "complete": 190,
     "severity_info": 190,
     "stale_broken": 12,
     "total_orphans": 12
   },
   "findings": [
-    {
-      "severity": "high",
-      "confidence": "high",
-      "domain": "invoices",
-      "method": "GET",
-      "path": "/api/v1/invoices/charge/{charge_id}",
-      "norm_path": "/invoices/charge/{param}",
-      "operation_id": "get_charge_invoice_api_v1_invoices_charge__charge_id__get",
-      "action": "read",
-      "response_fields": [
-        "charge_id",
-        "created_at",
-        "document_url",
-        "external_invoice_id",
-        "id",
-        "issued_at",
-        "provider"
-      ],
-      "fe_api_evidence": "",
-      "ui_evidence": "",
-      "status": "missing_frontend",
-      "recommended_next_action": "Create frontend API wrapper",
-      "notes": "",
-      "fe_todo_count": 0
-    },
-    {
-      "severity": "high",
-      "confidence": "high",
-      "domain": "invoices",
-      "method": "POST",
-      "path": "/api/v1/invoices",
-      "norm_path": "/invoices",
-      "operation_id": "attach_invoice_api_v1_invoices_post",
-      "action": "create",
-      "response_fields": [
-        "charge_id",
-        "created_at",
-        "document_url",
-        "external_invoice_id",
-        "id",
-        "issued_at",
-        "provider"
-      ],
-      "fe_api_evidence": "",
-      "ui_evidence": "",
-      "status": "missing_frontend",
-      "recommended_next_action": "Create frontend API wrapper",
-      "notes": "",
-      "fe_todo_count": 0
-    },
     {
       "severity": "high",
       "confidence": "high",
@@ -191,6 +142,56 @@
       "status": "missing_frontend",
       "recommended_next_action": "Create frontend API wrapper",
       "notes": "",
+      "fe_todo_count": 0
+    },
+    {
+      "severity": "medium",
+      "confidence": "medium",
+      "domain": "invoices",
+      "method": "GET",
+      "path": "/api/v1/invoices/charge/{charge_id}",
+      "norm_path": "/invoices/charge/{param}",
+      "operation_id": "get_charge_invoice_api_v1_invoices_charge__charge_id__get",
+      "action": "read",
+      "response_fields": [
+        "charge_id",
+        "created_at",
+        "document_url",
+        "external_invoice_id",
+        "id",
+        "issued_at",
+        "provider"
+      ],
+      "fe_api_evidence": "frontend/src/features/invoices/api/endpoints.ts:3",
+      "ui_evidence": "",
+      "status": "api_only_partial",
+      "recommended_next_action": "Connect API hook to a page or component",
+      "notes": "API client/hook found but no clear UI usage detected",
+      "fe_todo_count": 0
+    },
+    {
+      "severity": "medium",
+      "confidence": "medium",
+      "domain": "invoices",
+      "method": "POST",
+      "path": "/api/v1/invoices",
+      "norm_path": "/invoices",
+      "operation_id": "attach_invoice_api_v1_invoices_post",
+      "action": "create",
+      "response_fields": [
+        "charge_id",
+        "created_at",
+        "document_url",
+        "external_invoice_id",
+        "id",
+        "issued_at",
+        "provider"
+      ],
+      "fe_api_evidence": "frontend/src/features/invoices/api/endpoints.ts:2",
+      "ui_evidence": "",
+      "status": "api_only_partial",
+      "recommended_next_action": "Connect API hook to a page or component",
+      "notes": "API client/hook found but no clear UI usage detected",
       "fe_todo_count": 0
     },
     {
@@ -6577,8 +6578,8 @@
       "read": "complete"
     },
     "invoices": {
-      "create": "missing_frontend",
-      "read": "missing_frontend"
+      "create": "api_only_partial",
+      "read": "api_only_partial"
     },
     "notes": {
       "list": "complete",
