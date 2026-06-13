@@ -9,7 +9,7 @@ Source of truth: reference
 
 ## 1. Trigger
 
-`GET /clients/{client_id}/status-card`
+`GET /clients/{client_record_id}/status-card`
 
 ## 2. Entry Point in Code
 

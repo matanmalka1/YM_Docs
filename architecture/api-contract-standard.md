@@ -46,7 +46,7 @@ Good:
 
 ```txt
 /api/v1/clients
-/api/v1/clients/{client_id}
+/api/v1/clients/{client_record_id}
 /api/v1/binders/{binder_id}/mark-ready-for-handover
 /api/v1/notifications/preview
 /api/v1/notifications/send
@@ -227,9 +227,9 @@ The `response_model=` requirement is defined in `docs/architecture/api-contracts
 Good:
 
 ```python
-@router.get("/{client_id}", response_model=ClientResponse)
+@router.get("/{client_record_id}", response_model=ClientResponse)
 def get_client(...):
-    return service.get_client(client_id)
+    return service.get_client(client_record_id)
 ```
 
 Bad:

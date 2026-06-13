@@ -20,18 +20,18 @@ All paths confirmed in `backend/openapi.json`.
 
 | Method | Path | Roles | Purpose |
 |--------|------|-------|---------|
-| `POST` | `/api/v1/clients/{client_id}/businesses` | ADVISOR | Create a new business under a client |
-| `GET` | `/api/v1/clients/{client_id}/businesses` | ADVISOR, SECRETARY | List businesses for a client (paginated) |
-| `GET` | `/api/v1/clients/{client_id}/businesses/{business_id}` | ADVISOR, SECRETARY | Get a single business |
-| `PATCH` | `/api/v1/clients/{client_id}/businesses/{business_id}` | ADVISOR, SECRETARY | Partial update of a business |
-| `DELETE` | `/api/v1/clients/{client_id}/businesses/{business_id}` | ADVISOR | Soft-delete a business (204) |
-| `POST` | `/api/v1/clients/{client_id}/businesses/{business_id}/restore` | ADVISOR | Restore a soft-deleted business |
-| `GET` | `/api/v1/clients/{client_id}/status-card` | ADVISOR, SECRETARY | Cross-domain status card for a client |
+| `POST` | `/api/v1/clients/{client_record_id}/businesses` | ADVISOR | Create a new business under a client |
+| `GET` | `/api/v1/clients/{client_record_id}/businesses` | ADVISOR, SECRETARY | List businesses for a client (paginated) |
+| `GET` | `/api/v1/clients/{client_record_id}/businesses/{business_id}` | ADVISOR, SECRETARY | Get a single business |
+| `PATCH` | `/api/v1/clients/{client_record_id}/businesses/{business_id}` | ADVISOR, SECRETARY | Partial update of a business |
+| `DELETE` | `/api/v1/clients/{client_record_id}/businesses/{business_id}` | ADVISOR | Soft-delete a business (204) |
+| `POST` | `/api/v1/clients/{client_record_id}/businesses/{business_id}/restore` | ADVISOR | Restore a soft-deleted business |
+| `GET` | `/api/v1/clients/{client_record_id}/status-card` | ADVISOR, SECRETARY | Cross-domain status card for a client |
 
 > Notes endpoints (`/businesses/{business_id}/notes`) exist in `backend/openapi.json` but are owned by the `notes` domain (`backend/app/notes/api/business_notes.py`), not this domain.
 
 Router sources:
-- `backend/app/businesses/api/client_businesses_router.py` — prefix `/clients/{client_id}/businesses`
+- `backend/app/businesses/api/client_businesses_router.py` — prefix `/clients/{client_record_id}/businesses`
 - `backend/app/businesses/api/client_status_card_router.py` — prefix `/clients`
 - Aggregated in `backend/app/businesses/api/routers.py`
 

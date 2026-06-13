@@ -9,7 +9,7 @@ Source of truth: reference
 
 ## 1. Trigger
 
-`PATCH /clients/{client_id}` with `{ "status": "frozen" }` or `{ "status": "closed" }`.
+`PATCH /clients/{client_record_id}` with `{ "status": "frozen" }` or `{ "status": "closed" }`.
 
 ## 2. Entry Point in Code
 

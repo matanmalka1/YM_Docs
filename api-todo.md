@@ -401,7 +401,7 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 #### 70. `client_id` vs `client_record_id`
 **בעיה:** שני path params מעורבבים ב-spec.
 **AC:**
-- [ ] איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
+- [x] איחוד ל-`client_record_id` (ה-anchor התפעולי) בכל ה-paths + frontend.
 
 #### 72. `restore` לא עקבי
 **בעיה:** קיים ב-clients/businesses, חסר ב-binders/charges/documents.

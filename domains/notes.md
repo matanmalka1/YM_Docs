@@ -20,14 +20,14 @@ All routes require role `ADVISOR` or `SECRETARY` via router-level dependencies i
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /api/v1/clients/{client_id}/notes | List non-deleted notes attached to the client id |
-| POST | /api/v1/clients/{client_id}/notes | Create a client note with `created_by` taken from the authenticated user |
-| PATCH | /api/v1/clients/{client_id}/notes/{note_id} | Update one client note, but only if the caller created it |
-| DELETE | /api/v1/clients/{client_id}/notes/{note_id} | Soft-delete one client note |
-| GET | /api/v1/clients/{client_id}/businesses/{business_id}/notes | List non-deleted notes attached to the business after validating the business belongs to the client |
-| POST | /api/v1/clients/{client_id}/businesses/{business_id}/notes | Create a business note after validating the business belongs to the client |
-| PATCH | /api/v1/clients/{client_id}/businesses/{business_id}/notes/{note_id} | Update one business note after client/business ownership validation |
-| DELETE | /api/v1/clients/{client_id}/businesses/{business_id}/notes/{note_id} | Soft-delete one business note after client/business ownership validation |
+| GET | /api/v1/clients/{client_record_id}/notes | List non-deleted notes attached to the client id |
+| POST | /api/v1/clients/{client_record_id}/notes | Create a client note with `created_by` taken from the authenticated user |
+| PATCH | /api/v1/clients/{client_record_id}/notes/{note_id} | Update one client note, but only if the caller created it |
+| DELETE | /api/v1/clients/{client_record_id}/notes/{note_id} | Soft-delete one client note |
+| GET | /api/v1/clients/{client_record_id}/businesses/{business_id}/notes | List non-deleted notes attached to the business after validating the business belongs to the client |
+| POST | /api/v1/clients/{client_record_id}/businesses/{business_id}/notes | Create a business note after validating the business belongs to the client |
+| PATCH | /api/v1/clients/{client_record_id}/businesses/{business_id}/notes/{note_id} | Update one business note after client/business ownership validation |
+| DELETE | /api/v1/clients/{client_record_id}/businesses/{business_id}/notes/{note_id} | Soft-delete one business note after client/business ownership validation |
 
 ## Model & fields
 
