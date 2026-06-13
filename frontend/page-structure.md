@@ -87,6 +87,8 @@ export function ClientsPage() {
 
 - Components receive data via props. They do not fetch their own data.
 - Components do not call `useQuery`, `useMutation`, or feature API hooks directly.
+- Exception: a documented feature-level widget may load the resource it owns. Keep its presentational
+  children fetch-free.
 - Shared UI primitives live in `src/components/ui/`.
 - Shared cross-feature widgets live in `src/components/shared/`.
 - Do not move domain-specific UI into shared.
@@ -100,9 +102,26 @@ export function ClientsPage() {
 
 - `<domain>Api.ts` contains HTTP calls only. No business logic, no state.
 - `contracts.ts` contains request/response types and Zod schemas.
+- Endpoint constants and query-key factories remain feature-local.
+- API methods must return typed data and preserve backend nullability.
+- Use the shared Axios client and shared query-param serializer.
+- API modules must not show toasts, navigate, or invalidate React Query caches.
 - Reusable enum option arrays should live in constants files, not inline in multiple components.
 - HTTP calls must go through the shared Axios client.
 - Query keys must be feature-local, serializable, and stable.
+
+---
+
+## Import rules
+
+- Use `@/` for imports outside the current module folder.
+- A feature may import its own internals directly.
+- Import another feature's non-component API only from that feature's public `index.ts`.
+- Do not deep-import another feature's hooks, API, schemas, types, constants, or utilities.
+- Pages may compose exported cross-feature components. Reusable cross-feature logic still belongs
+  behind the owning feature's public barrel.
+- Keep every feature `index.ts` intentional: export only the surface other features are allowed to
+  depend on.
 
 ---
 

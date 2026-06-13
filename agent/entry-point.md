@@ -24,7 +24,8 @@ Mandatory starting point. Read this before changing any code or documentation.
 ## Read before, by change type
 
 - **Backend change** → `docs/architecture/backend.md`
-- **Frontend change** → `docs/architecture/frontend.md`
+- **Frontend change** → `docs/architecture/frontend.md` + `docs/frontend/page-structure.md`
+- **Frontend UI / styling / interaction change** → also read `docs/frontend/ui-guidelines.md`
 - **API contract change** → `docs/architecture/api-contracts.md` (binding); `docs/architecture/api-contract-standard.md` for worked examples
 - **DB / migration change** → `docs/architecture/database.md` + `docs/architecture/migrations.md`
 - **Auth / security change** → `docs/architecture/security.md`

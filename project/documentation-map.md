@@ -62,6 +62,14 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/workflow/backend-ci.md` — GitHub Actions backend CI: ruff lint, pyright, pytest+coverage, openapi.json sync, alembic migration roundtrip + check against Postgres 17.
 - `docs/workflow/local-mobile-testing.md` — local mobile testing guide.
 
+## Frontend
+
+- `docs/frontend/page-structure.md` ★ — mandatory page, hook, component, API-layer, and URL-state structure.
+- `docs/frontend/ui-guidelines.md` ★ — mandatory UI composition, Hebrew/RTL, accessibility, responsive, and interaction rules.
+- `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
+- `docs/frontend-alignment-todo.md` — temporary frontend/backend alignment backlog; not an architecture source of truth.
+- `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
+
 ## Agent
 
 - `docs/agent/entry-point.md` ★ — canonical agent instructions.
