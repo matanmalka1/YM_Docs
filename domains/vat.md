@@ -12,15 +12,17 @@ Source of truth: mandatory
 
 The VAT domain manages period-based VAT work items for a `ClientRecord`: material intake, invoice data entry, review, filing, audit history, client summaries, and VAT exports. The implemented aggregate is `VatWorkItem`, with `VatInvoice` rows as source documents and `VatAuditLog` rows as append-only workflow history.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-13.
 
 ## Endpoints
 
-All paths exist in `backend/openapi.json` (`backend/openapi.json:9757`, `backend/openapi.json:9927`, `backend/openapi.json:9975`, `backend/openapi.json:10095`, `backend/openapi.json:10210`, `backend/openapi.json:10258`, `backend/openapi.json:10316`, `backend/openapi.json:10374`, `backend/openapi.json:10476`, `backend/openapi.json:10578`, `backend/openapi.json:10642`, `backend/openapi.json:10707`, `backend/openapi.json:10795`, `backend/openapi.json:10842`, `backend/openapi.json:10912`, `backend/openapi.json:10982`, `backend/openapi.json:11029`).
+All paths listed below exist in `backend/openapi.json`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/api/v1/vat/work-items` | Create a VAT work item for a client period |
+| `PATCH` | `/api/v1/vat/work-items/{item_id}` | Update safe operational metadata only (`assigned_to`, `pending_materials_note`) |
+| `DELETE` | `/api/v1/vat/work-items/{item_id}` | Soft-delete a non-filed mistaken obligation |
 | `POST` | `/api/v1/vat/work-items/{item_id}/materials-complete` | Move pending material intake to material received |
 | `POST` | `/api/v1/vat/work-items/{item_id}/invoices` | Add an income or expense invoice to a work item |
 | `GET` | `/api/v1/vat/work-items/{item_id}/invoices` | List invoices for a work item, optionally by invoice type |
@@ -41,7 +43,7 @@ All paths exist in `backend/openapi.json` (`backend/openapi.json:9757`, `backend
 | `GET` | `/api/v1/vat/clients/{client_record_id}/summary` | Get client-level VAT period and annual aggregates |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/export` | Export a client's VAT data as Excel or PDF |
 
-Router sources: `backend/app/vat/api/routes_intake.py:14-22`, `backend/app/vat/api/routes_data_entry.py:16-104`, `backend/app/vat/api/routes_status.py:16-50`, `backend/app/vat/api/routes_filing.py:13-24`, `backend/app/vat/api/routes_grouped.py:17-46`, `backend/app/vat/api/routes_queries.py:25-158`, `backend/app/vat/api/routes_client_summary.py:12-38`.
+Router sources: `backend/app/vat/api/routes_intake.py:14-22`, `backend/app/vat/api/routes_work_items.py`, `backend/app/vat/api/routes_data_entry.py:16-104`, `backend/app/vat/api/routes_status.py:16-50`, `backend/app/vat/api/routes_filing.py:13-24`, `backend/app/vat/api/routes_grouped.py:17-46`, `backend/app/vat/api/routes_queries.py:25-158`, `backend/app/vat/api/routes_client_summary.py:12-38`.
 
 List/detail DTO split: the three work-item list endpoints return the thin `VatWorkItemListItem` — only the fields the VAT list/grouped table/cards render (identity, period, status, `net_vat`/`final_vat_amount`/`is_overridden`, the displayed deadline fields, `filed_at`, `updated_at`, `available_actions`). Detail-only fields (raw `total_*` amounts, `override_justification`, `submission_method`/`submission_reference`, `filed_by`/`filed_by_name`, `assigned_to`/`assigned_to_name`, `statutory_deadline`, amendment links, `client_status`, `pending_materials_note`) are served only by `GET /vat/work-items/{item_id}` as the full `VatWorkItemResponse`; the list-row click navigates to the detail page, which refetches by id (`backend/app/vat/schemas/vat_report.py`, `backend/app/vat/api/serializers.py`).
 
@@ -105,6 +107,9 @@ Other VAT enums:
 - `ready-for-review` only accepts `data_entry_in_progress`; `send-back` requires a non-empty correction note and transitions back to `data_entry_in_progress`. Cite: `backend/app/vat/services/data_entry_status.py:17-49`, `backend/app/vat/services/data_entry_status.py:52-90`.
 - Filing requires transition to be allowed by `VALID_TRANSITIONS`, permits optional override only with justification, and writes final filing fields plus audit entries. Cite: `backend/app/vat/services/constants.py:7-25`, `backend/app/vat/services/filing.py:46-114`.
 - Filing requires `assigned_to` to be non-null; filing an unassigned item raises `VAT.ASSIGNEE_REQUIRED`. Cite: `backend/app/vat/services/filing.py:66-67`.
+- Generic work-item PATCH is limited to operational metadata: `assigned_to` and `pending_materials_note`. It uses partial-update semantics, so omitted fields are not changed and explicit `null` clears nullable metadata. It does not update status, period, client identity, VAT totals, filing fields, amendment fields, or calendar snapshot fields.
+- Filed work items reject generic metadata PATCH and DELETE with `VAT.FILED_IMMUTABLE`; filed VAT periods are records of filing and must not be hidden through delete.
+- Work-item DELETE is soft delete only for non-filed mistaken obligations: it sets `deleted_at`, `deleted_by`, and `updated_at`, preserves invoices and audit logs, and appends a VAT audit entry. Soft-deleted items are excluded from list, lookup, detail, and client-summary query results through existing `deleted_at IS NULL` repository filters.
 - `is_amendment=True` requires `amends_item_id`; omitting it raises `VAT.AMENDMENT_ID_REQUIRED`. Amendment validation (client match, filed status, cycle detection) runs only when `amends_item_id` is provided. Cite: `backend/app/vat/services/filing.py:69-73`.
 - Amendments can point to an existing filed work item for the same client, and amendment cycles are rejected. Cite: `backend/app/vat/services/filing.py:24-44`.
 - `business_activity_id` on invoice update must belong to the same legal entity as the work item's client record; mismatched or non-existent IDs return `BUSINESS_ACTIVITY.NOT_FOUND` (404, no existence leak). Cite: `backend/app/vat/services/data_entry_invoice_update.py:79-87`.
@@ -127,7 +132,7 @@ The `VAT.REASON` codes this domain raises. Registry: `docs/architecture/error-co
 | `VAT.PENDING_NOTE_REQUIRED` | 400 via `AppError` | `mark_pending=True` without `pending_materials_note` |
 | `VAT.INVALID_TRANSITION` | 400 via `AppError` | Illegal status transition |
 | `VAT.INVALID_STATUS` | 400 via `AppError` | Invoice add attempted from a status not allowed for add |
-| `VAT.FILED_IMMUTABLE` | 400 via `AppError` | Invoice mutation attempted after filing |
+| `VAT.FILED_IMMUTABLE` | 400 via `AppError` | Invoice mutation, generic metadata update, or delete attempted after filing |
 | `VAT.NET_NOT_POSITIVE` | 400 via `AppError` | Non-positive net/gross amount |
 | `VAT.NEGATIVE_VAT` | 400 via `AppError` | Negative VAT amount |
 | `VAT.EXPENSE_CATEGORY_REQUIRED` | 400 via `AppError` | Expense invoice missing category |

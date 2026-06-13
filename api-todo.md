@@ -17,31 +17,27 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### VAT
 
-#### 2. `PATCH /api/v1/vat/work-items/{item_id}`
-**בעיה:** אין דרך לעדכן work item אחרי יצירה (סטטוס, הערות, שדות פנימיים).
+#### 2. `PATCH /api/v1/vat/work-items/{item_id}` ✅ בוצע
+**החלטת מוצר:** מיושם רק לעדכון metadata תפעולי בטוח (`assigned_to`, `pending_materials_note`). אין PATCH כללי לסטטוס, תקופה, client_record, סכומי מע"מ, שדות הגשה, תיקון או snapshot מועדים.
 **AC:**
-- [ ] endpoint מקבל `VatWorkItemUpdateRequest` עם שדות אופציונליים
-- [ ] עדכון חלקי (שדה בודד) לא מאפס שדות אחרים
-- [ ] מחזיר `VatWorkItemResponse` מעודכן + `404` אם לא קיים
+- [x] endpoint מקבל `VatWorkItemUpdateRequest` עם שדות אופציונליים
+- [x] עדכון חלקי (שדה בודד) לא מאפס שדות אחרים
+- [x] מחזיר `VatWorkItemResponse` מעודכן + `404` אם לא קיים
+- [x] פריט `filed` מוגן ומחזיר `VAT.FILED_IMMUTABLE`
 
-#### 3. `DELETE /api/v1/vat/work-items/{item_id}`
-**בעיה:** אין מחיקת work item.
+#### 3. `DELETE /api/v1/vat/work-items/{item_id}` ✅ בוצע
+**החלטת מוצר:** מחיקה רכה רק לפריטי חובה שגויים שעדיין לא הוגשו. אין החלפה לסמנטיקת `canceled`, ופריטי `filed` לא מוסתרים דרך delete.
 **AC:**
-- [ ] מחיקה רכה (soft delete) עקבית עם שאר הדומיינים
-- [ ] מחזיר `204` בהצלחה, `404` אם לא קיים
-- [ ] פריט מחוק לא מופיע ב-LIST כברירת מחדל
+- [x] מחיקה רכה (soft delete) עקבית עם שאר הדומיינים
+- [x] מחזיר `204` בהצלחה, `404` אם לא קיים
+- [x] פריט מחוק לא מופיע ב-LIST כברירת מחדל
+- [x] פריט מחוק לא מופיע ב-client list / lookup / detail / summary
 
-#### 4. `POST /api/v1/vat/work-items/bulk-transition`
-**בעיה:** אין שינוי סטטוס מרובה — צריך לעבור פריט-פריט.
-**AC:**
-- [ ] מקבל רשימת IDs + transition יעד
-- [ ] מחזיר סיכום הצלחות/כשלונות לכל פריט (כמו `BulkChargeActionResponse`)
-- [ ] transition לא חוקי לפריט בודד לא מפיל את כל ה-batch
+#### 4. `POST /api/v1/vat/work-items/bulk-transition` — לא למימוש עכשיו
+**החלטת מוצר:** לא מוסיפים endpoint גנרי לשינוי סטטוס מרובה. אם יעלה צורך מוצרי, לפתוח endpoint ספציפי לפעולה מוגדרת כמו bulk assign / cancel / materials-complete, עם חוקי הדומיין שלה.
 
-#### 56. 🔍 VAT CREATE רק global, לא per-client
-**בעיה:** בניגוד לדומיינים אחרים שיש להם `POST /clients/{id}/X`.
-**AC:**
-- [ ] בירור: להוסיף `POST /vat/clients/{id}/work-items` לעקביות?
+#### 56. VAT CREATE רק global, לא per-client — לא נדרש עכשיו
+**החלטת מוצר:** `POST /api/v1/vat/clients/{client_record_id}/work-items` הוא עקביות API בלבד ולא צורך מוצרי כרגע. לא לממש אלא אם code review עתידי מוכיח צורך אמיתי.
 
 ### Charges
 
