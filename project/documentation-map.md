@@ -85,6 +85,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/agent/behavior.md` ★ — required agent behavior.
 - `docs/agent/decision-making.md` ★ — how agents make decisions.
 - `docs/agent/source-of-truth.md` ★ — how to resolve doc precedence.
+- `docs/agent/code-review-playbook.md` ★ — review-for-correctness checklist applied before approving a code/docs change (distinct from completion verification).
 
 ## ADR (override all docs when relevant)
 

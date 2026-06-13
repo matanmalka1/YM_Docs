@@ -124,13 +124,7 @@ The `DOMAIN.REASON` codes this domain raises. Registry: `docs/backend/error-code
 
 Current code discrepancies found during authoring (bugs to fix in code, not intended behavior). Each item: what is wrong, `path:line`, the rule/invariant it violates, and a suggested fix. Omit the section if none found. Docs-only — never fix the code here; report it.
 
-Actively check for these recurring patterns before concluding "none found":
-
-1. **IDOR / missing ownership re-check on update.** Compare each `update_*`/`delete_*` service path against its `create_*` counterpart. If create validates that a child/related id (line, invoice, activity, document) belongs to the parent/owner, the update/delete path MUST do the same. A path that mutates by child `id` after only checking the parent exists is a finding. (Seen in annual-reports F-001, vat-reports F-008.)
-2. **Enforced invariants that the service skips.** For each invariant in the domain decisions (e.g. "no transition to X without field Y"), grep the service to confirm it is actually enforced. Documented-but-unenforced = finding. (Seen in vat-reports F-007 assigned_to.)
-3. **Computed/derived fields using a legacy/stale source.** When a field has both a legacy column and a newer source-of-truth column, confirm computed values read the new one. (Seen in advance-payments F-005 due_date vs due_date_effective.)
-4. **Error codes off the `DOMAIN.REASON` format.** Grep raised codes; flag any that are not `DOMAIN.REASON`. (Seen in vat-reports F-009.)
-5. **Broken/stale imports & dead references.** Imports of symbols not defined at the target, and module/README references to files that no longer exist. (Seen in businesses F-006.)
+Actively check the recurring code-review patterns in `docs/agent/code-review-playbook.md` (IDOR/ownership re-check, unenforced invariants, stale derived-field source, `DOMAIN.REASON` format, broken/stale imports) before concluding "none found".
 
 Record each finding in this section and report it in the task summary.
 

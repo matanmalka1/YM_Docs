@@ -23,6 +23,8 @@ Mandatory starting point. Read this before changing any code or documentation.
 
 Reference (not mandatory): `docs/project/glossary.md` — terminology disambiguation, e.g. `client_id` vs `client_record_id`.
 
+When reviewing a code or docs change before approval: `docs/agent/code-review-playbook.md`.
+
 ## Read before, by change type
 
 ### Backend
