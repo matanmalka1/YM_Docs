@@ -154,11 +154,65 @@ _Frontend gaps vs backend API | June 2026_
 
 ---
 
+## Section 3 — Frontend Filter Wiring
+
+### F-07 · Binders — wire open-binder filters to the UI
+
+**Priority:** Medium
+
+**Backend:** `GET /api/v1/binders/open` supports `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `created_after`, and `created_before`.
+
+**Current state:** `ListOpenBindersParams` and `bindersApi.getOpenBinders` already accept and forward all supported filters. The remaining gap is that the open-binders screen does not expose or send them.
+
+**Files:** `frontend/src/features/binders/api/binders.api.ts`, open-binders screen, `BindersFiltersBar`
+
+**AC:**
+- [ ] The open-binders screen exposes the relevant filters and passes them to `bindersApi.getOpenBinders`.
+- [ ] Filter state is stored in the URL so it survives refresh and can be shared.
+- [ ] Filtering is server-driven; no in-memory filtering remains for fields sent to the endpoint.
+- [ ] TypeScript compiles with no errors.
+
+---
+
+### F-08 · Audit — server-side filters for entity audit trails
+
+**Priority:** Medium
+
+**Backend:** `GET /api/v1/audit/{entity_type}/{entity_id}` supports `action`, `user_id`, `created_after`, and `created_before`.
+
+**Gap:** `EntityAuditTrailParams` only contains pagination, and `EntityAuditTrailSection` has no action, user, or date-range filtering.
+
+**Files:** `frontend/src/features/audit/api/contracts.ts`, `frontend/src/features/audit/api/audit.api.ts`, `frontend/src/features/audit/components/EntityAuditTrailSection.tsx`
+
+**AC:**
+- [ ] `EntityAuditTrailParams` adds `action`, `user_id`, `created_after`, and `created_before`.
+- [ ] The audit trail UI adds an action selector, user picker, and date range wired to those parameters.
+- [ ] Filter state is stored in the URL so it survives refresh and can be shared.
+- [ ] Filtering is server-driven, not applied in memory to the current page.
+- [ ] TypeScript compiles with no errors.
+
+---
+
+### F-09 · VAT — decide whether client work-item filters need UI
+
+**Priority:** Low · 🔍 requires clarification
+
+**Backend:** `GET /api/v1/vat/clients/{client_record_id}/work-items` supports `year`, `period`, `status`, `assigned_to`, `due_after`, and `due_before`.
+
+**Current state:** `VatClientWorkItemsParams` and `vatReportsApi.listByClient` already accept and forward all supported filters. `VatClientSummaryPanel` currently uses the summary endpoint, and no client work-item table consumes `listByClient`.
+
+**AC:**
+- [ ] Determine whether the client screen needs a filterable VAT work-item table or whether the summary panel is sufficient.
+- [ ] If no table is needed, document the decision and close this item without a UI change.
+- [ ] If a table is needed, wire its filters to `vatReportsApi.listByClient` and store filter state in the URL.
+- [ ] Filtering is server-driven; no in-memory filtering duplicates the endpoint parameters.
+- [ ] TypeScript compiles with no errors if UI changes are made.
+
+---
+
 _Note: The following items from the original audit were already fixed before this TODO was created and do not need action:_
 
 - **Signature requests `listPending` filters** — `ListPendingSignatureRequestsParams` in `signatureRequests/api/contracts.ts` already includes `client_record_id`, `request_type`, `signer_email`, `created_after`, `created_before`, `expires_before`. API client already uses `toQueryParams`. ✅
-- **Binders `getOpenBinders` filters** — `ListOpenBindersParams` in `binders/types.ts` already includes all 6 filter fields; API client already sends them. ✅
-- **VAT `listByClient` filters** — `VatClientWorkItemsParams` already includes `year`, `period`, `status`, `assigned_to`, `due_after`, `due_before`; `listByClient` already uses `toQueryParams`. ✅
 - **Annual reports `listReports` missing `sort_by`/`order`** — `annualReportsApi.listReports` already accepts and sends `sort_by` and `order`. ✅
 - **Annual reports `listClientReports` pagination** — method already accepts `{ page?, page_size? }` and passes them. ✅
 - **Notifications `getSummary` missing `business_id`** — `getSummary` already accepts `{ client_record_id?, business_id? }`. ✅
