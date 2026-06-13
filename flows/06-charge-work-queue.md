@@ -9,7 +9,7 @@ Source of truth: reference
 
 ## 1. Trigger
 
-Any work queue read: `GET /work-queue` or `GET /work-queue/full`.
+Any work queue read: `GET /work-queue`.
 No DB writes. Pure read-time derivation.
 
 ## 2. Entry Point in Code

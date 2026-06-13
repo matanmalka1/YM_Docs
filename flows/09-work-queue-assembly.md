@@ -9,7 +9,7 @@ Source of truth: reference
 
 ## 1. Trigger
 
-`GET /work-queue` or `GET /work-queue/full`
+`GET /work-queue`
 
 ## 2. Entry Point in Code
 

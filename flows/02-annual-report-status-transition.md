@@ -9,7 +9,7 @@ Source of truth: reference
 
 ## 1. Trigger
 
-`PATCH /annual-reports/{report_id}/status` or `PATCH /annual-reports/{report_id}/stage`.
+`POST /annual-reports/{report_id}/status` or `POST /annual-reports/{report_id}/transition`.
 
 Stage transitions map to status via `STAGE_TO_STATUS` (see §3).
 

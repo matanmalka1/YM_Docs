@@ -10,7 +10,7 @@ Source of truth: reference
 ## 1. Trigger
 
 Two paths:
-- **Manual**: `POST /vat-reports/work-items` API endpoint.
+- **Manual**: `POST /vat/work-items` API endpoint.
 - **Automatic**: called from `ClientOnboardingOrchestrator._sync_vat_work_items()` during client creation (see flow 01).
 
 ## 2. Entry Point in Code
