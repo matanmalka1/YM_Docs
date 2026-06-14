@@ -39,12 +39,13 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 #### 56. VAT CREATE רק global, לא per-client — לא נדרש עכשיו
 **החלטת מוצר:** `POST /api/v1/vat/clients/{client_record_id}/work-items` הוא עקביות API בלבד ולא צורך מוצרי כרגע. לא לממש אלא אם code review עתידי מוכיח צורך אמיתי.
 
-#### 78. 🔍 VAT audit log `created_at` של `filed` לא תואם את `filed_at`
+#### 78. VAT audit log `created_at` של `filed` לא תואם את `filed_at` ✅ בוצע
 **בעיה:** נמצא ב-UI audit פרונט (יוני 2026, client 100004): ה-History tab מציג entry `filed` עם `created_at`=28/05/2026, בזמן ש-`VatWorkItemResponse.filed_at` (ומוצג ב-banner ירוק + ב-list column "הוגש ב") הוא 02/05/2026. הצלבה מול עמודת "עדכון אחרון" ברשימת תיקי המע"מ מראה ש-28/05/2026 הוא תאריך **עדכון מאוחר יותר**, לא תאריך ההגשה בפועל.
 **חשש:** entry `filed` ב-audit log נכתב/מתעדכן ב-sync או עדכון מאוחר יותר, ולא ב-`created_at` המקורי של רגע ההגשה. זה data-integrity issue בטבלת audit, לא bug תצוגה — לכן לא תוקן בפרונט (לא רוצים להחביא אותו עם פורמט/מיפוי תצוגה).
+**בירור/תיקון:** מקור הבעיה בנתוני demo seed: `create_vat_audit_logs` יצר `VatAuditLog(action="filed")` בלי `performed_at`, ולכן ברירת המחדל הייתה זמן יצירת ה-audit row ולא `VatWorkItem.filed_at`. בנוסף, flow ההגשה הרגיל יצר את audit entry אחרי `mark_filed` בלי להצמיד במפורש ל-`filed_at` (פער קטן אפשרי בין שתי קריאות זמן). תוקן כך ש-`filed` audit נכתב עם `performed_at=filed_at`, גם ב-runtime וגם ב-demo seed.
 **AC:**
-- [ ] בירור: מאיפה נוצר ה-`filed` audit entry, ולמה `created_at` שלו מאוחר מ-`filed_at` בפועל?
-- [ ] לאחר הבירור: לתקן את כתיבת ה-audit entry כך ש-`created_at`=`filed_at` בזמן ההגשה, **או** להוסיף לפרונט אפשרות להציג `filed_at` במקום `created_at` עבור entry מסוג `filed` (רק אם מוחלט שה-audit log לא ניתן/לא רצוי לתיקון).
+- [x] בירור: מאיפה נוצר ה-`filed` audit entry, ולמה `created_at` שלו מאוחר מ-`filed_at` בפועל?
+- [x] לאחר הבירור: לתקן את כתיבת ה-audit entry כך ש-`created_at`=`filed_at` בזמן ההגשה, **או** להוסיף לפרונט אפשרות להציג `filed_at` במקום `created_at` עבור entry מסוג `filed` (רק אם מוחלט שה-audit log לא ניתן/לא רצוי לתיקון).
 
 ### VAT — Frontend UX Audit Findings (יוני 2026)
 
@@ -118,21 +119,21 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Documents
 
-#### 11. `GET /api/v1/documents/client/{client_record_id}/{document_id}`
+#### 11. `GET /api/v1/documents/client/{client_record_id}/{document_id}` ✅ בוצע
 **בעיה:** אפשר לרשום, להעלות, למחוק ולהחליף מסמך — אבל אין שליפת מסמך בודד.
 **AC:**
-- [ ] מחזיר metadata של מסמך יחיד + `404`
+- [x] מחזיר metadata של מסמך יחיד + `404`
 
-#### 12. `PATCH /api/v1/documents/client/{client_record_id}/{document_id}`
+#### 12. `PATCH /api/v1/documents/client/{client_record_id}/{document_id}` ✅ בוצע
 **בעיה:** אין עדכון metadata (שם, סוג, תגיות) בלי להחליף את הקובץ.
 **AC:**
-- [ ] עדכון metadata בלבד, ללא העלאה מחדש
-- [ ] לא משנה את גרסת הקובץ
+- [x] עדכון metadata בלבד, ללא העלאה מחדש
+- [x] לא משנה את גרסת הקובץ
 
-#### 13. `GET /api/v1/documents/binder/{binder_id}`
+#### 13. `GET /api/v1/documents/binder/{binder_id}` ✅ בוצע
 **בעיה:** יש `documents/client/{id}` ו-`documents/annual-report/{id}` אבל לא לפי binder.
 **AC:**
-- [ ] מחזיר מסמכים המשויכים ל-binder, באותו envelope כמו שאר רשימות המסמכים
+- [x] מחזיר מסמכים המשויכים ל-binder, באותו envelope כמו שאר רשימות המסמכים
 
 ### Tax Calendar
 
