@@ -9,14 +9,16 @@ Source of truth: mandatory
 
 # Verification
 
-Required checklist before finishing any change. Verify the smallest meaningful scope that proves the change. Report any check you could not run and why.
+Use this checklist before declaring a coherent change set complete. Verification should be
+risk-based and batched at a stable checkpoint rather than repeated mechanically after each edit.
+Verify the smallest meaningful scope that proves the result, and report any applicable check you
+could not run and why.
 
 How to run tests and checks: `docs/workflow/testing.md`. How to check API/OpenAPI: `docs/workflow/openapi-checks.md`.
 
 ## Checklist
 
-- [ ] Code compiles / typechecks.
-- [ ] Relevant tests pass (see `docs/workflow/testing.md`).
+- [ ] Applicable compile or typecheck verification passes for the changed surface.
 - [ ] API contract checked when an endpoint or schema changed (see `docs/workflow/openapi-checks.md`; CI drift baseline details in `docs/frontend/api-drift-ci.md`).
 - [ ] Migration generated and reviewed when the DB schema changed.
 - [ ] Frontend flow checked in a browser when UI changed, or final response explains why not.

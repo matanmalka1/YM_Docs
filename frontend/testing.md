@@ -9,7 +9,9 @@ Source of truth: mandatory
 
 # Frontend Testing
 
-- Run the most relevant tests for the files changed by default.
+- Choose test scope according to behavioral risk and the surface changed.
+- Batch routine verification at a stable checkpoint after a coherent set of edits. During iteration,
+  use a focused test when it provides useful feedback for the next decision.
 - Run the full suite when the change is broad, shared, risky, or explicitly requested.
 - Do not claim tests passed unless they were run in the current task.
 - See `docs/frontend/commands.md` for the canonical frontend test commands.
@@ -29,7 +31,7 @@ Source of truth: mandatory
   non-trivial.
 - A UI-only visual change does not require a synthetic unit test when browser verification proves the
   change more directly. Report the browser states and widths checked.
-- Run the smallest relevant Vitest scope while iterating, then `npm run test` when shared helpers,
-  shared UI, routing, auth, or cross-feature behavior changed.
+- Prefer the smallest relevant Vitest scope for focused behavior. Use `npm run test` at the completion
+  checkpoint when shared helpers, shared UI, routing, auth, or cross-feature behavior changed.
 - If frontend test coverage or required browser tooling is missing for an area, report that honestly
   instead of inventing test results.

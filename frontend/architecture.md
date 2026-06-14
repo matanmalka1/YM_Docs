@@ -136,8 +136,9 @@ This document defines frontend ownership and dependency boundaries. Page composi
 
 ## Verification
 
-- `npm run typecheck`, `npm run lint`, and the relevant Vitest tests are the minimum checks for
-  frontend logic changes.
+- Select verification that matches the changed surface and batch routine checks at a stable
+  completion checkpoint. Frontend logic changes commonly require typecheck, lint, and the relevant
+  Vitest scope; narrow changes may use a smaller combination when it directly proves correctness.
 - Run `npm run arch:check` when imports, ownership boundaries, or shared components change.
 - Run `npm run build` for routing, build configuration, dependency, or production-bundle changes.
 - Check changed UI in a browser at relevant desktop and mobile widths.

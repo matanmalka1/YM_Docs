@@ -32,13 +32,13 @@ When reviewing a code or docs change before approval: `docs/agent/code-review-pl
 - **Backend change** → `docs/backend/architecture.md`
 - **DB / migration change** → `docs/backend/database.md` + `docs/backend/migrations.md`
 - **Backend error-code / OpenAPI error-doc change** → `docs/backend/error-codes.md` + `docs/backend/error-doc-matrix.md`
-- **Backend tests / verification** (before finishing) → `docs/backend/testing.md` + `docs/workflow/verification.md`
+- **Backend completion verification** → `docs/backend/testing.md` + `docs/workflow/verification.md`
 
 ### Frontend
 
 - **Frontend change** → `docs/frontend/architecture.md` + `docs/frontend/page-structure.md`
 - **Frontend UI / styling / interaction change** → also read `docs/frontend/ui-guidelines.md`
-- **Frontend tests / verification** (before finishing) → `docs/frontend/testing.md` + `docs/workflow/verification.md`
+- **Frontend completion verification** → `docs/frontend/testing.md` + `docs/workflow/verification.md`
 
 ### Cross-cutting (both stacks)
 
@@ -69,4 +69,5 @@ Stop and report any conflict between the user request, code, and docs before edi
 - You must not add hidden fallback behavior.
 - You must not change domain behavior unless the relevant domain docs are updated in the same task.
 - You must stop and report conflicts between the user request, code, and docs before editing affected files.
-- You must run or report the relevant verification from `docs/workflow/verification.md` before finishing.
+- Before declaring a coherent change set complete, apply or report the risk-appropriate verification
+  from `docs/workflow/verification.md`.
