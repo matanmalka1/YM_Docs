@@ -75,6 +75,13 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 |------|------|-------------|
 | `BINDER_INTAKE.NOT_FOUND` | 404 | Intake ID does not exist, or `binder_id` path param does not match the intake's owning binder |
 
+### `TASK` codes (selected)
+
+| Code | HTTP | When raised |
+|------|------|-------------|
+| `TASK.INVALID_ASSIGNEE` | 404 | Bulk assign target user not found or inactive; whole-request failure |
+| `TASK.CLIENT_SOURCE_MISMATCH` | 400 | Provided `client_record_id` does not match the client resolved from the task's source record |
+
 ### `ANNUAL_REPORT` codes (selected)
 
 | Code | HTTP | When raised |

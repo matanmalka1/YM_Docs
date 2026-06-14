@@ -128,9 +128,12 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | method path | 400 | 409 | 500 |
 |---|---|---|---|
 | POST /tasks | ✓ | | |
+| POST /tasks/bulk-complete | ✓ | ✓ | |
+| POST /tasks/bulk-assign | ✓ | ✓ | |
 | PATCH /tasks/{id} | ✓ | ✓ | |
 | POST /tasks/{id}/complete | | ✓ | |
 | POST /tasks/{id}/cancel | | ✓ | |
+| GET /clients/{id}/tasks | | | |
 
 ### invoices (409 + 400: invoice_service)
 | method path | 400 | 409 | 500 |
