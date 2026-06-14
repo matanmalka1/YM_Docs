@@ -77,8 +77,6 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
 
-(`docs/frontend-alignment-todo.md` is listed under "Tracking & backlog" below.)
-
 ## Agent
 
 - `docs/agent/entry-point.md` ★ — canonical agent instructions.
@@ -105,7 +103,6 @@ ADRs are accepted architecture decisions. They have the highest precedence when 
 These are active working backlogs, not canonical product behavior. Do not treat them as source of truth for how the system behaves; canonical behavior lives in `docs/domains/*` and the architecture docs.
 
 - `docs/api-todo.md` — active backend/API alignment backlog; tracking only.
-- `docs/frontend-alignment-todo.md` — active frontend/backend alignment backlog; tracking only.
 
 ## Performance (reference artifacts)
 
