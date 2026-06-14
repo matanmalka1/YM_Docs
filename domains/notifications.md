@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The notification domain records outbound client-communication attempts, renders preview/send content for supported triggers, applies domain policy before delivery, and stores the resulting audit trail. In the current codebase, manual HTTP flows and the single automatic binder-handover flow both persist rows in `notifications`; real delivery is email-only.
 
-Last verified against code + backend/openapi.json: 2026-06-04.
+Last verified against code + backend/openapi.json: 2026-06-14.
 
 ## Endpoints
 
@@ -131,6 +131,7 @@ Trigger labels and domain labels used in list responses are defined in `TRIGGER_
 - Template context is resolved from the trigger and entity. Binder triggers can add `binder_number`; annual-report triggers add `tax_year`; charge, VAT, and signature triggers inject entity-specific fields; client-level free-text triggers default `message` to an empty string in previews (`backend/app/notifications/services/notification_context_resolver.py:28-109`).
 - Recipient resolution differs by trigger: signature triggers use `SignatureRequest.signer_email`; all other triggers resolve the OWNER `Person` email from the client record. If no recipient is found, the service persists a `skipped` row with `recipient=null` and returns `status="skipped"` (`backend/app/notifications/services/notification_send_service.py:321-372,417-422`, `backend/app/notifications/services/notification_context_resolver.py:111-139`).
 - Manual send validates the final trimmed subject/body after policy and template resolution. Empty values, oversize values, or visible `{placeholder}` tokens raise `NOTIFICATION.*` validation errors instead of creating a row (`backend/app/notifications/services/notification_send_service.py:234-288`, `backend/app/notifications/services/constants.py:6-8`).
+- Manual send requires an `X-Idempotency-Key` header. It is an opaque string, not a UUID contract; the API layer accepts any nonblank value with length 8-128 and returns a 400 `ErrorEnvelope` for missing or invalid length so clients receive domain error codes instead of generic request-validation errors (`backend/app/notifications/api/notifications.py:118-132`, `backend/app/infrastructure/idempotency/dependency.py:20-50`).
 - Manual send hashes the effective payload and reuses prior non-`pending` results for the same idempotency key within 24 hours. A prior `pending` row is treated as an interrupted attempt and does not short-circuit the retry (`backend/app/notifications/services/notification_send_service.py:71-92,290-318`, `backend/app/notifications/services/constants.py:6`).
 - Both manual and automatic services create a `pending` row before delivery, call `NotificationDeliveryService.send()`, then mark it `sent` or `failed`. `NotificationDeliveryService` itself never persists notification state (`backend/app/notifications/services/notification_send_service.py:374-415`, `backend/app/notifications/services/notification_auto_send_service.py:193-224`, `backend/app/notifications/services/notification_delivery_service.py:8-31`).
 - Real outbound email is enabled only when `APP_ENV` is `staging` or `production` and `NOTIFICATIONS_ENABLED` is true. In other environments, the email channel is constructed disabled (`backend/app/notifications/services/notification_send_service.py:102-110`, `backend/app/notifications/services/notification_auto_send_service.py:82-90`).
@@ -143,8 +144,8 @@ Registry: `docs/backend/error-codes.md`.
 | Code | Raised when |
 |------|-------------|
 | `NOTIFICATION.NOT_FOUND` | `GET /api/v1/notifications/{notification_id}` requests a notification that does not exist (`backend/app/notifications/services/notification_service.py`) |
-| `NOTIFICATION.MISSING_IDEMPOTENCY_KEY` | Manual send is missing `X-Idempotency-Key`, or auto-send receives a blank idempotency key (`backend/app/notifications/api/notifications.py:120-127`, `backend/app/notifications/services/notification_auto_send_service.py:110-111`) |
-| `NOTIFICATION.INVALID_IDEMPOTENCY_KEY` | Manual send header is present but not a valid UUID (`backend/app/notifications/api/notifications.py:128-135`) |
+| `NOTIFICATION.MISSING_IDEMPOTENCY_KEY` | Manual send is missing `X-Idempotency-Key`, or auto-send receives a blank idempotency key (`backend/app/notifications/api/notifications.py:124-130`, `backend/app/notifications/services/notification_auto_send_service.py:110-111`) |
+| `NOTIFICATION.INVALID_IDEMPOTENCY_KEY` | Manual send header is present but outside the accepted 8-128 character length range (`backend/app/notifications/api/notifications.py:124-130`, `backend/app/infrastructure/idempotency/dependency.py:45-49`) |
 | `NOTIFICATION.AUTO_SEND_TRIGGER_NOT_ALLOWED` | Internal auto-send is called with a trigger other than `binder_ready_for_handover` (`backend/app/notifications/services/notification_auto_send_service.py:105-109`) |
 | `NOTIFICATION.AUTO_ONLY_TRIGGER` | Manual preview/send tries to use `binder_ready_for_handover` (`backend/app/notifications/services/notification_send_service.py:119-124,198-203`) |
 | `NOTIFICATION.MISSING_ENTITY_ID` | A trigger that requires an entity id is called without one (`backend/app/notifications/services/notification_send_service.py:121-124,200-203`) |

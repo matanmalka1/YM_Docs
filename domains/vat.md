@@ -45,6 +45,8 @@ All paths listed below exist in `backend/openapi.json`.
 
 Router sources: `backend/app/vat/api/routes_intake.py:14-22`, `backend/app/vat/api/routes_work_items.py`, `backend/app/vat/api/routes_data_entry.py:16-104`, `backend/app/vat/api/routes_status.py:16-50`, `backend/app/vat/api/routes_filing.py:13-24`, `backend/app/vat/api/routes_grouped.py:17-46`, `backend/app/vat/api/routes_queries.py:25-158`, `backend/app/vat/api/routes_client_summary.py:12-38`.
 
+VAT export OpenAPI documents both successful download media types, Excel and PDF, as binary file responses rather than `application/json` with an empty schema (`backend/app/vat/api/routes_client_summary.py:50-57`, `backend/openapi.json`).
+
 List/detail DTO split: the three work-item list endpoints return the thin `VatWorkItemListItem` — only the fields the VAT list/grouped table/cards render (identity, period, status, `net_vat`/`final_vat_amount`/`is_overridden`, the displayed deadline fields, `filed_at`, `updated_at`, `available_actions`). Detail-only fields (raw `total_*` amounts, `override_justification`, `submission_method`/`submission_reference`, `filed_by`/`filed_by_name`, `assigned_to`/`assigned_to_name`, `statutory_deadline`, amendment links, `client_status`, `pending_materials_note`) are served only by `GET /vat/work-items/{item_id}` as the full `VatWorkItemResponse`; the list-row click navigates to the detail page, which refetches by id (`backend/app/vat/schemas/vat_report.py`, `backend/app/vat/api/serializers.py`).
 
 ## Model & fields

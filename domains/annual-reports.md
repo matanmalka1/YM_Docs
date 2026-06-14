@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Annual Reports
 
 The annual reports domain manages Israeli annual income-tax report work items per client record and tax year, including lifecycle status, statutory form/profile metadata, required schedules, annex data, income/expense lines, tax calculation, readiness checks, client approval, PDF export, and client/year season views.
-Last verified against code + backend/openapi.json: 2026-06-11 for the linked charges endpoint response schema; full-domain verification remains 2026-06-04.
+Last verified against code + backend/openapi.json: 2026-06-14 for PDF export and positive path-parameter OpenAPI docs; full-domain verification remains 2026-06-04.
 
 ## Endpoints
 
@@ -60,6 +60,8 @@ All paths below exist in `backend/openapi.json`. The `annual_reports` router is 
 | `GET` | `/api/v1/annual-reports/{report_id}/export/pdf` | Download a draft annual-report PDF. |
 | `POST` | `/api/v1/annual-reports/{report_id}/tax-calculation/save` | Persist `tax_due` or `refund_due`. |
 | `GET` | `/api/v1/annual-reports/{report_id}/charges` | List charges linked to a report, returned as `PaginatedResponse[ChargeResponse]` (`items`, `page`, `page_size`, `total`). |
+
+The PDF export is documented in OpenAPI as `application/pdf` with binary schema, not as an empty JSON response (`backend/app/annual_reports/api/routes_export.py:22-40`). Integer path parameters for report IDs, line IDs, client record IDs, and tax-year route values publish positive bounds (`minimum: 1`) in OpenAPI (`backend/app/core/path_params.py:7-9`).
 
 ## Model & fields
 

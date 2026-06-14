@@ -13,6 +13,7 @@ Source of truth: mandatory
 - Authenticated application APIs must use `/api/v1/*`.
 - Public backend routes may remain unprefixed when they are intentionally outside the authenticated application API surface, such as `/`, `/info`, `/health`, `/ready`, and `/sign/{token}`.
 - Public signature routes use `/sign/{token}/*` and do not require authenticated API JWTs.
+- Public signature route token path parameters must document explicit length bounds in OpenAPI (`minLength=32`, `maxLength=256`) unless a stricter token format is known and documented by the owning domain.
 - Auth endpoints are `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, and `POST /api/v1/auth/logout`.
 - Login returns `{ access_token, user }` and sets the refresh-token cookie.
 - Refresh returns `{ access_token }`.
@@ -21,6 +22,7 @@ Source of truth: mandatory
 - Resource URLs must use stable, plural, kebab-case resource names.
 - Business action endpoints may use verbs only for real domain commands or transitions.
 - `GET` endpoints must not change state.
+- Path parameters that represent database IDs must reject non-positive values at the routing/schema layer and publish `minimum: 1` in OpenAPI. Non-ID integer path parameters should use an equivalent positive bound only when semantically correct, such as a positive tax year.
 - Standard list endpoints must support `page`, `page_size`, `sort_by`, and `order`.
 - Standard paginated list endpoints should default to `page=1` and `page_size=20`, with page size capped at 200 unless an owning contract says otherwise.
 - New list endpoints must not introduce aliases such as `limit`, `offset`, `per_page`, `sort_dir`, or `order_by`.
@@ -40,6 +42,7 @@ Source of truth: mandatory
 - The thin-list-DTO rule applies to new endpoints and to endpoints touched during a refactor; it does not require an immediate retroactive migration of all existing domains.
 - Every response-bearing endpoint must declare `response_model=`.
 - Endpoints with no response body must use HTTP 204.
+- File download endpoints must not be documented as empty JSON responses. OpenAPI must publish the real download media type, such as `application/pdf`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, or `text/csv`, with schema `{ "type": "string", "format": "binary" }`.
 - Application error responses must use the standard error envelope: `{ "error": { "code": string, "message": string, "details": unknown | null, "request_id"?: string | null } }`.
 - Standard application error responses must include `error.code`, `error.message`, and `error.details`.
 - Standard application error responses may include `error.request_id` when a request ID is available.

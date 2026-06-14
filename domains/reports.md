@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The reports domain provides read-only management and operational reports that aggregate data from other domains (charge, vat-reports, advance-payments, annual-reports, clients). It defines no persistent tables of its own; all output is computed at request time and returned as derived payloads. Export endpoints additionally serialize reports to Excel or PDF files written to a server-side temp directory.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-14 for aging export binary OpenAPI docs; full-domain verification remains 2026-05-29.
 
 ## Endpoints
 
@@ -140,6 +140,7 @@ VAT period type values come from `VatWorkItem.period_type` (vat-reports domain).
 - Format validated at router level with regex `^(excel|pdf)$` (`reports.py:69`).
 - Excel export requires `openpyxl`; PDF export requires `reportlab`. Missing libraries raise HTTP 500 with explicit install guidance (`reports_export_service.py:38–43`).
 - Files are written to `EXPORT_TEMP_DIR` (`/tmp/.../exports`); the endpoint returns a `FileResponse` with `Content-Disposition: attachment` (`reports.py:81`).
+- OpenAPI documents both possible successful download media types, Excel and PDF, as binary file responses rather than `application/json` with an empty schema (`backend/app/reports/api/reports.py:74-78`, `backend/openapi.json`).
 
 ## Error codes
 
