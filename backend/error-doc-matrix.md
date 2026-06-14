@@ -20,10 +20,11 @@ Authoritative mapping of documented application error statuses per endpoint. Gen
 
 Statuses are documented by two mechanisms — do not duplicate:
 
-- **`401` and `403` — injected globally in `app/core/openapi.py` (`build_openapi`)**, NOT per-route:
+- **`401` and `403` — mostly injected globally in `app/core/openapi.py` (`build_openapi`)**:
   - `401`: every non-public operation (public set = `app/core/public_endpoints.py`, 11 ops).
   - `403`: every operation whose route has a `require_role(...)` dependency (detected by walking `route.dependant` and checking the dependency callable's `__requires_role__` marker). **186 of 201 ops are role-gated.**
-  - The non-public ops WITHOUT detected `require_role` are `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, `GET /api/v1/reminders/{reminder_id}`, and `POST /api/v1/reminders/{reminder_id}/cancel`; none currently documents a per-route `forbidden_response()`.
+  - The non-public ops WITHOUT detected `require_role` are `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, `GET /api/v1/reminders/{reminder_id}`, and `POST /api/v1/reminders/{reminder_id}/cancel`.
+  - `GET /api/v1/reminders/{reminder_id}` and `POST /api/v1/reminders/{reminder_id}/cancel` document per-route `forbidden_response()` because they are authenticated but not role-gated.
 - **`400`, `404`, `409`, `500` — documented per-route** via the `responses=` helpers in `app/core/openapi_responses.py`:
   - `404`: already swept (ID-param rule, guarded by `tests/core/test_openapi_not_found_docs.py`). Not re-listed here unless new.
   - `400` / `409` / `500`: added by the #53 sweep per the table below.
@@ -45,9 +46,9 @@ Document `500` **only** at `permanent_document_service.py:178` (`AppError("DOCUM
 
 **Intentionally NOT documented as 500** (environment/optional-dependency `ImportError` guards, not a business contract): `GET /clients/export`, `GET /clients/template` (`clients_excel.py:40,59`), `GET /reports/aging/export` (`reports_export_service.py:39,44`). The generic `SQLAlchemyError`/`Exception` → 500 handler is global and is not documented per-endpoint.
 
-## Per-route sweep matrix (400 / 409 / 500 only — 401/403 are hook-injected)
+## Per-route sweep matrix (400 / 403 / 409 / 500)
 
-Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` = handled by global hook (401 all non-public; 403 all role-gated) — not listed per row.
+Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` = handled by global hook (401 all non-public; 403 all role-gated) — not listed per row. Per-route 403 is listed only for authenticated, non-role-gated endpoints that can still forbid access.
 
 ### charges (reference impl — already complete)
 | method path | 400 | 409 | 500 |
@@ -189,10 +190,11 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | POST /notifications/send | ✓ | | |
 
 ### reminders (400: reminder_service)
-| method path | 400 | 409 | 500 |
-|---|---|---|---|
-| POST /reminders/ | ✓ | | |
-| POST /reminders/{id}/cancel | | ✓ | |
+| method path | 400 | 403 | 409 | 500 |
+|---|---|---|---|---|
+| POST /reminders/ | ✓ | | | |
+| GET /reminders/{id} | | ✓ | | |
+| POST /reminders/{id}/cancel | | ✓ | ✓ | |
 
 ### audit (400: audit_trail_service)
 | method path | 400 | 409 | 500 |
@@ -217,5 +219,5 @@ Note: `auth` endpoints are public (no `require_role`), so the global 401/403 hoo
 ## Intentional exclusions (allowlist for coverage test)
 
 - **No 500** on `GET /clients/export`, `GET /clients/template`, `GET /reports/aging/export` — `ImportError` env-guards, not a business contract.
-- **No 403 per-route** anywhere — all role-gating is hook-injected; `GET /auth/me`, `POST /auth/logout` are role-free and have no business `ForbiddenError`.
+- **No 403 per-route** except `GET /reminders/{id}` and `POST /reminders/{id}/cancel` — all role-gating is hook-injected; `GET /auth/me`, `POST /auth/logout` are role-free and have no business `ForbiddenError`.
 - Read-only list/summary/dashboard endpoints document no `400/409` (no reachable business error beyond auth + not-found).
