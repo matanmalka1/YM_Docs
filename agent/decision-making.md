@@ -17,6 +17,8 @@ Source of truth: mandatory
 - Do not add aliases, wrappers, compatibility shims, or alternate names to avoid updating callers.
 - Do not create hidden fallback behavior.
 - Remove duplicated logic instead of adding another copy.
+- Before adding literals or new constants, search for existing project-wide and feature-owned constants and reuse one only when its semantic meaning matches.
+- Apply a shared constant consistently across request parameters, comparisons, calculations, and user-facing text that represent the same value.
 - Say when existing structure is wrong and explain the operational impact.
 - Local mandatory architecture rules override generic best practices.
 - Treat the system as in development unless the user explicitly says production users or data are involved.
