@@ -34,7 +34,7 @@ Status values:
 | BindersPage | `/binders` | `features/binders/pages/BindersPage.tsx` | list | 206 | high | 6 | pending | useBindersPageDialogs exists — validate completeness |
 | WorkQueuePage | `/work-queue` | `features/workQueue/pages/WorkQueuePage.tsx` | list | 160 | medium | 7 | pending | All state in hooks — verify |
 | VatWorkItemsPage | `/tax/vat` | `features/vatReports/pages/VatWorkItemsPage.tsx` | list | 142 | medium | 8 | pending | showCreateModal in page, URL params for create/client_id/period |
-| AdvancePaymentsPage | `/tax/advance-payments` | `features/advancedPayments/pages/AdvancePaymentsPage.tsx` | list | 295 | high | 8.1 | pending | 4 state vars + complex batch logic — was missing from original plan |
+| AdvancePaymentsPage | `/tax/advance-payments` | `features/advancedPayments/pages/AdvancePaymentsPage.tsx` | list | 102 | high | 8.1 | in-progress | Page is now a composition shell backed by `useAdvancePaymentsPage`; batch querying, grouping, table rows, navigation, URL validation, and drawer mutation behavior were extracted. Automated verification passed. Browser smoke testing remains pending. |
 | NotificationsPage | `/notifications` | `features/notifications/pages/NotificationsPage.tsx` | list | 335 | high | 8.2 | pending | URL state violation: clientQuery shadow state |
 | SearchPage | `/search` | `features/search/pages/SearchPage.tsx` | list | 121 | low | 8.3 | pending | Verify queryDraft — fix only if it duplicates URL state |
 | TaxCalendarSettingsPage | `/settings/tax-calendar` | `features/taxCalendarSettings/pages/TaxCalendarSettingsPage.tsx` | settings | 402 | high | 8.5 | pending | Largest page — nested CRUD modals |
@@ -47,3 +47,44 @@ Status values:
 | ForgotPasswordPage | `/forgot-password` | `features/auth/pages/ForgotPasswordPage.tsx` | public | 96 | low | skipped | skipped | Auth/public flow — separate phase |
 | ResetPasswordPage | `/reset-password` | `features/auth/pages/ResetPasswordPage.tsx` | public | 147 | low | skipped | skipped | Auth/public flow — separate phase |
 | SigningPage | `/sign/:token` | `features/signing/pages/SigningPage.tsx` | public | 73 | low | skipped | skipped | Public client-facing flow — separate phase |
+
+## Step 8.1 — Advance Payments
+
+Completed:
+
+- Moved URL filters, permissions, batch grouping, workflow counters, overlay state, navigation, and update mutation behavior out of `AdvancePaymentsPage`.
+- Replaced unsafe URL casts with explicit validation for client record ID, payment status, and reporting frequency.
+- Split the batch implementation into the summary row, server-state hook, table content, table row, and table constants.
+- Replaced browser-level `_self` navigation with React Router navigation.
+- Uses one authoritative server-paginated overview query per displayed due-date batch.
+- Backend HTTP coverage verifies that filtering by one `due_date` returns both monthly and bimonthly payments sharing that deadline, with the correct total.
+- Recalculates merged `collection_rate` from merged paid and expected totals.
+
+Verification completed:
+
+- Frontend lint, typecheck, architecture check, full Vitest suite, and production build.
+- Focused advance-payment grouping tests, including invalid/null aggregate values and merged collection rate.
+- Backend `tests/advance_payments/api/test_advance_overview_filters.py`.
+
+Required before changing status to `done`:
+
+- Browser smoke-test `/tax/advance-payments` at desktop and narrow widths, including opening a batch, pagination, row navigation, filters, and the update drawer. This remains pending because local dev-server permission was not granted during the refactor session.
+
+Non-blocking follow-up:
+
+- `AdvancePaymentDrawer.tsx` remains 433 lines and still owns substantial form state, validation, and VAT prefill behavior. Split it only as a dedicated drawer refactor with focused form tests.
+- `useAdvancePaymentsPage` is 137 lines. Keep it as the page controller for now; split filters, batch groups, or drawer actions only if additional responsibilities are added.
+- The production build still reports the existing large-chunk warning. Address bundle splitting separately from this page refactor.
+
+## Annual Report Panels
+
+Completed:
+
+- Extracted tax calculation, income/expense, annex form, and status-transition behavior from presentation components into feature hooks.
+- Typed income payloads end to end and validate income/expense enum values before constructing API payloads.
+- Tax calculation error state now includes both calculation and report-detail query failures.
+- Annex form reset behavior depends on stable `react-hook-form` methods instead of the complete form object.
+
+Remaining:
+
+- Browser-check the annual-report detail financial, annex, tax-calculation, and status-transition states before treating the widget-level visual verification as complete.

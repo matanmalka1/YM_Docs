@@ -91,6 +91,41 @@ This document defines frontend ownership and dependency boundaries. Page composi
 - Do not use broad `invalidateQueries({ queryKey: ...all })` patterns as a default cache strategy when a narrower invalidation or cache update can express the change.
 - React Query `staleTime` must match the volatility of the data: effectively static reference data such as enums or config should use `Infinity`, while operational data should use an explicit bounded stale time chosen for that screen.
 - Shared stale-time constants should be organized by data volatility and used consistently instead of ad hoc per-hook defaults.
+- When multiple features need the same reference-data lookup (e.g. "active users for a dropdown"), extract one shared hook with a semantic, intent-based query key (e.g. `usersQK.activeOptions()`) rather than each feature calling the list endpoint with its own ad hoc params. Only share a hook when the underlying intent is truly identical; do not force-share queries whose filters differ for a real reason (e.g. audit trails needing inactive users).
+
+### React Query freshness policy
+
+Use the semantic constants from `src/lib/queryDefaults.ts`. Select the bucket from the data's
+volatility and the user's freshness expectation, not from endpoint shape or as a bulk performance
+optimization.
+
+| Bucket | Current value | Intended data |
+|---|---:|---|
+| `short` | 10 seconds | Operational or live-ish views such as work queues, notifications, pending requests, and operational dashboards |
+| `default` | 30 seconds | Normal list and detail data where brief reuse is acceptable |
+| `medium` | 1 minute | Slowly changing operational metadata that is revisited frequently |
+| `long` | 5 minutes | Low-volatility reference lookups such as active advisor options |
+| `static` | `Infinity` | Effectively immutable configuration or enum-style reference data |
+
+- The shared `QueryClient` owns the `default` bucket. Hooks that use normal freshness should inherit
+  it and must not add a redundant `staleTime: QUERY_STALE_TIME.default`.
+- Hooks must declare an explicit override when their data is more volatile or more stable than the
+  global default. Do not apply one bucket to a group of unrelated queries without classifying each
+  resource.
+- Operational queries must use an explicit bounded bucket. Examples include notifications, work
+  queues, pending signature requests, and dashboards used as an operational snapshot.
+- Before increasing a query's stale time, audit every frontend mutation that can affect it. Each
+  mutation must update the exact cache entry or invalidate the narrowest affected query-key root.
+- Frontend invalidation covers only changes performed through that frontend mutation. If data can
+  change externally through webhooks, background jobs, another user, or a public workflow, define an
+  additional refresh mechanism appropriate to the screen: polling, a push channel, a manual refresh
+  action, or a documented remount/reconnect trigger.
+- `staleTime` is not polling. It only determines when cached data becomes eligible for refetch.
+  Expiration alone does not issue a request.
+- `refetchOnWindowFocus` is disabled globally. Do not assume returning to the browser refreshes an
+  operational screen; enable an explicit trigger for that query when the product requires it.
+- A dashboard must be classified explicitly: use `short` for an operational snapshot and
+  `default` for a general overview. Do not choose based only on the cost of its aggregate endpoint.
 
 ## Mutations and errors
 
