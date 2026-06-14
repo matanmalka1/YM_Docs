@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The permanent-documents domain stores durable client and business files — identity documents, engagement agreements, tax forms, bank approvals, withholding certificates, and similar records. Each document is versioned: uploading a new file for the same `(client_record_id, business_id, document_type, tax_year)` combination supersedes the previous version rather than replacing it. Documents are soft-deleted; the storage object is not removed. Operational signals report missing required document types per client.
 
-Last verified against code + backend/openapi.json: 2026-06-05.
+Last verified against code + backend/openapi.json: 2026-06-14.
 
 ## Endpoints
 
@@ -25,9 +25,12 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/documents` is mou
 | GET | /api/v1/documents/client/{client_record_id}/signals | ADVISOR, SECRETARY | Advisory: return missing required document types |
 | GET | /api/v1/documents/client/{client_record_id}/versions | ADVISOR, SECRETARY | Version history for one `document_type`; required `?document_type=`, optional `?tax_year=` |
 | GET | /api/v1/documents/client/{client_record_id}/{document_id}/download-url | ADVISOR, SECRETARY | Presigned download URL (expires 1 hour); ownership verified against `client_record_id` |
+| GET | /api/v1/documents/client/{client_record_id}/{document_id} | ADVISOR, SECRETARY | Get a single document's metadata; ownership verified against `client_record_id` |
 | GET | /api/v1/documents/annual-report/{report_id} | ADVISOR, SECRETARY | List documents linked to an annual report |
+| GET | /api/v1/documents/binder/{binder_id} | ADVISOR, SECRETARY | List documents linked to a binder; 404 if binder does not exist |
+| PATCH | /api/v1/documents/client/{client_record_id}/{document_id} | ADVISOR, SECRETARY | Update document metadata (`document_type`, `original_filename`, `tax_year`) without touching the file or version; ownership verified |
 | DELETE | /api/v1/documents/client/{client_record_id}/{document_id} | ADVISOR | Soft-delete a document; ownership verified against `client_record_id` |
-| PUT | /api/v1/documents/client/{client_record_id}/{document_id}/replace | ADVISOR | Replace file in-place (same record, incremented version); ownership verified |
+| PUT | /api/v1/documents/client/{client_record_id}/{document_id}/replace | ADVISOR, SECRETARY | Replace file in-place (same record, incremented version); ownership verified |
 
 ## Model & fields
 
@@ -51,6 +54,7 @@ All paths confirmed in `backend/openapi.json`. Router prefix `/documents` is mou
 | version | int | no | default `1` |
 | superseded_by | int FK → permanent_documents.id | yes | self-FK; only the latest version has this NULL |
 | annual_report_id | int FK → annual_reports.id | yes | links supporting docs to a specific report |
+| binder_id | int FK → binders.id | yes | links document to a physical binder; indexed |
 | uploaded_by | int FK → users.id | no | |
 | uploaded_at | datetime | no | UTC |
 | approved_by | int FK → users.id | yes | |
@@ -116,7 +120,10 @@ Source: `backend/app/documents/permanent_documents/services/permanent_document_s
   - client-scoped: `clients/{client_record_id}/{document_type}/{tax_year_or_permanent}/v{version}_{filename}`
   - When `tax_year` is None, the segment is `permanent`.
 - **Soft delete.** `delete_document(client_record_id, document_id)` sets `is_deleted=True` only; storage object is not removed. Fetches via `get_by_id_and_client_record` — raises `PERMANENT_DOCUMENTS.NOT_FOUND` if the document does not exist or does not belong to the given client. All list/get queries filter `is_deleted == False`.
-- **Replace in-place.** `replace_document(client_record_id, document_id, ...)` increments `version`, uploads new file, updates all file metadata, and commits — does not create a new `PermanentDocument` row or update `superseded_by`. Same ownership check as delete.
+- **Replace in-place.** `replace_document(client_record_id, document_id, ...)` increments `version`, uploads new file, updates all file metadata, and commits — does not create a new `PermanentDocument` row or update `superseded_by`. Same ownership check as delete. ADVISOR and SECRETARY both allowed.
+- **Get single document.** `get_document(client_record_id, document_id)` returns full DTO; raises `PERMANENT_DOCUMENTS.NOT_FOUND` (404) if missing, soft-deleted, or belongs to a different `client_record_id`.
+- **Update metadata.** `update_document_metadata(client_record_id, document_id, **fields)` applies only the fields present in the request (`exclude_unset=True`), then flushes. Does not touch `version`, `storage_key`, `file_size_bytes`, `mime_type`, or trigger a storage call. `document_type` cannot be set to `null` (non-nullable column, rejected with 422); `original_filename` and `tax_year` accept explicit `null` to clear.
+- **List documents by binder.** `list_binder_documents(binder_id, page, page_size)` raises `BINDER.NOT_FOUND` (404) if the binder does not exist; otherwise returns the same paginated envelope as the client-list endpoint, excluding soft-deleted and superseded documents.
 - **Default required types for signals.** `_DEFAULT_REQUIRED_TYPES = [id_copy, power_of_attorney, engagement_agreement]` (`service.py:43`). `get_client_operational_signals` returns the subset of these not yet present for the client (`service.py:249-255`).
 - **List endpoints.** By default exclude soft-deleted documents and superseded versions (`superseded_by IS NULL`).
 
@@ -139,6 +146,7 @@ Registry: `docs/backend/error-codes.md`.
 | `DOCUMENT.FILE_TOO_LARGE` | 422 | File exceeds 10 MB |
 | `DOCUMENT.UPLOAD_FAILED` | 500 | Storage upload failure |
 | `DOCUMENT.VERSION_CONFLICT` | 409 | Concurrent upload of same version |
+| `BINDER.NOT_FOUND` | 404 | Binder not found when listing documents by binder |
 
 ## Known issues
 
