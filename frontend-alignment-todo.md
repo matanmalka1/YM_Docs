@@ -146,21 +146,22 @@ _Frontend gaps vs backend API | June 2026_
 
 ## Section 3 — Frontend Filter Wiring
 
-### F-07 · Binders — wire open-binder filters to the UI
+### F-07 · Binders — complete filters on the binders page ✅ Resolved
 
 **Priority:** Medium
 
-**Backend:** `GET /api/v1/binders/open` supports `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `created_after`, and `created_before`.
+**Backend:** The existing `/binders` page uses `GET /api/v1/binders`, which supports `client_record_id`, `binder_number`, `location_status`, `capacity_status`, `query`, `year`, sorting, and pagination.
 
-**Current state:** `ListOpenBindersParams` and `bindersApi.getOpenBinders` already accept and forward all supported filters. The remaining gap is that the open-binders screen does not expose or send them.
+**Resolution (2026-06-14):** There is no separate open-binders frontend screen. The existing all-binders page remains backed by `GET /api/v1/binders` so handed-over binders and aggregate counters remain available. The page now exposes client, binder-number, location, capacity, and year filters. The redundant general search was removed because it duplicated the client-name and binder-number filters. All filter state is URL-backed and filtering remains server-driven.
 
-**Files:** `frontend/src/features/binders/api/binders.api.ts`, open-binders screen, `BindersFiltersBar`
+`GET /api/v1/binders/open` remains available for operational consumers that specifically need to exclude handed-over binders; it is not used as the data source for the all-binders page.
 
 **AC:**
-- [ ] The open-binders screen exposes the relevant filters and passes them to `bindersApi.getOpenBinders`.
-- [ ] Filter state is stored in the URL so it survives refresh and can be shared.
-- [ ] Filtering is server-driven; no in-memory filtering remains for fields sent to the endpoint.
-- [ ] TypeScript compiles with no errors.
+
+- [x] The binders page exposes client, binder-number, location, capacity, and year filters.
+- [x] Filter state is stored in the URL so it survives refresh and can be shared.
+- [x] Filtering is server-driven through `bindersApi.list`; no in-memory filtering duplicates endpoint parameters.
+- [x] TypeScript compiles with no errors.
 
 ---
 
@@ -191,12 +192,14 @@ _Frontend gaps vs backend API | June 2026_
 
 **Current state:** `VatClientWorkItemsParams` and `vatReportsApi.listByClient` already accept and forward all supported filters. `VatClientSummaryPanel` currently uses the summary endpoint, and no client work-item table consumes `listByClient`.
 
+**Decision (2026-06-14):** No table needed. `VatClientSummaryPanel` already shows year-grouped period cards (status, dates, amounts, link to report detail) — sufficient for the client page. Status/assignment/due-date filtering for a single client is low-value; cross-client filtering is already covered by the global `/tax/vat` work items page. `listByClient` remains unused for now; revisit only if a concrete client-page filtering need arises.
+
 **AC:**
-- [ ] Determine whether the client screen needs a filterable VAT work-item table or whether the summary panel is sufficient.
-- [ ] If no table is needed, document the decision and close this item without a UI change.
-- [ ] If a table is needed, wire its filters to `vatReportsApi.listByClient` and store filter state in the URL.
-- [ ] Filtering is server-driven; no in-memory filtering duplicates the endpoint parameters.
-- [ ] TypeScript compiles with no errors if UI changes are made.
+- [x] Determine whether the client screen needs a filterable VAT work-item table or whether the summary panel is sufficient.
+- [x] If no table is needed, document the decision and close this item without a UI change.
+- [ ] ~~If a table is needed, wire its filters to `vatReportsApi.listByClient` and store filter state in the URL.~~ (N/A — no table)
+- [ ] ~~Filtering is server-driven; no in-memory filtering duplicates the endpoint parameters.~~ (N/A)
+- [x] TypeScript compiles with no errors if UI changes are made. (no UI changes made)
 
 ---
 
