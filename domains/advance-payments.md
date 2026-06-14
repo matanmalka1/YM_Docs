@@ -14,7 +14,7 @@ The advance-payments domain manages periodic tax prepayments (מקדמות מס 
 
 The expected amount formula is: `turnover_amount × advance_rate / 100 = calculated_amount`. An optional `override_amount` replaces `expected_amount` when set.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-06-14.
 
 ## Endpoints
 
@@ -29,8 +29,8 @@ All paths confirmed present in `backend/openapi.json`.
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments/kpi` | Annual KPI aggregates for a client |
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments/prefill-turnover` | Look up VAT-report turnover for prefilling a new payment |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/generate` | Generate full-year schedule for a client (ADVISOR only) |
-| `GET` | `/api/v1/advance-payments/overview` | Cross-client overview (paginated; filter by year, month, status, etc.) |
-| `GET` | `/api/v1/advance-payments/overview/batches` | Month-batch summaries for the overview grouping |
+| `GET` | `/api/v1/advance-payments/overview` | Cross-client overview (paginated; filter by year, month, status, exact `client_record_id`, legacy fuzzy `client_search`, etc.) |
+| `GET` | `/api/v1/advance-payments/overview/batches` | Month-batch summaries for the overview grouping; supports exact `client_record_id` |
 | `GET` | `/api/v1/annual-reports/{report_id}/advances-summary` | Advances summary scoped to an annual report (owned by annual_reports domain) |
 | `GET` | `/api/v1/reports/advance-payments` | Reporting export (owned by reports domain) |
 
@@ -114,6 +114,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **due_date_effective requires reason:** If `due_date_effective ≠ due_date_original`, `due_date_override_reason` must be non-empty. Enforced on insert and update. (`models/due_date_snapshot_events.py:16-21`)
 - **due_date_effective is overdue source of truth:** All overdue checks, badges, and reminders must use `due_date_effective`. Using `due_date_original` or `TaxCalendarEntry.due_date` is a bug. (INV-05)
 - **anchor = client_record_id:** Workflow objects link to `ClientRecord`, never directly to `LegalEntity`. Joins to `LegalEntity` always go through `ClientRecord`. (INV per `domain_decisions_v3.md` §1)
+- **Selected-client overview filters are exact:** The overview and overview batch endpoints accept `client_record_id` for exact `ClientRecord` matching. `client_search` remains a legacy fuzzy text filter for name, ID number, and office-client-number search.
 - **Schedule generation:** `generate_annual_schedule` skips periods where `entry.due_date < reference_date` (default today) and skips periods that already have an active payment. (`advance_payment_service.py:269-287`)
 
 **Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):

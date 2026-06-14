@@ -35,3 +35,12 @@ Source of truth: mandatory
   checkpoint when shared helpers, shared UI, routing, auth, or cross-feature behavior changed.
 - If frontend test coverage or required browser tooling is missing for an area, report that honestly
   instead of inventing test results.
+
+## Browser tooling in IDE sessions
+
+- When Codex runs from an IDE session, the in-app Browser may be listed as available but still have no
+  active browser instance. If connecting reports that the in-app Browser is unavailable, report that
+  limitation and do not claim browser QA was completed.
+- Use the Chrome plugin from IDE sessions only after verifying that its browser connection works. If
+  Chrome is installed and the Codex Chrome Extension is enabled but the plugin still cannot connect,
+  report the Chrome connection failure instead of treating Chrome as the verified browser path.

@@ -35,6 +35,7 @@ Each captured the old `backend/app/<domain>/README.md` (or equivalent legacy spe
 ### Historical TODOs and planning docs
 
 - `annual-reports-todo.md` — historical annual-reports task list. Current annual-report behavior: `docs/domains/annual-reports.md`; live backlog: `docs/api-todo.md`.
+- `frontend-alignment-todo.md` — historical frontend/backend alignment task list. Archived after remaining items were resolved or no longer active. Current frontend rules: `docs/frontend/*`; current backend/API backlog: `docs/api-todo.md`.
 - `migration-phases.md` — historical backend domain migration execution plan (structural migration complete). Replaced by `docs/project/backend-module-map.md` (package inventory) and `docs/domains/*` (canonical behavior).
 
 ### Historical generated scans / gap analyses

@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The VAT domain manages period-based VAT work items for a `ClientRecord`: material intake, invoice data entry, review, filing, audit history, client summaries, and VAT exports. The implemented aggregate is `VatWorkItem`, with `VatInvoice` rows as source documents and `VatAuditLog` rows as append-only workflow history.
 
-Last verified against code + backend/openapi.json: 2026-06-13.
+Last verified against code + backend/openapi.json: 2026-06-14.
 
 ## Endpoints
 
@@ -31,14 +31,14 @@ All paths listed below exist in `backend/openapi.json`.
 | `POST` | `/api/v1/vat/work-items/{item_id}/ready-for-review` | Move data entry to review |
 | `POST` | `/api/v1/vat/work-items/{item_id}/send-back` | Advisor sends a reviewed item back for correction |
 | `POST` | `/api/v1/vat/work-items/{item_id}/file` | Advisor files the VAT return |
-| `GET` | `/api/v1/vat/work-items/groups` | List grouped work-item summaries |
-| `GET` | `/api/v1/vat/work-items/groups/{group_key}/items` | List items (thin `VatWorkItemListItem`) in a grouped due-date bucket |
+| `GET` | `/api/v1/vat/work-items/groups` | List grouped work-item summaries; selected-client filters use exact `client_record_id`, while `client_name` remains a free-text legacy filter |
+| `GET` | `/api/v1/vat/work-items/groups/{group_key}/items` | List items (thin `VatWorkItemListItem`) in a grouped due-date bucket; selected-client filters use exact `client_record_id`, while `client_name` remains a free-text legacy filter |
 | `GET` | `/api/v1/vat/work-items/lookup` | Look up one item by `client_record_id` and `period` |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/period-options` | Return valid period options for a client |
-| `GET` | `/api/v1/vat/work-items/status-summary` | Count work items by status |
+| `GET` | `/api/v1/vat/work-items/status-summary` | Count work items by status; selected-client filters use exact `client_record_id`, while `client_name` remains a free-text legacy filter |
 | `GET` | `/api/v1/vat/work-items/{item_id}` | Get one enriched work item (full `VatWorkItemResponse`) |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items (thin `VatWorkItemListItem`); paginated (default `page_size=200`), filterable by `year`, `period`, `status`, `assigned_to`, `due_after`/`due_before` (date, vs `due_date_effective`). Ordered by `period desc, id desc` |
-| `GET` | `/api/v1/vat/work-items` | List work items across clients (thin `VatWorkItemListItem`) |
+| `GET` | `/api/v1/vat/work-items` | List work items across clients (thin `VatWorkItemListItem`); supports exact `client_record_id` and legacy fuzzy `client_name` filters |
 | `GET` | `/api/v1/vat/work-items/{item_id}/audit` | Get audit trail for a work item |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/summary` | Get client-level VAT period and annual aggregates |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/export` | Export a client's VAT data as Excel or PDF |
@@ -89,6 +89,7 @@ Other VAT enums:
 ## Domain rules & invariants
 
 - Work items are anchored to `client_record_id`, not directly to `legal_entity_id`. The service resolves the active client and legal entity through `VatClientContextService`. Cite: `backend/app/vat/services/intake.py:62-70`.
+- Page-level selected-client filters use `client_record_id` for exact `ClientRecord` matching on list, grouped, group-items, and status-summary endpoints. `client_name` is retained only as a free-text/fuzzy API filter.
 - Closed or frozen clients cannot create new VAT work items. Cite: `backend/app/vat/services/intake.py:65-68`.
 - Effective VAT frequency is derived from legal entity type and `vat_reporting_frequency`: `OSEK_PATUR` and `EMPLOYEE` resolve to `exempt`; otherwise the configured VAT frequency is used, falling back to `monthly`. Cite: `backend/app/vat/services/vat_type_resolver.py:6-18`.
 - Exempt clients cannot create periodic VAT work items. Bi-monthly clients cannot create work items for even start months. Cite: `backend/app/vat/services/intake.py:36-48`.

@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Search
 
 The search domain exposes one role-gated unified endpoint that composes client, binder, and permanent-document lookups into a single response. It is an orchestration layer over other domains' repositories and does not own persisted tables of its own.
-Last verified against code + backend/openapi.json: 2026-06-12.
+Last verified against code + backend/openapi.json: 2026-06-14.
 
 ## Endpoints
 
@@ -27,7 +27,7 @@ This domain has no `backend/app/search/models/` package and no search-owned pers
 
 The domain-owned response projections are:
 
-- `SearchResult` (`backend/app/search/schemas/search.py:4-14`): `result_type` (non-null `str`), `client_id` (non-null `int`), `office_client_number` (`int | None`), `client_name` (non-null `str`), `id_number` (`str | None`), `client_status` (`str | None`), `binder_id` (`int | None`), `binder_number` (`str | None`).
+- `SearchResult` (`backend/app/search/schemas/search.py:4-14`): `result_type` (non-null `str`), `client_record_id` (non-null `int`), `office_client_number` (`int | None`), `client_name` (non-null `str`), `id_number` (`str | None`), `client_status` (`str | None`), `binder_id` (`int | None`), `binder_number` (`str | None`).
 - `DocumentSearchResult` (`backend/app/search/schemas/search.py:17-28`): `id` (non-null `int`), `client_record_id` (non-null `int`), `office_client_number` (`int | None`), `client_name` (non-null `str`), `business_id` (`int | None`), `business_name` (`str | None`), `document_type` (non-null `str`), `original_filename` (`str | None`), `tax_year` (`int | None`).
 - `SearchResponse` (`backend/app/search/schemas/search.py:31-38`): `results` (non-null list), `documents` (non-null list with default empty list), `page` (non-null `int`), `page_size` (non-null `int`), `total` (non-null `int`).
 
@@ -45,13 +45,13 @@ Returned `SearchResult.result_type` values are `client` and `binder`, as emitted
 ## Domain rules & invariants
 
 - Access is router-gated to `ADVISOR` and `SECRETARY` via `require_role(...)` (`backend/app/search/api/search.py:11-15`).
-- The endpoint accepts optional filters `search`, `client_id`, `id_number`, `binder_number`, `client_status`, `entity_type`, `binder_location_status`, `binder_capacity_status`, `filename`, plus paginated `page>=1` and `1<=page_size<=100` (`backend/app/search/api/search.py:18-32`).
+- The endpoint accepts optional filters `search`, `client_record_id`, `id_number`, `binder_number`, `client_status`, `entity_type`, `binder_location_status`, `binder_capacity_status`, `filename`, plus paginated `page>=1` and `1<=page_size<=100` (`backend/app/search/api/search.py:18-32`).
 - `search` is the only broad/free-text parameter. It matches client identity fields through `ClientRecordRepository.search(...)`, including legal/client name and ID number, and it also drives binder-number and permanent-document text matching where relevant.
-- `client_id` scopes results to an exact client record. For `search + client_id`, permanent-document matches use the client-scoped document query and do not return documents belonging to other clients.
+- `client_record_id` scopes results to an exact client record. For `search + client_record_id`, permanent-document matches use the client-scoped document query and do not return documents belonging to other clients.
 - Document matches are produced whenever either `search` or `filename` is present; otherwise `documents` is an empty list (`backend/app/search/services/search_service.py:50-58`).
 - If there is at least one client-side filter and no binder-side filter, search uses `ClientRecordRepository.search(...)` with DB-level pagination and returns only `client` rows in `results` (`backend/app/search/services/search_service.py:55-95`).
 - Any binder-side search path is assembled in memory, then paginated after result construction; the service hard-limits mixed-mode client fetches to `500` and binder fetches to `1000` (`backend/app/search/services/search_service.py:13-17,97-173`).
-- In binder mode, `search` is reused as a binder-number filter only when `binder_number` is absent and neither `client_id` nor `id_number` is provided (`backend/app/search/services/search_service.py:131-142`).
+- In binder mode, `search` is reused as a binder-number filter only when `binder_number` is absent and neither `client_record_id` nor `id_number` is provided (`backend/app/search/services/search_service.py:131-142`).
 - Active-binder enrichment for client rows comes from `map_active_by_clients(...)`, which returns only binders that are `in_office`, `open`, and not soft-deleted (`backend/app/search/services/search_service.py:71-72`; `backend/app/binders/repositories/binder_repository.py:501-525`).
 - Binder result rows come from `list_active(...)`, which excludes handed-over binders unless `binder_location_status == handed_over`, filters by optional location/capacity/binder number, and paginates before returning (`backend/app/search/services/search_service.py:131-141`; `backend/app/binders/repositories/binder_repository.py:156-205`).
 - Document search is capped at `50` results, searches filename-only when `filename` is present without `search`, otherwise searches `original_filename` or `document_type`, and returns only non-deleted, non-superseded documents (`backend/app/search/services/document_search_service.py:10,21-49`; `backend/app/documents/permanent_documents/repositories/permanent_document_repository.py:158-185`).

@@ -5,38 +5,7 @@ _Frontend gaps vs backend API | June 2026_
 
 ---
 
-## Section 1 — Missing Features (entire domain or capability absent from frontend)
 
-### F-01 · Reminders domain — entirely missing from frontend
-
-**Priority:** High
-
-**Backend:** `GET /api/v1/reminders/`, `POST /api/v1/reminders/`, `GET /api/v1/reminders/{id}`, `POST /api/v1/reminders/{id}/cancel`
-
-**Gap:** No `src/features/reminders/` directory exists. No API client, no React Query hooks, no UI wiring. The backend has a fully operational reminders domain; the frontend has zero integration.
-
-**AC:**
-- [ ] `frontend/src/features/reminders/api/endpoints.ts` defines all 4 endpoint paths (`/api/v1/reminders/`, `/api/v1/reminders/{id}`, `/api/v1/reminders/{id}/cancel`).
-- [ ] `frontend/src/features/reminders/api/contracts.ts` defines:
-  - `ReminderResponse { id, client_record_id, business_id?, contact_id?, action_type, remind_at, note?, status, created_by, created_at, updated_at }`
-  - `CreateReminderPayload { client_record_id, business_id?, contact_id?, action_type, remind_at, note? }`
-  - `ReminderListResponse` = `PaginatedResponse<ReminderResponse>`
-  - `ReminderStatus` enum: `scheduled | fired | canceled`
-  - `ReminderActionType` enum: snake_case values matching backend (e.g. `create_task`, `send_message`, etc.)
-- [ ] `frontend/src/features/reminders/api/reminders.api.ts` exports `remindersApi` with:
-  - `list(params: { page?, page_size? }): Promise<ReminderListResponse>`
-  - `getById(id: number): Promise<ReminderResponse>`
-  - `create(payload: CreateReminderPayload): Promise<ReminderResponse>`
-  - `cancel(id: number): Promise<ReminderResponse>`
-- [ ] React Query hooks exist in `frontend/src/features/reminders/hooks/`:
-  - `useReminders(params)` — query key includes params; calls `remindersApi.list`
-  - `useReminder(id)` — calls `remindersApi.getById`
-  - `useCreateReminder()` — mutation; invalidates list on success
-  - `useCancelReminder()` — mutation; invalidates list and detail on success
-- [ ] `ReminderActionType` values are snake_case in both the TS enum and the API requests (backend uses snake_case per item #68 in api-todo.md).
-- [ ] TypeScript compiles with no errors after adding the feature (no `any` escape hatches).
-
----
 
 ## Section 2 — API Contract Mismatches
 
@@ -88,11 +57,11 @@ _Frontend gaps vs backend API | June 2026_
 
 **Backend:** `DELETE /api/v1/vat/work-items/{item_id}` — soft delete; returns 204. Only non-filed items can be deleted; filed items return `400 VAT.FILED_IMMUTABLE`.
 
-**Current state (2026-06-13):** The API method is implemented. No delete UI consumes it yet, so an exported mutation hook is intentionally not shipped as dead code.
+**Resolution (2026-06-14):** `useDeleteWorkItem` mutation hook added in `useVatInvoiceMutations.ts`; consumed by `VatWorkItemRowActions` (work items list/groups). Delete option shown for advisor/secretary roles on non-filed items, with `ConfirmDialog`, success/error toasts, and `invalidateVatWorkItem` cache invalidation on success.
 
 **AC:**
 - [x] `vatReportsApi.deleteWorkItem(id: number): Promise<void>` is added, calling `DELETE /api/v1/vat/work-items/{id}`.
-- [ ] Add the mutation hook together with the first delete UI consumer, including confirmation, pending/error feedback, and targeted cache removal/invalidation.
+- [x] Add the mutation hook together with the first delete UI consumer, including confirmation, pending/error feedback, and targeted cache removal/invalidation.
 - [x] TypeScript compiles with no errors.
 
 ---

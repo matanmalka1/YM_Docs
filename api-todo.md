@@ -199,6 +199,39 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 **AC:**
 - [ ] שינוי שם ל-`/reports/annual-report-status` (או דומה)
 
+
+## Section 1 — Missing Features (entire domain or capability absent from frontend)
+
+### F-01 · Reminders domain — entirely missing from frontend
+
+**Priority:** High
+
+**Backend:** `GET /api/v1/reminders/`, `POST /api/v1/reminders/`, `GET /api/v1/reminders/{id}`, `POST /api/v1/reminders/{id}/cancel`
+
+**Gap:** No `src/features/reminders/` directory exists. No API client, no React Query hooks, no UI wiring. The backend has a fully operational reminders domain; the frontend has zero integration.
+
+**AC:**
+- [ ] `frontend/src/features/reminders/api/endpoints.ts` defines all 4 endpoint paths (`/api/v1/reminders/`, `/api/v1/reminders/{id}`, `/api/v1/reminders/{id}/cancel`).
+- [ ] `frontend/src/features/reminders/api/contracts.ts` defines:
+  - `ReminderResponse { id, client_record_id, business_id?, contact_id?, action_type, remind_at, note?, status, created_by, created_at, updated_at }`
+  - `CreateReminderPayload { client_record_id, business_id?, contact_id?, action_type, remind_at, note? }`
+  - `ReminderListResponse` = `PaginatedResponse<ReminderResponse>`
+  - `ReminderStatus` enum: `scheduled | fired | canceled`
+  - `ReminderActionType` enum: snake_case values matching backend (e.g. `create_task`, `send_message`, etc.)
+- [ ] `frontend/src/features/reminders/api/reminders.api.ts` exports `remindersApi` with:
+  - `list(params: { page?, page_size? }): Promise<ReminderListResponse>`
+  - `getById(id: number): Promise<ReminderResponse>`
+  - `create(payload: CreateReminderPayload): Promise<ReminderResponse>`
+  - `cancel(id: number): Promise<ReminderResponse>`
+- [ ] React Query hooks exist in `frontend/src/features/reminders/hooks/`:
+  - `useReminders(params)` — query key includes params; calls `remindersApi.list`
+  - `useReminder(id)` — calls `remindersApi.getById`
+  - `useCreateReminder()` — mutation; invalidates list on success
+  - `useCancelReminder()` — mutation; invalidates list and detail on success
+- [ ] `ReminderActionType` values are snake_case in both the TS enum and the API requests (backend uses snake_case per item #68 in api-todo.md).
+- [ ] TypeScript compiles with no errors after adding the feature (no `any` escape hatches).
+
+---
 ## בוצע כבר - חוזה API רוחבי
 
 ### Response Envelopes / Errors
