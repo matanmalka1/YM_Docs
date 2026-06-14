@@ -53,31 +53,32 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 #### 79. 🔍 VAT invoice — שני מזהים שונים לאותה שורת חשבונית
 **בעיה:** ב-`VatInvoiceTable`/`VatInvoiceRow`, ה-`aria-label` של row actions משתמש ב-id מספרי פנימי (למשל "פעולות לחשבונית 2828"), בעוד עמודת "מספר" מציגה מזהה אוטומטי-מיוצר בפורמט `income-2026-05-dc05380c`. שני מזהים שונים לאותה רשומה.
 **AC:**
-- [ ] בירור: מה ה-id שצריך להיות user-facing ("מספר") — ה-id המספרי הפנימי, ה-slug המיוצר, או שדה נפרד (מספר חשבונית אמיתי שהמשתמש מזין)?
-- [ ] להחליט ולתעד; לעדכן `VatInvoiceRow`/`VatInvoiceEditRow` בהתאם.
+- [x] בירור: `invoice_number` הוא מספר החשבונית האמיתי שהמשתמש מזין; `id` הוא פנימי בלבד; slug auto-generated הוא fallback טכני כשלא הוזן מספר.
+- [x] `VatInvoiceRow` מציג `invoice_number` אמיתי, מציג "לא צוין" עבור fallback טכני, ו-`aria-label` משתמש באותו label user-facing.
 
 #### 80. VAT invoice edit row — שדה מזהה פנימי נראה editable
 **בעיה:** ב-`VatInvoiceEditRow`, שדה ה-id/מספר הפנימי מוצג כ-input editable במצב inline-edit, בעוד שמדובר ב-identifier שלא אמור להיות ניתן לשינוי על ידי המשתמש.
 **AC:**
-- [ ] לוודא אם השדה אכן נשלח ב-`VatInvoiceUpdateRequest` ומשפיע על משהו; אם לא — להפוך לקריא-בלבד ב-edit row.
-- [ ] תלוי בהחלטה ב-#79.
+- [x] אומת: `invoice_number` נשלח ב-`VatInvoiceUpdateRequest` ומשפיע על המספר העסקי, ולכן נשאר editable.
+- [x] אם הערך הנוכחי הוא fallback טכני auto-generated, `VatInvoiceEditRow` פותח את השדה ריק כדי לא להציג מזהה מערכת כערך שהמשתמש אמור לערוך.
 
 #### 81. VAT invoice row actions menu — toggle לא עקבי + scroll-to-top
 **בעיה:** לחיצה חזרתית על כפתור "..." (row actions, `VatInvoiceRow`) פותחת/סוגרת את התפריט באופן לא עקבי, ובנוסף מאפסת את מיקום ה-scroll של העמוד לראש.
 **AC:**
-- [ ] לאתר את מקור ה-scroll-to-top (לרוב `focus()`/`scrollIntoView` לא מכוון, או re-render שמזיז את ה-DOM tree מעל נקודת ה-scroll).
-- [ ] לתקן כך שפתיחה/סגירה של תפריט row actions לא תזיז את מיקום הגלילה.
+- [x] מקור סביר אותר ב-focus restore של shared `RowActions` ללא `preventScroll`.
+- [x] `RowActions` מחזיר focus ל-trigger עם `preventScroll` ומונע default click behavior ב-toggle.
 
 #### 82. VAT status badge — חשד ל-staleness לאחר "אישור קבלת חומרים"
 **בעיה:** חשד (לא reproduced בוודאות) ש-badge הסטטוס בראש העמוד לא מתעדכן מיידית לאחר `markMaterialsComplete`, אף שה-toast מציג הצלחה.
 **AC:**
-- [ ] לשחזר באופן יציב: לבדוק אם `invalidateVatWorkItem` (ב-`useVatWorkItemActions`) מכסה את כל ה-query keys שמזינים את ה-badge (כולל list/grouped views אם פתוחים בטאב אחר).
-- [ ] אם reproduced — לתקן את ה-invalidation; אם לא — לסגור כ-not-reproduced.
+- [x] נבדק: detail/list/group/client queries כבר היו מכוסים; `status-summary` לא היה מכוסה.
+- [x] נוסף `statusSummaryRoot` ל-query keys ונוסף invalidation ממוקד ב-`invalidateVatWorkItem`.
 
 #### 83. VAT invoice — מחיקת רשומה מ-row menu ללא guard נוסף מעבר ל-confirm
 **בעיה:** פעולת מחיקת חשבונית (`VatInvoiceTable` → `ConfirmDialog`) מוגנת רק ע"י דיאלוג confirm גנרי ("פעולה זו אינה הפיכה"). אין guard נוסף (לדוגמה: אם החשבונית כבר חלק מחישוב מע"מ שהוגש).
 **AC:**
-- [ ] בירור 🔍: האם יש מקרה (work item `filed`/`canceled`) שבו מחיקת חשבונית אמורה להיות חסומה ב-API/UI ולא רק ב-confirm? אם `canAddInvoice`/`available_actions` כבר חוסם edit במצב הזה — לתעד שזה מספיק ולסגור.
+- [x] בירור: backend חוסם invoice mutation ב-`filed` דרך `VAT.FILED_IMMUTABLE`; `available_actions` לא מחזיר `add_invoice` עבור `filed` או `canceled`.
+- [x] UI משתמש ב-`available_actions` כמקור האמת דרך `canMutateVatInvoices(available_actions)`; confirm נשאר כאשר המחיקה מותרת.
 
 ### Charges
 
@@ -93,23 +94,14 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Notifications
 
-#### 6. `PATCH /api/v1/notifications/{notification_id}` — mark read/unread
-**בעיה:** אין endpoint לסימון notification כנקרא. ה-UI כנראה עוקף את זה בצד הלקוח.
-**AC:**
-- [ ] מאפשר עדכון סטטוס קריאה
-- [ ] מחזיר ה-notification מעודכן + `404` אם לא קיים
+#### 6. `PATCH /api/v1/notifications/{notification_id}` — לא למימוש
+**החלטת מוצר:** Notifications הן רשומות היסטוריית תקשורת יוצאת ללקוח (`sent`/`failed`/`skipped`/`pending`) ולא inbox פנימי למשתמשי המערכת. אין מצב קריאה (`read`/`unread`) ואין צורך ב-endpoint לסימון נקרא/לא נקרא.
 
-#### 7. `POST /api/v1/notifications/mark-all-read`
-**בעיה:** אין סימון גורף.
-**AC:**
-- [ ] מסמן את כל ה-notifications של המשתמש כנקראו
-- [ ] מחזיר מספר הפריטים שעודכנו
+#### 7. `POST /api/v1/notifications/mark-all-read` — לא למימוש
+**החלטת מוצר:** לא נדרש סימון גורף כנקרא, כי הדומיין לא מנהל סטטוס קריאה להתראות.
 
-#### 8. `DELETE /api/v1/notifications/{notification_id}` — dismiss
-**בעיה:** אין הסרה/dismiss.
-**AC:**
-- [ ] מסיר notification מהתצוגה
-- [ ] מחזיר `204` + `404` אם לא קיים
+#### 8. `DELETE /api/v1/notifications/{notification_id}` — לא למימוש
+**החלטת מוצר:** לא מוסיפים dismiss/delete להתראות, כי הרשומות משמשות audit trail של ניסיונות שליחה ותוכן שנשלח/נכשל. הסרה מהתצוגה רלוונטית רק אם יתווסף בעתיד Notification Center אישי, ואז צריך לפתוח החלטת מוצר נפרדת ולא למחוק את היסטוריית השליחה.
 
 ### Reminders
 
