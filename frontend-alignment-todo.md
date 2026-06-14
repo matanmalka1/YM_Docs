@@ -40,33 +40,24 @@ _Frontend gaps vs backend API | June 2026_
 
 ## Section 2 — API Contract Mismatches
 
-### F-02 · Binders — `markReadyForHandover` and `markReadyForHandoverBulk` wrong return type
+### F-02 · Binders — `markReadyForHandover` and `markReadyForHandoverBulk` wrong return type — ✅ DONE (2026-06-14)
 
 **Priority:** High
 
-**Backend:**
-- `POST /api/v1/binders/{id}/mark-ready-for-handover` → `BinderReadyForHandoverResponse { binder: BinderResponse, notification: NotificationResponse | null }`
-- `POST /api/v1/binders/bulk-mark-ready-for-handover` → `{ results: BinderReadyForHandoverResponse[] }`
+**Backend (actual, per `backend/app/binders/api/binders_receive_return.py`):**
+- `POST /api/v1/binders/{id}/mark-ready-for-handover` → `response_model=BinderReadyForHandoverResponse { binder: BinderResponse, notification: NotificationResponse | null }`
+- `POST /api/v1/binders/mark-ready-for-handover-bulk` → `response_model=list[BinderReadyForHandoverResponse]` (bare array, not `{ results: [...] }` — the `{results}` wrapper described above does not exist in backend; superseded by actual OpenAPI schema)
 
-**Gap:** Frontend declares both as returning `BinderResponse` / `BinderResponse[]`. The `notification` field is silently dropped, so any caller that needs to display or act on the notification emitted by the backend cannot.
+**Gap (resolved):** Frontend now declares both correctly via `contracts.ts`'s `BinderReadyForHandoverResponse` and `BinderMarkReadyForHandoverBulkResponse = BinderReadyForHandoverResponse[]`.
 
-**File:** `frontend/src/features/binders/api/binders.api.ts` lines 57–65, `frontend/src/features/binders/api/contracts.ts`
+**File:** `frontend/src/features/binders/api/binders.api.ts`, `frontend/src/features/binders/api/contracts.ts`
 
 **AC:**
-- [ ] `contracts.ts` adds:
-  ```ts
-  export interface BinderReadyForHandoverResponse {
-    binder: BinderResponse
-    notification: NotificationResponse | null
-  }
-  export interface BinderMarkReadyForHandoverBulkResponse {
-    results: BinderReadyForHandoverResponse[]
-  }
-  ```
-- [ ] `bindersApi.markReadyForHandover(binderId)` return type changes from `Promise<BinderResponse>` to `Promise<BinderReadyForHandoverResponse>`.
-- [ ] `bindersApi.markReadyForHandoverBulk(payload)` return type changes from `Promise<BinderResponse[]>` to `Promise<BinderMarkReadyForHandoverBulkResponse>`.
-- [ ] Any existing callers of these two methods are updated to use `result.binder` where they previously used the result directly as `BinderResponse`.
-- [ ] TypeScript compiles with no errors; no `as any` casts added.
+- [x] `contracts.ts` defines `BinderReadyForHandoverResponse { binder, notification }` and `BinderMarkReadyForHandoverBulkResponse` as `BinderReadyForHandoverResponse[]` (matches actual backend array response, not the `{results}` shape).
+- [x] `bindersApi.markReadyForHandover(binderId)` returns `Promise<BinderReadyForHandoverResponse>`.
+- [x] `bindersApi.markReadyForHandoverBulk(payload)` returns `Promise<BinderMarkReadyForHandoverBulkResponse>`.
+- [x] Existing callers updated (bulk success message uses `response.length`).
+- [x] `tsc --noEmit` clean; no `as any` casts added.
 
 ---
 
