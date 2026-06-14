@@ -39,6 +39,46 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 #### 56. VAT CREATE רק global, לא per-client — לא נדרש עכשיו
 **החלטת מוצר:** `POST /api/v1/vat/clients/{client_record_id}/work-items` הוא עקביות API בלבד ולא צורך מוצרי כרגע. לא לממש אלא אם code review עתידי מוכיח צורך אמיתי.
 
+#### 78. 🔍 VAT audit log `created_at` של `filed` לא תואם את `filed_at`
+**בעיה:** נמצא ב-UI audit פרונט (יוני 2026, client 100004): ה-History tab מציג entry `filed` עם `created_at`=28/05/2026, בזמן ש-`VatWorkItemResponse.filed_at` (ומוצג ב-banner ירוק + ב-list column "הוגש ב") הוא 02/05/2026. הצלבה מול עמודת "עדכון אחרון" ברשימת תיקי המע"מ מראה ש-28/05/2026 הוא תאריך **עדכון מאוחר יותר**, לא תאריך ההגשה בפועל.
+**חשש:** entry `filed` ב-audit log נכתב/מתעדכן ב-sync או עדכון מאוחר יותר, ולא ב-`created_at` המקורי של רגע ההגשה. זה data-integrity issue בטבלת audit, לא bug תצוגה — לכן לא תוקן בפרונט (לא רוצים להחביא אותו עם פורמט/מיפוי תצוגה).
+**AC:**
+- [ ] בירור: מאיפה נוצר ה-`filed` audit entry, ולמה `created_at` שלו מאוחר מ-`filed_at` בפועל?
+- [ ] לאחר הבירור: לתקן את כתיבת ה-audit entry כך ש-`created_at`=`filed_at` בזמן ההגשה, **או** להוסיף לפרונט אפשרות להציג `filed_at` במקום `created_at` עבור entry מסוג `filed` (רק אם מוחלט שה-audit log לא ניתן/לא רצוי לתיקון).
+
+### VAT — Frontend UX Audit Findings (יוני 2026)
+
+> פריטים 79–83 הם ממצאי audit UI/UX בפרונט (`/tax/vat/{id}`), לא API gaps — מתועדים כאן כדי לא ללכת לאיבוד. חלקם תלויים בבירור backend/data.
+
+#### 79. 🔍 VAT invoice — שני מזהים שונים לאותה שורת חשבונית
+**בעיה:** ב-`VatInvoiceTable`/`VatInvoiceRow`, ה-`aria-label` של row actions משתמש ב-id מספרי פנימי (למשל "פעולות לחשבונית 2828"), בעוד עמודת "מספר" מציגה מזהה אוטומטי-מיוצר בפורמט `income-2026-05-dc05380c`. שני מזהים שונים לאותה רשומה.
+**AC:**
+- [ ] בירור: מה ה-id שצריך להיות user-facing ("מספר") — ה-id המספרי הפנימי, ה-slug המיוצר, או שדה נפרד (מספר חשבונית אמיתי שהמשתמש מזין)?
+- [ ] להחליט ולתעד; לעדכן `VatInvoiceRow`/`VatInvoiceEditRow` בהתאם.
+
+#### 80. VAT invoice edit row — שדה מזהה פנימי נראה editable
+**בעיה:** ב-`VatInvoiceEditRow`, שדה ה-id/מספר הפנימי מוצג כ-input editable במצב inline-edit, בעוד שמדובר ב-identifier שלא אמור להיות ניתן לשינוי על ידי המשתמש.
+**AC:**
+- [ ] לוודא אם השדה אכן נשלח ב-`VatInvoiceUpdateRequest` ומשפיע על משהו; אם לא — להפוך לקריא-בלבד ב-edit row.
+- [ ] תלוי בהחלטה ב-#79.
+
+#### 81. VAT invoice row actions menu — toggle לא עקבי + scroll-to-top
+**בעיה:** לחיצה חזרתית על כפתור "..." (row actions, `VatInvoiceRow`) פותחת/סוגרת את התפריט באופן לא עקבי, ובנוסף מאפסת את מיקום ה-scroll של העמוד לראש.
+**AC:**
+- [ ] לאתר את מקור ה-scroll-to-top (לרוב `focus()`/`scrollIntoView` לא מכוון, או re-render שמזיז את ה-DOM tree מעל נקודת ה-scroll).
+- [ ] לתקן כך שפתיחה/סגירה של תפריט row actions לא תזיז את מיקום הגלילה.
+
+#### 82. VAT status badge — חשד ל-staleness לאחר "אישור קבלת חומרים"
+**בעיה:** חשד (לא reproduced בוודאות) ש-badge הסטטוס בראש העמוד לא מתעדכן מיידית לאחר `markMaterialsComplete`, אף שה-toast מציג הצלחה.
+**AC:**
+- [ ] לשחזר באופן יציב: לבדוק אם `invalidateVatWorkItem` (ב-`useVatWorkItemActions`) מכסה את כל ה-query keys שמזינים את ה-badge (כולל list/grouped views אם פתוחים בטאב אחר).
+- [ ] אם reproduced — לתקן את ה-invalidation; אם לא — לסגור כ-not-reproduced.
+
+#### 83. VAT invoice — מחיקת רשומה מ-row menu ללא guard נוסף מעבר ל-confirm
+**בעיה:** פעולת מחיקת חשבונית (`VatInvoiceTable` → `ConfirmDialog`) מוגנת רק ע"י דיאלוג confirm גנרי ("פעולה זו אינה הפיכה"). אין guard נוסף (לדוגמה: אם החשבונית כבר חלק מחישוב מע"מ שהוגש).
+**AC:**
+- [ ] בירור 🔍: האם יש מקרה (work item `filed`/`canceled`) שבו מחיקת חשבונית אמורה להיות חסומה ב-API/UI ולא רק ב-confirm? אם `canAddInvoice`/`available_actions` כבר חוסם edit במצב הזה — לתעד שזה מספיק ולסגור.
+
 ### Charges
 
 #### 5. `PATCH /api/v1/charges/{charge_id}`

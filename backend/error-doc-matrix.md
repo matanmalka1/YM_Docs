@@ -62,6 +62,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | method path | 400 | 409 | 500 |
 |---|---|---|---|
 | POST /vat/work-items | ✓ | ✓ | |
+| PATCH /vat/work-items/{id} | ✓ | | |
+| DELETE /vat/work-items/{id} | ✓ | | |
 | POST /vat/work-items/{id}/invoices | ✓ | ✓ | |
 | PATCH /vat/work-items/{id}/invoices/{invoice_id} | ✓ | ✓ | |
 | DELETE /vat/work-items/{id}/invoices/{invoice_id} | ✓ | | |
