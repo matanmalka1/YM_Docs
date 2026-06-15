@@ -131,7 +131,7 @@ export function ClientsPage() {
 - Modal open state → local state (unless product requires deep-linkable modals).
 - Selected drawer/row id → URL param only if the product requires a shareable link.
 - Never duplicate a URL param into local state as a shadow copy.
-- `useSearchParamFilters` is the standard hook for URL filter sync.
+- `useSearchParamFilters` is the standard hook for URL filter sync. Use its `setFilter` / `setFilters` / `resetFilters` / `setPage` helpers for all writes, and `getParam(key)` / `getPage()` for reads. Never hand-roll `new URLSearchParams(searchParams)` mutations inline.
 
 ---
 

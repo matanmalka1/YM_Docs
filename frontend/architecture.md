@@ -168,6 +168,8 @@ optimization.
 - Pages may read route params and perform route-level guards, but API loading and product logic belong
   in the page hook or feature widget.
 - Query-string state must use the shared URL-state helpers and preserve unrelated parameters.
+- Use `useSearchParamFilters` for all URL filter/sort/page state. Never hand-roll `new URLSearchParams(searchParams)` + mutate + `setSearchParams` inline — use `setFilter`, `setFilters`, `resetFilters`, or `setPage` instead.
+- Read string params via `getParam(key)` (returns `''` when absent). Read the page param via `getPage()`. Do not inline `searchParams.get(key) ?? ''` or `parsePositiveInt(searchParams.get('page'), 1)` at each callsite.
 
 ## Verification
 
