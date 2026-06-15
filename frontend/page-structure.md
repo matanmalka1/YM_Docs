@@ -132,6 +132,10 @@ export function ClientsPage() {
 - Selected drawer/row id → URL param only if the product requires a shareable link.
 - Never duplicate a URL param into local state as a shadow copy.
 - `useSearchParamFilters` is the standard hook for URL filter sync. Use its `setFilter` / `setFilters` / `resetFilters` / `setPage` helpers for all writes, and `getParam(key)` / `getPage()` for reads. Never hand-roll `new URLSearchParams(searchParams)` mutations inline.
+- URL params and `<select>` values are external strings. Enum-backed filters must parse them with a
+  feature-owned guard/parser before assigning typed state or building API params. Invalid enum values
+  should normalize to the presentation sentinel (`''`) or omission (`undefined`/`null`), not be cast
+  with `as SomeEnum`.
 
 ---
 

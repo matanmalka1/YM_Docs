@@ -53,6 +53,11 @@ This document defines frontend ownership and dependency boundaries. Page composi
   an appropriate top-level owner instead.
 - Architecture exceptions must be narrow, documented beside the import, and removed rather than
   normalized. `arch-check-disable` is not a routine escape hatch.
+- If importing through a feature barrel would create or preserve a circular dependency, prefer first
+  to move the shared contract to an appropriate owner. If the shared surface is too narrow to move,
+  a direct import of that feature's exact contract/constant file is allowed only with a local
+  `no-restricted-imports` suppression that explains the barrel cycle. Do not use this exception to
+  deep-import hooks, components, or mutable feature behavior.
 
 ## UI composition
 
