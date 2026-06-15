@@ -64,6 +64,9 @@ This document defines frontend ownership and dependency boundaries. Page composi
 - Conditional `className` composition must use the shared `cn()` helper from `src/utils/utils.ts`; that helper intentionally wraps `clsx` with `tailwind-merge`, so `clsx` is a direct frontend dependency.
 - Reuse primitives from `src/components/ui/` and layout components from `src/components/layout/`
   before adding a new local equivalent.
+- Feature-owned status badge variant maps must stay with the owning feature constants. Direct badge
+  variant lookups must use `makeVariantGetter` from `src/utils/labels.ts`, while `StatusBadge`
+  callers may pass the feature-owned `variantMap` because the primitive applies the same fallback.
 - Feature components receive data and callbacks through props. Data fetching and mutations belong in
   feature hooks, except for a feature-level widget whose documented responsibility includes loading
   its own resource.
