@@ -139,7 +139,7 @@ Source: `backend/app/signature_requests/models/signature_request.py:24`, `servic
 
 Source: `backend/app/signature_requests/services/`
 
-1. **`client_record_id` always required.** Every request must belong to a client record. Checked at creation; raises `CLIENT_RECORD.NOT_FOUND` if missing. (`create_request.py:57-59`)
+1. **`client_record_id` always required.** Every request must belong to a client record. Checked at creation via `get_client_or_raise`; raises `CLIENT_RECORD.NOT_FOUND` if missing. (`create_request.py:57`)
 
 2. **`business_id` ownership validated on create.** When `business_id` is provided, it must belong to the `legal_entity_id` of the client record. Delegates to `assert_business_belongs_to_legal_entity`. (`create_request.py:62-68`)
 
@@ -191,6 +191,7 @@ No open known issues.
 
 ## Resolved issues
 
+- **SignatureRequests-001** (2026-06-15): `signature_request_service.py:list_by_client_record` called `ClientRecordRepository` inline. Replaced with `get_client_or_raise`; removed unused `NotFoundError` import. No error-code change (was already `CLIENT_RECORD.NOT_FOUND`).
 - **F-029** (2026-06-05): Detail lookup raised the generic `not_found` code via raw `HTTPException`. Fixed: now raises `SIGNATURE_REQUEST.NOT_FOUND` through `NotFoundError`.
 - **F-030** (2026-06-05): Cancellation route was bare and used an unscoped lookup. Fixed: `POST /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel` with locked client-and-request-scoped pending lookup.
 - **F-031** (2026-06-05): Closed as stale; reported orphaned bytecode absent; `__pycache__/` is ignored.

@@ -126,8 +126,7 @@ Registry: `docs/backend/error-codes.md`.
 
 | Code | Raised when |
 |------|-------------|
-| `CHARGE.CLIENT_NOT_FOUND` | `_validate_charge_scope` cannot find the client record while validating scope (`backend/app/charges/services/billing_service.py:45-50`) |
-| `CHARGE.CLIENT_RECORD_NOT_FOUND` | `create_charge` cannot find the client record before active/scope checks (`backend/app/charges/services/billing_service.py:69-74`) |
+| `CLIENT_RECORD.NOT_FOUND` | `_validate_charge_scope` or `create_charge` cannot find the client record (`backend/app/charges/services/billing_service.py`) |
 | `CHARGE.AMOUNT_INVALID` | Amount is zero/negative in the service layer (`backend/app/charges/services/billing_service.py:67-68`) |
 | `CHARGE.NOT_FOUND` | Requested charge id does not exist for get/issue/pay/cancel/delete (`backend/app/charges/services/billing_service.py:101-102`, `127-128`, `158-159`, `186-187`, `199-201`) |
 | `CHARGE.INVALID_STATUS` | Status transition or delete is not allowed from the current state (`backend/app/charges/services/billing_service.py:104-107`, `130-133`, `160-161`, `189-191`) |
@@ -142,6 +141,7 @@ No open known issues.
 
 ## Resolved issues
 
+- **Charges-001** (2026-06-15): `billing_service.py` raised `CHARGE.CLIENT_NOT_FOUND` and `CHARGE.CLIENT_RECORD_NOT_FOUND` (domain-prefixed codes) for a missing client record — both non-standard and inconsistent with the `CLIENT_RECORD` namespace. Replaced both with `CLIENT_RECORD.NOT_FOUND` via `get_client_or_raise`; removed the now-dead `CLIENT_NOT_FOUND` constant from `charges/services/messages.py`.
 - **F-013** (2026-06-05): List `stats` did not respect most list filters. Fixed: `stats_by_status()` now accepts and applies `business_id`, `period`, `issued_after`, and `issued_before` in addition to `client_record_id` and `charge_type`. `list_charges_paginated()` threads all active filters through.
 - **F-014** (2026-06-05): OpenAPI advertised `X-Idempotency-Key` as optional on bulk action, but runtime rejected missing keys. Fixed: `require_idempotency_key` header parameter changed from `str | None` with `default=None` to required `str`. FastAPI now generates `required: true` and returns 422 for missing header.
 

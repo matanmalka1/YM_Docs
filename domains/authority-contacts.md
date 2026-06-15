@@ -60,7 +60,7 @@ Source: `backend/app/authority_contacts/models/authority_contact.py:48–72`.
 
 ## Domain rules & invariants
 
-- **Client-record existence check on create/list.** `add_contact` and `list_client_contacts` validate the `client_record_id` via `ClientRecordRepository.get_by_id`; raise `CLIENT.NOT_FOUND` if missing. Source: `backend/app/authority_contacts/services/authority_contact_service.py:32–33, 69–70`.
+- **Client-record existence check on create/list.** `add_contact` and `list_client_contacts` validate the `client_record_id` via `get_client_or_raise`; raise `CLIENT_RECORD.NOT_FOUND` if missing. Source: `backend/app/authority_contacts/services/authority_contact_service.py:32, 69`.
 - **Soft delete, never hard delete.** `delete_contact` sets `deleted_at` + `deleted_by`; the row is preserved for audit. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:81–96`.
 - **Deleted rows excluded from all reads.** `_base_where` always includes `deleted_at IS NULL`; `BaseRepository.get_by_id` also applies this filter. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:41–47`, `backend/app/common/repositories/base_repository.py:17–20`.
 - **List ordered newest-first.** `list_by_client_record` orders by `created_at DESC`. Source: `backend/app/authority_contacts/repositories/authority_contact_repository.py:57–63`.
@@ -71,7 +71,7 @@ Source: `backend/app/authority_contacts/models/authority_contact.py:48–72`.
 
 | Code | Trigger |
 |------|---------|
-| `CLIENT.NOT_FOUND` | `client_record_id` does not exist (create, list) |
+| `CLIENT_RECORD.NOT_FOUND` | `client_record_id` does not exist (create, list) |
 | `AUTHORITY_CONTACT.NOT_FOUND` | `contact_id` not found or already soft-deleted (get, update, delete) |
 
 Registry: `docs/backend/error-codes.md`.
@@ -81,6 +81,10 @@ Registry: `docs/backend/error-codes.md`.
 No open known issues.
 
 ## Resolved issues
+
+### AuthorityContacts-001 (2026-06-15) — `CLIENT.NOT_FOUND` → `CLIENT_RECORD.NOT_FOUND`
+
+`add_contact` and `list_client_contacts` called `ClientRecordRepository.get_by_id` inline and raised `CLIENT.NOT_FOUND`. Replaced with `get_client_or_raise` → now raises `CLIENT_RECORD.NOT_FOUND`, consistent with the canonical client-lookup contract.
 
 ### F-022 — IDOR on GET, PATCH, DELETE contact endpoints
 

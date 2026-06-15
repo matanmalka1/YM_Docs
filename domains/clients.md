@@ -221,6 +221,7 @@ Registry: `docs/backend/error-codes.md`.
 | Code | Raised when |
 |------|-------------|
 | `CLIENT.NOT_FOUND` | `client_id` does not exist or is already deleted (`client_lifecycle_service.py:27`) |
+| `CLIENT_RECORD.NOT_FOUND` | `client_id` not found via the cross-domain guard `get_client_or_raise` (`client_service.py:9`) — raised by all downstream services that validate client existence before operating |
 | `CLIENT.CONFLICT` | `id_number` already belongs to an active client (`create_client_service.py:163`) |
 | `CLIENT.DELETED_EXISTS` | `id_number` belongs to a soft-deleted client (`create_client_service.py:168`) |
 | `CLIENT.NOT_DELETED` | Restore called on a client that is not deleted (`client_lifecycle_service.py:36`) |
@@ -230,6 +231,10 @@ Registry: `docs/backend/error-codes.md`.
 ## Known issues
 
 None found during authoring.
+
+## Resolved issues
+
+- **Clients-001** (2026-06-15): 17+ services across `businesses`, `charges`, `tasks`, `signature_requests`, `authority_contacts`, and `clients` each reinvented the client-existence check inline, using inconsistent error codes (`CLIENT.NOT_FOUND`, `CLIENT_RECORD.NOT_FOUND`, `CHARGE.CLIENT_NOT_FOUND`, `CHARGE.CLIENT_RECORD_NOT_FOUND`, `BUSINESS.NOT_FOUND`). Standardized: all sites now call `get_client_or_raise` (`client_service.py:9`) which raises `CLIENT_RECORD.NOT_FOUND`. The canonical function's own code was also updated from `CLIENT.NOT_FOUND` to `CLIENT_RECORD.NOT_FOUND`.
 
 ## Decisions (preserved)
 

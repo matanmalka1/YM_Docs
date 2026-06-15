@@ -108,10 +108,10 @@ These five domains also own the `client_record_id` backfill: when a task is link
 ## Domain rules & invariants — client scoping
 
 - `client_record_id` is populated automatically when a task is created with a supported source link. If the request also supplies `client_record_id` explicitly, the service validates the two are consistent (same client); a mismatch raises `TASK.CLIENT_SOURCE_MISMATCH` (`backend/app/tasks/services/task_service.py`).
-- A task created without a source link but with an explicit `client_record_id` is validated: the client must exist, or `CLIENT.NOT_FOUND` is raised.
+- A task created without a source link but with an explicit `client_record_id` is validated: the client must exist, or `CLIENT_RECORD.NOT_FOUND` is raised.
 - When a task's source is changed via PATCH, `client_record_id` is recomputed from the new source (source authoritative).
 - When a task's source is cleared via PATCH (`source_domain=null, source_id=null`), `client_record_id` is preserved (the task becomes a manual client-scoped task). `client_record_id` is not directly patchable; scope only changes through source updates or at creation time.
-- `GET /api/v1/clients/{client_record_id}/tasks` only returns tasks where `Task.client_record_id` matches the path parameter (direct column match — no source joins). The client must exist (`CLIENT.NOT_FOUND` on unknown id).
+- `GET /api/v1/clients/{client_record_id}/tasks` only returns tasks where `Task.client_record_id` matches the path parameter (direct column match — no source joins). The client must exist (`CLIENT_RECORD.NOT_FOUND` on unknown id).
 
 ## Domain rules & invariants — bulk operations
 
@@ -133,7 +133,7 @@ Registry: `docs/backend/error-codes.md`.
 | `TASK.INVALID_SOURCE` | Source link is partial or uses an unsupported source domain (`backend/app/tasks/services/task_service.py`) |
 | `TASK.INVALID_ASSIGNEE` | Bulk assign target user not found or inactive (whole-request 404) (`backend/app/tasks/services/task_service.py`) |
 | `TASK.CLIENT_SOURCE_MISMATCH` | Source record belongs to a different client than the explicitly provided `client_record_id` (`backend/app/tasks/services/task_service.py`) |
-| `CLIENT.NOT_FOUND` | Provided `client_record_id` does not exist when creating/updating a task or listing client tasks (`backend/app/tasks/services/task_service.py`) |
+| `CLIENT_RECORD.NOT_FOUND` | Provided `client_record_id` does not exist when creating/updating a task or listing client tasks (`backend/app/tasks/services/task_service.py`) |
 
 ## Known issues
 
@@ -141,6 +141,7 @@ No open known issues.
 
 ## Resolved issues
 
+- **Tasks-001** (2026-06-15): `task_service.py:_validate_client_exists` called `ClientRecordRepository` inline and raised `CLIENT.NOT_FOUND`. Replaced with `get_client_or_raise` → now raises `CLIENT_RECORD.NOT_FOUND`.
 - **F-012** (2026-06-05): `GET /api/v1/tasks` accepted `assigned_role` and `source_domain` as plain strings, so invalid values bypassed validation and silently returned empty results. Fixed: route filters now use `UserRole` and `WorkQueueSourceType` (`backend/app/tasks/api/routes.py:32-33`), and the service accepts those typed values (`backend/app/tasks/services/task_service.py:51-52`).
 
 ## Decisions (preserved)

@@ -83,7 +83,7 @@ BusinessStatus(str, Enum):
 Sources: `backend/app/businesses/services/business_service.py`, `business_guards.py`, `business_lifecycle_service.py`.
 
 **Create:**
-- Client (`client_record_id`) must exist; missing → `CLIENT.NOT_FOUND` (`business_service.py:62`).
+- Client (`client_record_id`) must exist; missing → `CLIENT_RECORD.NOT_FOUND` (`business_service.py:61`).
 - If the legal entity already has at least one non-deleted business and **all** of them are `closed`, creating a new business is blocked → `BUSINESS.CLIENT_ALL_CLOSED` (`business_service.py:67–71`). This prevents silently re-opening a fully-closed client.
 - `business_name` must be unique (case-insensitive, trimmed) among existing non-deleted businesses of the same legal entity → `BUSINESS.NAME_CONFLICT` (`business_service.py:73–84`). Also enforced at DB level by the partial unique index.
 - Generic DB integrity error on create → `BUSINESS.CONFLICT` (`business_service.py:94–98`).
@@ -143,8 +143,7 @@ Registry: `docs/backend/error-codes.md`.
 | `BUSINESS.CLOSED` | 403 | downstream guard: record creation on closed business |
 | `BUSINESS.FROZEN` | 403 | downstream guard: record creation on frozen business |
 | `BUSINESS.INVALID_STATUS` | 400 | unrecognised status value on update |
-| `CLIENT.NOT_FOUND` | 404 | client_id not found during create/update |
-| `CLIENT_RECORD.NOT_FOUND` | 404 | raised by status-card service |
+| `CLIENT_RECORD.NOT_FOUND` | 404 | client_id not found during create/list/update or status-card lookup |
 
 Error envelope follows global format (`app/core/exceptions.py`): `error.code`, `error.message`, `error.details`, `error.request_id`.
 See `docs/architecture/api-contracts.md` for envelope spec.
@@ -156,6 +155,7 @@ No open known issues.
 ## Resolved issues
 
 - **F-006** (2026-06-04): `constants.py` imported `EntityType` from `models/business.py`, which did not define it. Fixed: the module imports `EntityType` from `app.common.enums`.
+- **Businesses-002** (2026-06-15): `business_service.py` and `client_business_service.py` raised `CLIENT.NOT_FOUND` / `BUSINESS.NOT_FOUND` (wrong code) for a missing client. Standardized: all client-not-found checks in `business_service.py`, `client_business_service.py`, and `status_card_service.py` now call `get_client_or_raise` and raise `CLIENT_RECORD.NOT_FOUND`.
 - **Businesses-001** (2026-06-05): `backend/app/businesses/README.md` listed `business_repository_read.py` and `business_update_service.py` as source files, but neither existed. README has since been rewritten as a pointer-only file — stale references are gone.
 
 ## Decisions (preserved)
