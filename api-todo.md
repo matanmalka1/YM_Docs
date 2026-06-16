@@ -149,15 +149,14 @@ _מבוסס על gap analysis מ-OpenAPI spec | יוני 2026_
 
 ### Tasks
 
-#### 19. `GET /api/v1/clients/{client_record_id}/tasks`
-**בעיה:** אין שליפת משימות לפי לקוח — חובה לסנן ידנית.
+#### 19. `GET /api/v1/clients/{client_record_id}/tasks` ✅ בוצע
 **AC:**
-- [ ] מחזיר משימות מסוננות ל-client_record_id, עם pagination אחיד
+- [x] מחזיר משימות מסוננות ל-client_record_id, עם pagination אחיד
 
-#### 32–33. Bulk operations ל-tasks
+#### 32–33. Bulk operations ל-tasks ✅ בוצע
 **AC:**
-- [ ] `POST /tasks/bulk-complete` — השלמה מרובה
-- [ ] `POST /tasks/bulk-assign` — שיוך מחדש מרובה
+- [x] `POST /tasks/bulk-complete` — השלמה מרובה
+- [x] `POST /tasks/bulk-assign` — שיוך מחדש מרובה
 
 ### Binders
 
