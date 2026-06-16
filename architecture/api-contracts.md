@@ -25,7 +25,7 @@ Source of truth: mandatory
 - Path parameters that represent database IDs must reject non-positive values at the routing/schema layer and publish `minimum: 1` in OpenAPI. Non-ID integer path parameters should use an equivalent positive bound only when semantically correct, such as a positive tax year.
 - Standard list endpoints must support `page`, `page_size`, `sort_by`, and `order`.
 - Standard paginated list endpoints should default to `page=1` and `page_size=20`, with page size capped at 200 unless an owning contract says otherwise.
-- New list endpoints must not introduce aliases such as `limit`, `offset`, `per_page`, `sort_dir`, or `order_by`.
+- New list endpoints must not introduce aliases such as `limit`, `offset`, `per_page`, `sort_dir`, `sort_order`, or `order_by`.
 - Existing list endpoints that still use aliases such as `sort_dir` or `sort_order` should migrate callers to `order` and then remove the old names.
 - Filters must be query parameters with stable `snake_case` names.
 - List filters should be scalar query parameters unless the endpoint explicitly needs repeated query parameters, such as exclusion lists.

@@ -386,7 +386,7 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 **החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
 **AC:**
 - [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
-- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות.
+- [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות; `order` מתועד ב-OpenAPI דרך schema משותף `SortOrder`.
 - [x] ה-frontend מעודכן (clients types/contracts/hooks/filters; binders כבר שלח `order`).
 
 #### 45. POST מחזיר 200 במקום 201 ✅ בוצע
