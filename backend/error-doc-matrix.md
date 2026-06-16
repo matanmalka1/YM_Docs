@@ -22,7 +22,7 @@ Statuses are documented by two mechanisms — do not duplicate:
 
 - **`401` and `403` — mostly injected globally in `app/core/openapi.py` (`build_openapi`)**:
   - `401`: every non-public operation (public set = `app/core/public_endpoints.py`, 11 ops).
-  - `403`: every operation whose route has a `require_role(...)` dependency (detected by walking `route.dependant` and checking the dependency callable's `__requires_role__` marker). **186 of 201 ops are role-gated.**
+  - `403`: every operation whose route has a `require_role(...)` dependency (detected by walking `route.dependant` and checking the dependency callable's `__requires_role__` marker). **194 of 209 ops are role-gated.**
   - The non-public ops WITHOUT detected `require_role` are `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, `GET /api/v1/reminders/{reminder_id}`, and `POST /api/v1/reminders/{reminder_id}/cancel`.
   - `GET /api/v1/reminders/{reminder_id}` and `POST /api/v1/reminders/{reminder_id}/cancel` document per-route `forbidden_response()` because they are authenticated but not role-gated.
 - **`400`, `404`, `409`, `500` — documented per-route** via the `responses=` helpers in `app/core/openapi_responses.py`:
@@ -42,7 +42,12 @@ Statuses are documented by two mechanisms — do not duplicate:
 
 ## 500 policy
 
-Document `500` **only** at `permanent_document_service.py:178` (`AppError("DOCUMENT.UPLOAD_FAILED", status_code=500)`), reachable from `POST /documents/upload` and `PUT /documents/client/{id}/{document_id}/replace`.
+Document `500` only when it is intentionally present in the route's OpenAPI `responses=` contract. Current 500 documentation is:
+
+- `DOCUMENT.UPLOAD_FAILED`, reachable from `POST /documents/upload` and `PUT /documents/client/{id}/{document_id}/replace`.
+- `POST /charges`, via `CHARGE_CREATE_RESPONSES`.
+
+Drift note: `POST /charges` documents `500`, but no explicit `AppError(..., status_code=500)` raise site was found in the charge service during the 2026-06-16 sweep. Keep the row while OpenAPI and `test_error_doc_coverage_matrix.py` expect it; remove it from the route, test, and matrix together if it is not a desired contract.
 
 **Intentionally NOT documented as 500** (environment/optional-dependency `ImportError` guards, not a business contract): `GET /clients/export`, `GET /clients/template` (`clients_excel.py:40,59`), `GET /reports/aging/export` (`reports_export_service.py:39,44`). The generic `SQLAlchemyError`/`Exception` → 500 handler is global and is not documented per-endpoint.
 
@@ -53,10 +58,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 ### charges (reference impl — already complete)
 | method path | 400 | 409 | 500 |
 |---|---|---|---|
-| POST /charges | ✓ | | |
+| POST /charges | ✓ | | ✓ |
 | POST /charges/{id}/cancel | ✓ | ✓ | |
-| POST /charges/{id}/issue | ✓ | ✓ | |
-| POST /charges/{id}/mark-paid | ✓ | ✓ | |
 
 ### vat (conflict: intake.py, data_entry_invoice*.py; 400: data_entry_*, filing, intake, period_options)
 | method path | 400 | 409 | 500 |
@@ -98,10 +101,13 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | POST /annual-reports/{id}/deadline | ✓ | | |
 | POST /annual-reports/{id}/expenses | ✓ | | |
 | PATCH /annual-reports/{id}/expenses/{line_id} | ✓ | | |
+| DELETE /annual-reports/{id}/expenses/{line_id} | ✓ | | |
 | POST /annual-reports/{id}/income | ✓ | | |
 | PATCH /annual-reports/{id}/income/{line_id} | ✓ | | |
+| DELETE /annual-reports/{id}/income/{line_id} | ✓ | | |
 | POST /annual-reports/{id}/annex/{schedule} | ✓ | | |
 | PATCH /annual-reports/{id}/annex/{schedule}/{line_id} | ✓ | | |
+| DELETE /annual-reports/{id}/annex/{schedule}/{line_id} | ✓ | | |
 | POST /annual-reports/{id}/schedules | ✓ | | |
 | POST /annual-reports/{id}/schedules/complete | ✓ | | |
 | POST /annual-reports/{id}/tax-calculation/save | ✓ | | |
@@ -110,11 +116,11 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 ### clients (409: create/lifecycle/guards; 400: create)
 | method path | 400 | 409 | 500 |
 |---|---|---|---|
+| POST /clients/preview-impact | ✓ | | |
 | POST /clients | ✓ | ✓ | |
 | PATCH /clients/{id} | ✓ | ✓ | |
 | DELETE /clients/{id} | | ✓ | |
 | POST /clients/{id}/restore | | ✓ | |
-| POST /clients/import | ✓ | | |
 
 ### businesses (409: business_service/lifecycle; 400: business_service)
 | method path | 400 | 409 | 500 |

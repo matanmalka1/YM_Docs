@@ -13,7 +13,8 @@ Source of truth: reference
 This file is non-normative. The binding error-envelope and `error.code` rules live in `docs/architecture/api-contracts.md`. The authoritative list of codes is the `ErrorCode` enum in `backend/app/core/error_codes.py`; the `AppError` base classes live in `backend/app/core/exceptions.py`. List every code with:
 
 ```bash
-python -c "from app.core.error_codes import ErrorCode; [print(e.value) for e in ErrorCode]"
+cd backend
+APP_ENV=test JWT_SECRET=x ./.venv/bin/python -c "from app.core.error_codes import ErrorCode; [print(e.value) for e in ErrorCode]"
 ```
 
 ## Code registry
@@ -94,6 +95,13 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 |------|------|-------------|
 | `ANNUAL_REPORT.AUDIT_ACTOR_REQUIRED` | 400 | VAT auto-populate service call omitted the actor id required for financial mutation audit |
 | `ANNUAL_REPORT.SIGNER_NAME_MISSING` | 400 | `→ PENDING_CLIENT`: neither `Person.full_name` nor `LegalEntity.official_name` is populated for the client |
+
+### `CLIENT_RECORD` codes (selected)
+
+| Code | HTTP | When raised |
+|------|------|-------------|
+| `CLIENT_RECORD.NOT_FOUND` | 404 | Client record is missing or soft-deleted when a client-scoped service validates its anchor |
+| `CLIENT_RECORD.CLOSED` | 409 | A downstream mutation is attempted for a frozen or closed client record |
 
 ---
 

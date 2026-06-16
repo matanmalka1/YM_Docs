@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Annual Reports
 
 The annual reports domain manages Israeli annual income-tax report work items per client record and tax year, including lifecycle status, statutory form/profile metadata, required schedules, annex data, income/expense lines, tax calculation, readiness checks, client approval, PDF export, and client/year season views.
-Last verified against code + backend/openapi.json: 2026-06-14 for PDF export and positive path-parameter OpenAPI docs; full-domain verification remains 2026-06-04.
+Last verified against code + live OpenAPI schema: 2026-06-16 for financial-line mutation guards, typed error codes, and documented body-driven error statuses; full-domain verification remains 2026-06-04.
 
 ## Endpoints
 
@@ -123,7 +123,7 @@ Source: `backend/app/annual_reports/services/constants.py:24`.
 - List endpoints (`GET /annual-reports`, `/overdue`, season and client report lists) return the thin `AnnualReportListItem` row DTO (identity, status, deadlines, and the persisted outcome amounts only); they intentionally omit detail/calculation/action/transition fields. Only `GET /annual-reports/{id}` returns the full `AnnualReportDetailResponse`. See `backend/app/annual_reports/services/base.py` (`_to_list_items`).
 - Tax calculation is read-only. It uses financial summary, detail deductions/credits, credit-point rows/default resident points, income-tax engine, national-insurance engine, VAT net balance, and paid advances. `tax_after_credits` is the computed tax before advances; `final_balance = tax_after_credits - advances_paid` (negative = refund expected). Public tax calculation amounts, rates, bracket rates, and credit-point totals are serialized as `ApiDecimal` strings; frontend code parses them only for display/math. See `backend/app/annual_reports/services/tax_service.py`.
 - Persisting a tax calculation rejects requests with both `tax_due` and `refund_due`. See `backend/app/annual_reports/services/tax_service.py`.
-- Income and expense line create/update/delete are financial mutations. A missing or soft-deleted related `ClientRecord` raises `CLIENT_RECORD.NOT_FOUND`; closed/frozen clients must not create, update, or delete annual-report income/expense lines. Successful manual income/expense mutations clear saved `tax_due` and `refund_due` while the report is still pre-submission (`not_started`, `collecting_docs`, `in_preparation`, or `pending_client`). See `backend/app/annual_reports/services/financial_line_helpers.py:55` and `backend/app/annual_reports/services/financial_line_service.py`.
+- Income and expense line create/update/delete are financial mutations. A missing or soft-deleted related `ClientRecord` raises `CLIENT_RECORD.NOT_FOUND`; a frozen or closed client raises `CLIENT_RECORD.CLOSED` before creating, updating, or deleting annual-report income/expense lines. Successful manual income/expense mutations clear saved `tax_due` and `refund_due` while the report is still pre-submission (`not_started`, `collecting_docs`, `in_preparation`, or `pending_client`). See `backend/app/annual_reports/services/financial_line_helpers.py:55`, `backend/app/clients/guards/client_record_guards.py`, and `backend/app/annual_reports/services/financial_line_service.py`.
 - Income/expense source/category values are validated against enum values; audit entries are written for manual line mutations. See `backend/app/annual_reports/services/financial_line_service.py`.
 - VAT auto-populate is a financial mutation and follows the same mutation rules as manual income/expense line changes. It requires a concrete actor id so audit cannot be silently skipped, raises `CLIENT_RECORD.NOT_FOUND` when the related `ClientRecord` is missing or soft-deleted, and is blocked for closed/frozen clients, including `force=True`; it writes audit records for created income lines, created expense lines, and deleted/replaced lines when `force=True`. Created-line audit payloads mark `source=vat_import`; force-replacement delete payloads mark `mutation_source=vat_import` and `mutation_reason=force_replace`. See `backend/app/annual_reports/services/vat_import_service.py:145`.
 - VAT auto-populate is allowed only in `not_started`, `collecting_docs`, and `in_preparation`; existing income/expense lines cause `ANNUAL_REPORT.LINES_ALREADY_EXIST` unless `force=True`; import aggregates VAT by `client_record_id` and `tax_year`, maps VAT categories to annual expense categories, and writes lines only for positive generated totals. See `backend/app/annual_reports/services/vat_import_service.py:51`.
@@ -155,9 +155,10 @@ The annual reports namespace is registered as `ANNUAL_REPORT` in `docs/backend/e
 - `ANNUAL_REPORT.AUDIT_ACTOR_REQUIRED`
 - `ANNUAL_REPORT.SIGNER_NAME_MISSING`
 
-Related code raised from this module but owned by another namespace:
+Related codes raised from this module but owned by another namespace:
 
 - `CLIENT_RECORD.NOT_FOUND` when a related client record is missing or soft-deleted during annual-report signature setup or financial mutation validation.
+- `CLIENT_RECORD.CLOSED` when a financial mutation is attempted for a frozen or closed client record.
 
 Source grep: `backend/app/annual_reports/services/*`.
 
