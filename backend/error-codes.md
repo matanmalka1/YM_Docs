@@ -10,11 +10,17 @@ Source of truth: reference
 
 # Error Codes
 
-This file is non-normative. The binding error-envelope and `error.code` rules live in `docs/architecture/api-contracts.md`. The authoritative list of codes is the backend service code; the `AppError` base classes live in `backend/app/core/exceptions.py`. Find every code in use with:
+This file is non-normative. The binding error-envelope and `error.code` rules live in `docs/architecture/api-contracts.md`. The authoritative list of codes is the `ErrorCode` enum in `backend/app/core/error_codes.py`; the `AppError` base classes live in `backend/app/core/exceptions.py`. List every code with:
 
 ```bash
-grep -rhoE '"[A-Z][A-Z_]+\.[A-Z][A-Z_]+"' --include='*.py' backend | sort -u
+python -c "from app.core.error_codes import ErrorCode; [print(e.value) for e in ErrorCode]"
 ```
+
+## Code registry
+
+Every code is a member of the `ErrorCode(str, Enum)` registry in `backend/app/core/error_codes.py`. `AppError.code` (and its subclasses) is typed to `ErrorCode`, so the code slot cannot hold a typo, a free-form string, or a user-facing message — the message slot stays Hebrew, the code slot stays a registered `DOMAIN.REASON`. Members subclass `str`, so the JSON wire value is the literal `DOMAIN.REASON` string and clients are unaffected.
+
+Adding a code = add the member to `ErrorCode` (grouped under its domain comment) and, for a new namespace, the table below. Do not pass raw strings to `AppError`.
 
 ## Format
 
