@@ -179,6 +179,14 @@ optimization.
 - Use `useSearchParamFilters` for all URL filter/sort/page state. Never hand-roll `new URLSearchParams(searchParams)` + mutate + `setSearchParams` inline — use `setFilter`, `setFilters`, `resetFilters`, or `setPage` instead.
 - Read string params via `getParam(key)` (returns `''` when absent). Read the page param via `getPage()`. Do not inline `searchParams.get(key) ?? ''` or `parsePositiveInt(searchParams.get('page'), 1)` at each callsite.
 
+## Display formatting
+
+- User-facing date/time, currency, and number display must use the shared formatters in `src/utils/utils.ts`. Do not hand-roll `Intl.DateTimeFormat`, `toLocaleDateString`, `toLocaleString`, or inline `date-fns` `format(...)` for display.
+- Date formatters: `formatDate` (`dd/MM/yyyy`), `formatDateTime` (`dd/MM/yyyy HH:mm`), `formatMonthYear` (`MM.yyyy`), `formatAuditTimestamp` (`d MMM yyyy HH:mm`), `formatHebrewDate` (`EEEE, d בMMMM`, takes a `Date`). All string-input formatters are null-safe via `parseISO` + `isValid` and return `'—'` on missing/invalid input; the `he` locale is applied internally.
+- Need a display pattern none of these cover? Add a new named formatter to `src/utils/utils.ts` routed through `formatSafeDate`, rather than inlining `format(...)` at the call site. A pattern used by two or more features must be a shared formatter, not duplicated.
+- A genuinely feature-local pattern (e.g. timeline long-date headings, the dashboard period label) may stay in that feature's `utils.ts`, but must still go through `date-fns` + the `he` locale — never `Intl`/`toLocale*`.
+- `yyyy-MM-dd`/ISO serialization for API payloads, form defaults, and query keys is input-layer, not display. It is exempt from these rules.
+
 ## Verification
 
 - Select verification that matches the changed surface and batch routine checks at a stable
