@@ -61,7 +61,6 @@ Action service modules:
 - `binder_actions.py` — binder action factories.
 - `charge_actions.py` — charge action factories.
 - `vat_report_actions.py` — VAT work-item action factories.
-- `report_deadline_actions.py` — annual-report action factories.
 - `obligation_orchestrator.py` — cross-domain obligation generation used by client creation/update and business creation flows.
 
 Shared builders/schema live in `backend/app/core/`: `action_schemas.py`
