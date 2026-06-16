@@ -70,7 +70,7 @@ Entries are mutable via the PATCH endpoint. The `updated_at` column (nullable) i
 
 Source: `backend/app/communications/services/correspondence_service.py`.
 
-1. **Client record must exist.** Every write and read operation calls `_get_client_record_or_raise` first (`service.py:37-41`). Raises `CLIENT.NOT_FOUND`.
+1. **Client record must exist.** Every write and read operation calls `_get_client_record_or_raise` first (`service.py:37-41`). Raises `CLIENT_RECORD.NOT_FOUND`.
 2. **Entry ownership enforced on every access.** `_get_entry_or_raise` checks `entry.client_record_id == client_record_id` (`service.py:55-63`). Cross-client access returns `CORRESPONDENCE.NOT_FOUND`.
 3. **Business scope validated on create and update.** When `business_id` is provided, `_assert_business_belongs_to_client` verifies the business belongs to the same legal entity as the client record (`service.py:30-35`). Raises `BUSINESS.NOT_FOUND` on mismatch.
 4. **Contact ownership validated on create and update.** When `contact_id` is provided, `_assert_contact_belongs_to_client` checks `contact.client_record_id == client_record_id` (`service.py:43-53`). Raises `CORRESPONDENCE.FORBIDDEN_CONTACT` on mismatch.
@@ -85,7 +85,7 @@ Source: `backend/app/communications/services/correspondence_service.py`.
 |------|-----------|-----------|
 | `CORRESPONDENCE.NOT_FOUND` | service `_get_entry_or_raise` | Entry not found or belongs to a different client |
 | `CORRESPONDENCE.FORBIDDEN_CONTACT` | service `_assert_contact_belongs_to_client` | `contact_id` does not belong to the requested client record |
-| `CLIENT.NOT_FOUND` | service `_get_client_record_or_raise` | `client_record_id` does not exist |
+| `CLIENT_RECORD.NOT_FOUND` | service `_get_client_record_or_raise` | `client_record_id` does not exist |
 | `BUSINESS.NOT_FOUND` | service / `business_guards.assert_business_belongs_to_legal_entity` | `business_id` not found or belongs to a different legal entity |
 
 Error envelope format: `docs/backend/error-codes.md`.

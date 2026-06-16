@@ -93,7 +93,7 @@ Race condition risk if two concurrent requests attempt to freeze the same client
 
 | Condition | Error Code | HTTP |
 |-----------|-----------|------|
-| Client not found | `CLIENT.NOT_FOUND` | 404 |
+| Client not found | `CLIENT_RECORD.NOT_FOUND` | 404 |
 | Entity type change by SECRETARY | `CLIENT.ENTITY_TYPE_CHANGE_FORBIDDEN` | 403 |
 
 ## 11. Derived State

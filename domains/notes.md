@@ -77,7 +77,7 @@ Registry: `docs/backend/error-codes.md`.
 |------|-------------|
 | `NOTE.NOT_FOUND` | Requested note id does not exist, is soft-deleted, or does not belong to the requested `entity_type` + `entity_id` scope (`backend/app/notes/services/entity_note_service.py:29-36,81-82`) |
 | `NOTE.FORBIDDEN` | Caller tries to update a note created by another user (`backend/app/notes/services/entity_note_service.py:77-80`) |
-| `CLIENT.NOT_FOUND` | Business-note routes: client record does not exist (`backend/app/notes/services/business_note_service.py:88`) |
+| `CLIENT_RECORD.NOT_FOUND` | Business-note routes: client record does not exist (`backend/app/notes/services/business_note_service.py:88`) |
 | `BUSINESS.NOT_FOUND` | Business-note routes: business does not exist or does not belong to the client (`backend/app/notes/services/business_note_service.py:82-89`, `backend/app/businesses/services/business_guards.py:37-43`) |
 
 ## Known issues
@@ -87,7 +87,7 @@ No open known issues.
 ## Resolved issues
 
 - **F-017 / Notes-001** (2026-06-05): Client-note routes did not validate client existence. Fixed: `EntityNoteService._assert_client_exists()` now called on all `list_notes` and `add_note` operations for `entity_type="client"`. Source: `backend/app/notes/services/entity_note_service.py:21-23,53,65`.
-- **F-018 / Notes-002** (2026-06-05): Business-note routes raised `BUSINESS.NOT_FOUND` for a missing client record. Fixed: `business_note_service.py:88` now raises `CLIENT.NOT_FOUND` when the client record does not exist.
+- **F-018 / Notes-002** (2026-06-05): Business-note routes raised `BUSINESS.NOT_FOUND` for a missing client record. Fixed: `business_note_service.py:88` now raises `CLIENT_RECORD.NOT_FOUND` when the client record does not exist.
 
 ## Decisions (preserved)
 
