@@ -59,7 +59,6 @@ Action service modules:
 
 - `action_registry.py` — aggregate import surface for domain action factories.
 - `binder_actions.py` — binder action factories.
-- `business_actions.py` — business action factories.
 - `charge_actions.py` — charge action factories.
 - `vat_report_actions.py` — VAT work-item action factories.
 - `report_deadline_actions.py` — annual-report action factories.
