@@ -26,6 +26,7 @@ app/<domain>/
 ```
 
 - Domain `schemas/` modules own Pydantic request and response models.
+- Paginated list response schemas must subclass `app.core.api_types.PaginatedResponse[T]` rather than re-declaring the `items`/`total`/`page`/`page_size` envelope by hand; add only the extra aggregate field (e.g. `summary`) in the subclass.
 - Domain `models/` modules own SQLAlchemy ORM declarations.
 - Domain `api/routers.py` assembles feature routers into the domain router registered by `app/router_registry.py`.
 - Routers must parse requests, apply endpoint-level dependencies, call services, and return responses.
@@ -49,7 +50,9 @@ app/<domain>/
 - Repositories must not raise FastAPI `HTTPException`.
 - Repositories flush after writes but must not commit transactions.
 - `BaseRepository` subclasses must set a class-level `model`.
+- Repositories must not re-implement a `BaseRepository` method (e.g. `get_by_id`, `soft_delete`) when the inherited behavior is identical; override only to add real, differing behavior such as a non-`deleted_at` soft-delete column.
 - List repository methods should return `(items, count)` when pagination metadata is needed.
+- Pagination must use the shared helpers: `BaseRepository.apply_pagination` for SQL `select` statements and `app.core.pagination.paginate_sequence` for already-materialized in-memory lists. Do not hand-write `offset((page - 1) * page_size).limit(...)` or `seq[start:start + page_size]`.
 - Count queries must use the same filters as list queries, without pagination.
 - Repository method naming should use `get_by_id`, `list_by_*`, `list_*_paginated`, `count_*`, `map_*_by_*`, and `soft_delete` consistently.
 - Application query code must use SQLAlchemy ORM/select constructs.
