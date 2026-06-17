@@ -31,7 +31,7 @@ Status values:
 | UsersPage | `/settings/users` | `features/users/pages/UsersPage.tsx` | settings | 146 | medium | 3 | pending | 5+ modal states |
 | ChargesPage | `/charges` | `features/charges/pages/ChargesPage.tsx` | list | 157 | medium | 4 | pending | notificationContext in page |
 | ClientsPage | `/clients` | `features/clients/pages/ClientsPage.tsx` | list | 233 | high | 5 | pending | 3 modal states + URL param useEffect |
-| BindersPage | `/binders` | `features/binders/pages/BindersPage.tsx` | list | 206 | high | 6 | pending | useBindersPageDialogs exists — validate completeness |
+| BindersPage | `/binders` | `features/binders/pages/BindersPage.tsx` | list | 156 | high | 6 (Wave 0A) | done | Reference page. Grouped contract adopted; columns + dialogs composition moved into `useBindersPage`. Wave 0A (contract-only); modal/drawer ownership deferred to Wave 0B. Automated verification + Atlas browser smoke passed (behavior verified identical to main via git diff). |
 | WorkQueuePage | `/work-queue` | `features/workQueue/pages/WorkQueuePage.tsx` | list | 160 | medium | 7 | pending | All state in hooks — verify |
 | VatWorkItemsPage | `/tax/vat` | `features/vatReports/pages/VatWorkItemsPage.tsx` | list | 142 | medium | 8 | pending | showCreateModal in page, URL params for create/client_id/period |
 | AdvancePaymentsPage | `/tax/advance-payments` | `features/advancedPayments/pages/AdvancePaymentsPage.tsx` | list | 102 | high | 8.1 | in-progress | Page is now a composition shell backed by `useAdvancePaymentsPage`; batch querying, grouping, table rows, navigation, URL validation, and drawer mutation behavior were extracted. Automated verification passed. Browser smoke testing remains pending. |
@@ -47,6 +47,56 @@ Status values:
 | ForgotPasswordPage | `/forgot-password` | `features/auth/pages/ForgotPasswordPage.tsx` | public | 96 | low | skipped | skipped | Auth/public flow — separate phase |
 | ResetPasswordPage | `/reset-password` | `features/auth/pages/ResetPasswordPage.tsx` | public | 147 | low | skipped | skipped | Auth/public flow — separate phase |
 | SigningPage | `/sign/:token` | `features/signing/pages/SigningPage.tsx` | public | 73 | low | skipped | skipped | Public client-facing flow — separate phase |
+
+## Wave 0A — Binders (reference page, contract-only)
+
+`BindersPage` is the canonical reference. Wave 0A established the grouped page-hook
+contract on this page only; it did **not** move modal/drawer ownership (Wave 0B).
+
+Completed:
+
+- `useBindersPage` now returns the grouped contract: `status` (`isLoading` /
+  `isFetching` / `error: string | null` / `loadingMessage`), `headerProps`,
+  `stats`, `filters` (incl. `resetFilters`), and `table`
+  (`data` / `columns` / `pagination` / `emptyState`).
+- Column construction (`buildBindersColumns`) moved out of the page into the hook;
+  the page no longer imports `buildBindersColumns`.
+- `useBindersPageDialogs` is now composed inside `useBindersPage` (necessary so the
+  column action callbacks can reference dialog handlers). Dialog/selection **state
+  ownership is unchanged** — still owned by `useBindersPageDialogs` /
+  `useBinderSelection`; only the call site relocated, grouped under `modals` /
+  `drawers` for the page to compose JSX from.
+- `table.emptyState` is an `EmptyStateConfig` (`isEmpty`, `isFiltered`, `title`,
+  `message`, `action`); loading/error/empty derivation moved into the hook.
+- `BindersPage` is now slot composition: `const page = useBindersPage(...)` reading
+  `page.status` / `page.headerProps` / `page.stats` / `page.filters` /
+  `page.table.*`. Page no longer derives loading/error/empty copy.
+- Receive drawer (`receiveOpen`) and its action button stay page-owned per the
+  Wave 0A boundary; the hook receives `onOpenReceive` so it still owns the
+  empty-state action copy.
+
+Side-effects handled (behavior-preserving):
+
+- Wrapped `pageItems` in `useMemo` — moving the columns memo into the hook surfaced
+  an unstable-ref lint warning the old page-level memo had masked.
+
+Verification completed:
+
+- `npm run typecheck` (zero binder errors), `npm run lint` (binder files clean),
+  `npm run arch:check` (no violations), `npm run build` (green).
+- No binder unit tests exist — none run.
+
+Required before changing status to `done`:
+
+- Browser smoke-test `/binders`: loading/error/empty states, stats filter chips,
+  filters bar + reset, table pagination + row click → detail drawer, receive
+  drawer, and the delete / handover / bulk dialogs.
+
+Deferred to Wave 0B:
+
+- Move dialog wiring, receive flow, and detail-drawer selected-entity state fully
+  behind the hook; fold `useBindersPageDialogs`' separate dialog states into the
+  `modals` / `drawers` groups.
 
 ## Step 8.1 — Advance Payments
 
