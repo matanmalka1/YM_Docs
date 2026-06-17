@@ -461,3 +461,116 @@ harness — focused URL-state / create=1 / restore-flow tests were not cheap to 
 (same finding as Waves 1–2) and were not added. Behavior-preserving → diff review
 vs `main`; Atlas smoke of `/clients` strongly recommended (rich empty state +
 deleted-client restore flow break easily).
+
+---
+
+## Wave 4 — WorkQueuePage
+
+Status: **done.** Behavior identical to `main`; automated verification passed.
+`WorkQueuePage` is now pure slot composition (~70 lines, no second hook call,
+no `useEffect`, no `useMemo`, no `buildWorkQueueColumns` import, no `renderEmpty`
+function) — except the one page-composed "משימה חדשה" header button (sanctioned).
+This page is the standard-validator: it already exposed `isFetching` on `main`,
+so getting it cleanly into the grouped contract confirms the shape generalizes.
+
+Files changed:
+- `features/workQueue/hooks/useWorkQueuePage.ts`
+- `features/workQueue/pages/WorkQueuePage.tsx`
+
+Changes:
+1. **Grouped contract.** `useWorkQueuePage` now returns
+   `status` / `headerProps` / `stats` / `filters` / `table` / `modals`. The old
+   flat object (`items`/`summary`/`isLoading`/`isFetching`/`error` + ~10 filter
+   fields + handlers + `page`/`total`/`setPage`) is gone.
+2. **Second-actions hook composed INTO the page hook.** `useWorkQueueActions()`
+   (task-modal / confirm-dialog / mutation state) is now called inside
+   `useWorkQueuePage`, mirroring the Binders precedent (`useBindersPageDialogs`
+   composed inside `useBindersPage`). `useWorkQueueActions` remains the sole owner
+   of task-modal/confirm/mutation **state** — only the call site relocated, so the
+   page consumes ONE `useWorkQueuePage()`. This is the "second-actions hook"
+   resolution.
+3. **Columns into the hook.** `buildWorkQueueColumns` + the `showLinkedTasks` /
+   `showWarnings` derivation (from `items`) moved out of the page into the hook
+   (columns need `activeActionKey` / `runAction` from the now-composed actions);
+   the page no longer imports `buildWorkQueueColumns`.
+4. **Error-toast effect into the hook.** The `useEffect` that fires
+   `toast.error('טעינת העבודה לטיפול נכשלה', { description })` on error change
+   moved into the hook (fires once per `requestError` change). The page owns no
+   effect.
+5. **`status` group.** `{ isLoading, isFetching, error: requestError,
+   loadingMessage: 'טוען משימות...' }`.
+6. **`stats` group (EC-5 preserved).** `{ summary, isLoading: isFetching,
+   summaryError: error, urgencyFilter, onFilter }` — summary cards intentionally
+   use `isFetching` (NOT `isLoading`) and `summaryError = error`; preserved
+   exactly. Spread straight into `WorkQueueSummaryCards`.
+7. **`filters` group.** All ~10 filter fields (`search` / `urgencyFilter` /
+   `typeFilter` / `statusFilter` / `linkedFilter` / `scopeFilter` / `historyMode`
+   / `hasFilters` / `hasContentFilters`) + `onFilterChange` / `onMultiFilterChange`
+   + `resetFilters` (= `clearFilters`, canonical name) + `onClear` (= `clearFilters`,
+   the bar's prop name). Spread straight into `WorkQueueFiltersBar`; the extra
+   `hasContentFilters` / `resetFilters` keys are harmless via JSX spread (no excess
+   check). `onClear` retained so the spread satisfies the bar without renaming the
+   component prop (smallest change).
+8. **`table` group (raw `PaginatedDataTable`).** `{ data, columns, isLoading,
+   isFetching, pagination {page, pageSize: WORK_QUEUE_PAGE_SIZE, total,
+   onPageChange}, label: 'משימות', showPagination: total > 0, stickyHeader: true,
+   emptyState }`. Both `isLoading` + `isFetching` passed (EC-7).
+9. **`modals` group.** Pre-wired `confirmProps` (open/title/message with the
+   `pendingConfirm.action.confirm_title` / `confirm_message` fallbacks, `isLoading:
+   actionMutation.isPending`, onConfirm/onCancel) + `taskModalProps` (null when
+   closed; mode/source/`task: taskDetail.data`/`isLoading: create||update||detail`/
+   onClose/onSubmit) + `openCreateTask`. The page renders `<ConfirmDialog
+   {...modals.confirmProps} />` and `{modals.taskModalProps && <TaskModal
+   {...modals.taskModalProps} />}`.
+
+### `renderEmpty` → `emptyState` decision + outcome
+
+`renderEmpty` (custom `StateCard`, branched on `hasContentFilters` / `historyMode`)
+was converted to an `EmptyStateConfig` computed in the hook (`isEmpty:
+items.length === 0`, `isFiltered: hasContentFilters`, `icon: CheckSquare`, branched
+`variant` / `title` / `message`): filtered → `default` variant / "אין תוצאות" /
+"אין תוצאות שתואמות לסינון"; unfiltered → `illustration` variant / `historyMode ?
+'אין היסטוריה' : 'אין עבודה לטיפול'` / `historyMode ? 'אין משימות היסטוריות
+להצגה.' : 'אין כרגע עבודה לטיפול. כל הדוחות, התשלומים והמשימות הפעילות מסודרים.'`
+The page maps the visual subset (`icon`/`variant`/`title`/`message`) into the
+table's `emptyState` prop (no derivation page-side; mirrors Wave 3 Clients).
+
+**Verified rendering equivalence (no fallback to `table.renderEmpty` needed).**
+`PaginatedDataTable` → `DataTable` renders the empty `StateCard` from `emptyState`
+with the same `icon` / `variant` / `title` / `message` the old `renderEmpty`
+returned, and both paths are gated identically: `renderEmpty` was shown only when
+`isEmpty && !suppressEmpty` (suppressed during background refetch), and the
+`emptyState` path also yields `null` under `suppressEmpty` (= `isFetching &&
+isEmpty`) before reaching `DataTable`. During `isLoading` both paths show the
+skeleton (`isEmpty` is false). The rendered output is identical, so the cleaner
+`emptyState` config was used (no `renderEmpty` passthrough).
+
+Edge cases preserved: EC-1 (350ms `useDebounce` stays in hook), EC-2 (role gating:
+no role → `error: 'לא ניתן לזהות תפקיד משתמש'` + query disabled via `enabled:
+hasRole`), EC-3 (`historyMode` → empty text + `include_task_history`), EC-4 (error
+toast once per error change, now hook-owned), EC-5 (summary cards use `isFetching`
++ `summaryError = error`), EC-6 (columns depend on `showLinkedTasks`/`showWarnings`
++ `activeActionKey`/`runAction`), EC-7 (`label="משימות"`, `showPagination={total >
+0}`, `stickyHeader`, both `isLoading` + `isFetching` passed), EC-8 (confirm dialog
+fallbacks), EC-9 (TaskModal `isLoading = create || update || detail`), EC-10
+(the `parseTaskStatus` `no-restricted-imports` eslint-disable preserved; tasks
+barrel not introduced).
+
+Behavior-preserving side-effect:
+- Wrapped `items` in `useMemo` (was a bare `data?.items ?? []`) — moving the
+  columns memo into the hook surfaced the same unstable-ref concern Binders/Charges
+  hit (the `showLinkedTasks`/`showWarnings` + columns memos now depend on `items`).
+
+Sanctioned exception kept page-side: the "משימה חדשה" header button stays
+page-composed JSX (label + icon + its `data-work-queue-focus-fallback` attribute),
+wired to `modals.openCreateTask` (same header-action exception as
+Binders/Users/Charges/Clients).
+
+Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
+`npm run arch:check` (no violations) · `npm run build` (green; pre-existing
+large-chunk warning only) · `npm run test` (42 passed / 11 files). No workQueue
+unit tests exist, and the repo still has no `renderHook` / Router+QueryClient hook
+harness — focused URL-state tests were not cheap to add (same finding as Waves
+1–3) and were not added. Behavior-preserving → diff review vs `main`; Atlas smoke
+of `/work-queue` recommended (verify both empty variants + history-mode text render
+identically after the `renderEmpty` → `emptyState` conversion).
