@@ -169,3 +169,78 @@ Verification: `npm run typecheck` (binder-clean) · `npm run lint` (binder files
 clean) · `npm run arch:check` (no violations) · `npm run build` (green). No binder
 unit tests exist. Behavior-preserving → diff review vs post-0A; live re-smoke
 optional.
+
+---
+
+## Wave 1 — UsersPage
+
+Status: **done.** Behavior identical to `main` (one additive item, see below);
+automated verification passed. `UsersPage` is now pure slot composition (~80
+lines, no `useState`, no `useMemo`, no `useAuthStore`, no `buildUserColumns`
+import, no inline handler expressions) — except the two page-composed header
+action buttons and the non-advisor permission branch (both sanctioned).
+
+Files changed:
+- `features/users/hooks/useUsersPage.ts`
+- `features/users/pages/UsersPage.tsx`
+- `features/users/components/UsersFiltersBar.tsx`
+
+Changes:
+1. **Grouped contract.** `useUsersPage` now returns
+   `status` / `headerProps` / `filters` / `table` / `modals` / `permissions`
+   (no `stats` — Users has none). The old flat object
+   (`users`/`loading`/`error`/modal setters/actions/`isAdvisor`) is gone.
+2. **Columns into the hook.** `buildUserColumns` is now built in a `useMemo`
+   inside `useUsersPage` (it reads `currentUserId` via `useAuthStore` hook-side);
+   `table.columns` is consumed by the page, which no longer imports
+   `buildUserColumns` or calls `useAuthStore`.
+3. **Toggle-active dialog state into the hook.** `pendingToggle` `useState` +
+   confirm/cancel moved out of the page; the hook exposes a pre-wired
+   `modals.toggleActiveProps` (open/title/message/labels/`isLoading`/onConfirm/
+   onCancel). Title/message/labels still derive from `pendingToggle.is_active`;
+   confirm toggles + closes, cancel closes. The page renders
+   `<ConfirmDialog {...modals.toggleActiveProps} />`.
+4. **Modal prop objects pre-wired.** `createProps` / `editProps` /
+   `resetPasswordProps` / `auditLogsProps` + `openCreate` / `openAuditLogs`
+   openers assembled in the hook; the page spreads them. Modal **state** stays
+   owned by `useUsersPage`'s `useState` — only the call site moved into config.
+5. **`status` group.** `status.isFetching` added (was absent);
+   loading/error/`loadingMessage` ('טוען משתמשים...') derived hook-side
+   (`status.error: string | null`).
+6. **`table.emptyState`.** Now an `EmptyStateConfig`-shaped object
+   (`isEmpty: users.length === 0`, `isFiltered: Boolean(search || is_active)`,
+   title/message/action) mirroring Binders; the page reads title/message/action.
+7. **Page-size preserved.** `table.pagination.onPageSizeChange` wraps
+   `handleFilterChange('page_size', String(size))`.
+
+Additive item (approved, EC-5): **`filters.resetFilters`.**
+`UsersFiltersBar` already rendered a reset control (via `FilterPanel.onReset` →
+`ActiveFilterBadges`), so **no new UI button was added**. The reset logic moved
+from an inline two-call closure in `UsersFiltersBar` into the hook
+(`resetFilters = () => setFilters({ search: '', is_active: '' })` — clears
+search + is_active, resets to page 1, preserves `page_size`, identical to prior
+behavior). `UsersFiltersBar` now takes an `onReset` prop wired to
+`filters.resetFilters`.
+
+Sanctioned exceptions kept page-side (per reference rules):
+- The two header action buttons (לוג ביקורת, משתמש חדש) stay page-composed JSX,
+  wired to `modals.openAuditLogs` / `modals.openCreate` (same header-action
+  exception as Binders; no config→button mapper).
+- The non-advisor permission branch (EC-1) stays a page-level early return:
+  simple `PageHeader` + warning `Alert`, no action buttons. Its copy
+  (description "ניהול חשבונות משתמשים במערכת") differs from the advisor
+  `headerProps.description` and is preserved exactly. Page reads
+  `permissions.isAdvisor`.
+
+Behavior-preserving notes:
+- Self-row (EC-2): `currentUserId` is now read in the hook and passed to
+  `buildUserColumns` unchanged — `UserRowActions` still disables self-actions.
+- `is_active` guard (EC-3) unchanged — only 'true'/'false' valid, else undefined.
+
+Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
+`npm run arch:check` (no violations) · `npm run build` (green; pre-existing
+large-chunk warning only). No users unit tests exist, and the repo has no
+`renderHook` test infra — none added (setting up a QueryClient + Router hook
+harness from scratch is out of scope for a behavior-preserving refactor).
+Behavior-preserving → diff review vs `main`; optional Atlas smoke of
+`/settings/users`.
