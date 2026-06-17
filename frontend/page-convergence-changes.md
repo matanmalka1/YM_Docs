@@ -688,6 +688,122 @@ progress+table / no-summary→empty StateCard) preserved exactly · header + ove
 filters render regardless of loading (no guard) · `handleResetFilters` (preserves
 default year) · `openReport(id)` navigation.
 
+---
+
+## Wave 6 — No-hook pages: NotificationsPage + TaxCalendarGroupsPage
+
+Status: **done.** Behavior identical to `main`; automated verification passed.
+Neither page had a `useXPage` hook on entry — query + `useSearchParamFilters` +
+columns lived in the component. Both hooks were created from scratch and grouped to
+the contract. `NotificationsPage` keeps its top-level `PageStateGuard`;
+`TaxCalendarGroupsPage` stays guardless (section-loading variant — same as Wave 5).
+
+**Stale-flag note (Notifications):** the tracker flagged a "clientQuery shadow
+state violation." **Unfounded.** The current code reads the client filter from the
+URL (`getParam('client_record_id'/'client_name')`) and the client-picker writes both
+back to the URL — there is no shadow `useState`. No refactor was invented; the flag
+was stale and is now cleared in `page-refactor-status.md`.
+
+### NotificationsPage (raw-table-with-guard) — 346 → 60 lines
+
+Files changed:
+- `features/notifications/hooks/useNotificationsPage.ts` (new)
+- `features/notifications/components/table/NotificationsColumns.tsx` (new — Decision A)
+- `features/notifications/components/NotificationDetailDrawer.tsx` (new — Decision B)
+- `features/notifications/pages/NotificationsPage.tsx`
+- `features/notifications/index.ts` (barrel: `useNotificationsPage` + `NotificationDetailDrawer`)
+
+**Decision A — extract `buildNotificationColumns`: EXTRACTED.** Mirrors
+`buildUserColumns`/`buildBindersColumns`. The base columns (date/trigger/client/
+status/recipient) + the actions column (view always + advisor-gated send) moved into
+`components/table/NotificationsColumns.tsx`, which also now owns the
+`getTriggerLabel`/`getDomainLabel` helpers + `ENGLISH_TEXT_PATTERN` (the page no
+longer defines them). The builder takes `{ isAdvisor, onView, onSend }`; the page
+imports it not at all.
+
+**Decision B — extract `NotificationDetailDrawer`: EXTRACTED.** Mirrors
+`ClientEditDrawer`. The `DetailDrawer` + `DrawerSection`/`DrawerField` body (incl.
+the advisor-gated footer send button) moved into a component driven by
+`drawers.detail` (`{ open, notification, isLoading, error, onClose, onSend }`).
+Advisor gating stays hook-side: `onSend` is pre-bound to the open notification's
+client and is `undefined` for non-advisors, so the drawer renders the footer only
+when `notification && onSend`. The drawer reuses the extracted
+`getTriggerLabel`/`getDomainLabel` from the columns module + `NOTIFICATION_STATUS_LABELS`.
+
+Grouped contract returned by `useNotificationsPage`:
+- `status` — `{ isLoading: isPending, isFetching (newly exposed), error: error ?
+  'שגיאה בטעינת הודעות' : null, loadingMessage: 'טוען הודעות...' }`. The generic
+  error string is preserved (this page does not use `getErrorMessage` — smallest
+  change).
+- `headerProps` — `{ title, description }`. The advisor-gated "שליחת הודעה" header
+  button stays page-composed JSX (sanctioned header-action exception), wired to
+  `modals.openSend()`.
+- `permissions` — `{ isAdvisor }`.
+- `filters` (FilterPanel pattern) — `{ fields, values, onChange, onMultiChange,
+  onReset, gridClass }`. `filterFields` (incl. `userOptions` from
+  `useActiveUserOptions`, `triggered_by` disabled while `usersQuery.isPending`,
+  `page_size` field), `filterValues`, and the three handlers moved into the hook.
+- `table` (raw `PaginatedDataTable` + guard) — `{ data, columns, onRowClick (open
+  detail), pagination {page, pageSize, total, onPageChange}, label: 'הודעות',
+  showPagination: total > 0, emptyState: { icon: Bell, message: 'אין הודעות להצגה' } }`.
+- `drawers.detail` — `selectedId` + `useNotificationDetail` moved into the hook;
+  exposes the pre-wired drawer props (above).
+- `modals` — `openSend` + `sendProps` (`open`/`onClose`/`clientRecordId`/
+  `allowedTriggers`); `sendOpen`/`sendClient` moved into the hook.
+
+EC preserved: `page_size` default 25 + `NOTIFICATIONS_PAGE_SIZE_OPTIONS`
+(page_size is a filter field) · date-range `created_after`+`T00:00:00` /
+`created_before`+`T23:59:59` · `trigger`/`status` guards
+(`isNotificationTrigger`/`isNotificationStatus`) · `triggered_by` select uses
+`userOptions`, disabled while `usersQuery.isPending` · row actions: view always +
+send (advisor) · detail-drawer loading/error/content states + advisor footer send
+button · send modal advisor-only with `CLIENT_LEVEL_MANUAL_NOTIFICATION_TRIGGERS`.
+
+### TaxCalendarGroupsPage (section-loading variant, no guard) — 87 → 47 lines
+
+Files changed:
+- `features/taxCalendar/hooks/useTaxCalendarGroupsPage.ts` (new)
+- `features/taxCalendar/pages/TaxCalendarGroupsPage.tsx`
+- `features/taxCalendar/index.ts` (barrel: `useTaxCalendarGroupsPage`)
+
+Confirmed **section-loading variant** (Wave 5): NO top-level `PageStateGuard`. The
+page keeps its bare `<div className="space-y-4" dir="rtl">`; header + stats + filters
+render unconditionally and `TaxCalendarGroupsContent` owns loading/error/empty.
+
+Grouped contract returned by `useTaxCalendarGroupsPage`:
+- `status` — `{ isLoading: groupsQuery.isPending, isFetching, error: groupsQuery.error,
+  errorFallback: 'שגיאה בטעינת יומן המס' }` — wired into the content section, NOT a
+  guard. (`status` is returned for contract completeness; the page reads the
+  equivalent values via `table.*` into `TaxCalendarGroupsContent`.)
+- `headerProps` — `{ title: 'יומן מס', size: 'lg' }` (the `size` prop is preserved).
+- `stats` — `{ summary (defaults to a zeroed summary when undefined), linkedLabel:
+  'לקוחות מקושרים', showGroupsCount: true }` → `TaxCalendarStatsSection`. The
+  `?? EMPTY_SUMMARY` default moved into the hook (was inline in the page).
+- `filters` — all `TaxCalendarFiltersBar` props (years/obligation/status + change
+  handlers, `onReset: resetFilters(taxCalendarYearResetDefaults())`,
+  `clientSearchText`, `includeEmpty`/`onIncludeEmptyChange`). The 350ms
+  `useDebounce` + param mapping moved into the hook.
+- `table` — `{ groups, isLoading, error, errorFallback, clientSearchText, page,
+  pageSize: TAX_CALENDAR_GROUP_PAGE_SIZE, total, onPageChange }` →
+  `TaxCalendarGroupsContent`.
+
+EC preserved: debounced client search (350ms) · `include_empty` `'true'`-string
+param · `resetFilters(taxCalendarYearResetDefaults())` · status `'all'`→`''`
+mapping · obligation/year param mapping · `dir="rtl"`, header `size="lg"`, no guard
+(variant).
+
+### Verification
+
+`npm run typecheck` · `npm run lint` (`--max-warnings=0`) · `npm run arch:check`
+(no violations) · `npm run build` (green; pre-existing large-chunk warning only) ·
+`npm run test` (47 passed / 13 files). No notifications / taxCalendar page unit
+tests exist, and the repo still has no `renderHook` / Router+QueryClient hook
+harness — focused URL-state / debounce tests were not cheap to add (same finding as
+Waves 1–5) and were not added. Behavior-preserving → diff review vs `main`; Atlas
+smoke recommended (`/notifications`: filter panel incl. page_size + date-range,
+detail drawer, send modal, advisor gating; `/tax/calendar`: debounced search, reset,
+include-empty, content loading/empty).
+
 Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
 `npm run arch:check` (no violations) · `npm run build` (green; pre-existing
 large-chunk warning only) · `npm run test` (42 passed / 11 files). No vatReports /
