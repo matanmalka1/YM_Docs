@@ -47,6 +47,11 @@ This document defines frontend ownership and dependency boundaries. Page composi
   business logic.
 - A feature must not deep-import another feature's hooks, API files, schemas, types, constants, or
   utilities. Cross-feature imports must use the owning feature's public `index.ts`.
+- A feature must not import from its own root barrel (`@/features/X` inside `features/X/**`); use
+  direct relative imports internally. Self-imports through the root barrel risk same-feature cycles.
+  (Importing a feature's own sub-barrel such as `../api` is fine.)
+- Files under a feature's `components/` or `hooks/` must not import from that feature's `pages/`;
+  shared constants/helpers belong at the feature root, not under `pages/`.
 - Cross-feature component composition is allowed when the consuming screen genuinely owns the
   workflow. Prefer the feature public barrel when the component is part of the feature's public API.
 - Do not create circular feature dependencies. Move genuinely shared contracts or infrastructure to

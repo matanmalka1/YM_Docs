@@ -40,6 +40,7 @@ features/<domain>/
     <Domain>EmptyState.tsx
   utils/
     <domain>Formatters.ts  — pure formatting/display helpers
+  constants.ts             — feature-level constants/option arrays (NOT under pages/)
 ```
 
 Not every file is required. Create only what the domain actually needs.
@@ -51,34 +52,80 @@ Not every file is required. Create only what the domain actually needs.
 - Page = orchestration only. Layout + slot-filling. Nothing else.
 - No direct `useQuery` or `useMutation` calls inside Page.
 - No API calls inside Page.
-- Page consumes one page-level hook: `useXPage()`.
-- Exception: a second hook is allowed when it has a clearly separate concern (e.g. `useXActions()` for confirmations).
+- Page consumes **exactly one** page-level hook: `useXPage()`. If a page needs an
+  actions/confirmations concern (`useXActions`), `useXPage` **composes it internally**
+  and re-exposes its surface through the grouped slots — the page does not call a
+  second hook (see WorkQueue / Binders precedent).
+- The page is pure slot composition: destructure the grouped slots and spread them
+  into slot components. No `useState`/`useEffect`/`useMemo`/`useNavigate`/
+  `useSearchParams`/`build*Columns` in the page.
 - Usually under ~80 lines. Exception allowed if the page only composes sections and contains no logic.
 - If the page already matches this standard, do not refactor it. Document it as compliant.
 
 ```tsx
-// Good
+// Good — grouped slots, pure composition
 export function ClientsPage() {
-  const page = useClientsPage()
+  const { status, headerProps, stats, filters, table, drawers, modals } = useClientsPage()
   return (
-    <PageShell>
-      <ClientsPageHeader total={page.total} onCreate={page.openCreate} />
-      <ClientsFiltersBar filters={page.filters} onChange={page.setFilters} />
-      <ClientsTable clients={page.clients} isLoading={page.isLoading} onRowClick={page.openClient} />
-      <ClientsDrawer client={page.selected} open={page.drawerOpen} onClose={page.closeDrawer} />
-    </PageShell>
+    <PageStateGuard isLoading={status.isLoading} error={status.error} header={<PageHeader {...headerProps} />}>
+      <ClientsStatsSection {...stats} />
+      <ClientsFiltersBar filters={filters.values} onFilterChange={filters.onFilterChange} onReset={filters.resetFilters} />
+      <PaginatedDataTable data={table.data} columns={table.columns} onRowClick={table.onRowClick}
+        {...table.pagination} emptyState={table.emptyState} />
+      <ClientEditDrawer {...drawers.edit} />
+      <CreateClientModal {...modals.createProps} />
+    </PageStateGuard>
   )
 }
 ```
+
+### Grouped page-hook contract (slots)
+
+`useXPage()` returns **named, grouped slots** (naming/location convention — not a
+shared TS type). Reference implementation: `useBindersPage` + `BindersPage.tsx`.
+
+| Slot | Shape / purpose |
+|------|-----------------|
+| `status` | `{ isLoading; isFetching; error: string \| null; loadingMessage? }` — error converted to a string in the hook, never in the page |
+| `headerProps` | `{ title; description?; actions? }` — **data, not rendered JSX** |
+| `stats` | feature-owned stats props (one slot) |
+| `filters` | feature-owned filter values + handlers, including `resetFilters()` |
+| `table` | `{ data; columns; pagination?; emptyState?; selection? }` — page renders `table.data`/`table.columns`, never `page.<entityPlural>`; columns built in the hook/a feature helper, never in page JSX |
+| `modals` / `drawers` | pre-wired prop objects the page spreads (`<X {...modals.createProps} />`) |
+| `permissions` | capability booleans grouped under one name (keep a `can` object if the feature already exposes one) |
+
+**Structural Definition of Done — the page must own NONE of:** query calls, URL
+parsing/effects/navigation, column construction, modal/drawer state, loading/error
+conversion, empty-state derivation. Hooks return config (not JSX).
+
+**Sanctioned exception:** header action buttons may stay page-composed JSX
+(label + icon) wired to a hook callback (e.g. `modals.openCreate`), because
+`PageHeader.actions` is a `ReactNode`. Do not build a config→button mapper for this.
+
+### Rendering variants (pick by existing behavior — never convert one to the other)
+
+1. **Guarded** — wrap the body in `PageStateGuard` (fed by `status`). Use when the
+   whole body should be hidden during load.
+2. **Section-loading variant** — NO top-level `PageStateGuard`; header + filters
+   (+ stats) render unconditionally and a composite section component owns its own
+   loading/error/empty. Use when filters/header must stay visible during load
+   (forcing a guard there hides filters = behavior change). The hook still returns
+   `status`; the page wires `status.isLoading/error/errorFallback` into the section
+   component (single source — do not also duplicate them on `table`).
+
+`table.emptyState` (an `EmptyStateConfig`: `isEmpty`, `isFiltered`, copy, action) is
+**required** for a raw `PaginatedDataTable`, **optional** when a composite wrapper
+already owns empty rendering. `table.selection` (bulk select) is bulk-list pages only
+and nests under `table`, not its own top-level slot.
 
 ---
 
 ## Hook rules
 
-- `use<Domain>Page` owns: page orchestration, query state, filter state, derived state, modal/drawer state. It may call `use<Domain>Actions`, but should not become a mutation dump.
+- `use<Domain>Page` owns: page orchestration, query state, filter state, derived state, modal/drawer state, and returns the grouped slot contract (above). It **composes** smaller feature hooks (`useXFilters`/`useXActions`/`useXDialogs`/a second data hook) internally rather than becoming a dump — the page still consumes only `useXPage`.
 - `use<Domain>Filters` owns: filter shape, URL sync, reset logic. Use when filter logic exceeds ~30 lines.
 - `use<Domain>Actions` owns: mutations, confirmation dialogs, optimistic updates.
-- Hooks must not render JSX.
+- Hooks return config (data + callbacks + column definitions). Hooks must **not** return rendered JSX (no `<PageHeader/>`, buttons, modals, drawers, or arbitrary nodes).
 - Hooks must not import from other feature hooks unless there is an explicit cross-domain dependency.
 
 ---
@@ -116,6 +163,9 @@ export function ClientsPage() {
 
 - Use `@/` for imports outside the current module folder.
 - A feature may import its own internals directly.
+- **Never import from a feature's own root barrel inside that feature.** Inside `features/X/**`, do not import from `@/features/X` (the root `index.ts`) — use direct relative imports (`./useThing`, `../api`, `../components/Thing`). Root-barrel self-imports risk same-feature cycles. A sub-barrel like `../api` is fine.
+- **Nothing in `components/` or `hooks/` may import from `pages/`.** Page-level constants/helpers that components or hooks also need belong at the feature root (`features/X/constants.ts`), not under `pages/`.
+- **Page-role components live in `pages/`, not `components/`.** A component used directly as a route element must sit under `pages/`.
 - Import another feature's non-component API only from that feature's public `index.ts`.
 - Do not deep-import another feature's hooks, API, schemas, types, constants, or utilities.
 - Pages may compose exported cross-feature components. Reusable cross-feature logic still belongs
