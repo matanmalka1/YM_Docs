@@ -58,6 +58,25 @@ NOT treat it as a pattern to replicate or "fix":
 This is the only exception. Everything else (status/stats/filters/table/modals/
 drawers, columns, empty copy, error conversion) is hook-owned.
 
+### Section-loading variant (Wave 5 — no top-level `PageStateGuard`)
+
+Some pages must keep their header, filters (and stats/overdue banner) visible while
+the list/season section loads — wrapping the whole page in `PageStateGuard` would
+hide filters during load, a behavior change. These pages are a sanctioned variant
+of the contract:
+
+- **No top-level `PageStateGuard`.** Header + filters (+ stats/overdue) render
+  unconditionally. A composite list/season section owns its own
+  loading/error/empty (extends the Wave 2 "composite wrapper may own empty"
+  clarification to loading + error).
+- **The hook still returns the full grouped contract**
+  (`status`/`headerProps`/`stats`/`filters`/`table`/`modals`/`permissions`). The
+  page wires `status`/`emptyState` into the section component (or a section-level
+  `PageLoading`/`Alert`), **not** into a guard.
+- Applies to `VatWorkItemsPage` and `AnnualReportsPage` (Wave 5). This is a
+  documented variant, NOT a DoD miss — the absence of `PageStateGuard` here is
+  deliberate (behavior-preservation outranks contract-purity).
+
 ---
 
 ## Wave 0A — Binders reference page (contract-only)
@@ -574,3 +593,106 @@ harness — focused URL-state tests were not cheap to add (same finding as Waves
 1–3) and were not added. Behavior-preserving → diff review vs `main`; Atlas smoke
 of `/work-queue` recommended (verify both empty variants + history-mode text render
 identically after the `renderEmpty` → `emptyState` conversion).
+
+---
+
+## Wave 5 — Tax workflow lists: VatWorkItemsPage + AnnualReportsPage
+
+Status: **done.** Behavior identical to `main`; automated verification passed. Both
+pages are the **section-loading variant** (above): no top-level `PageStateGuard` —
+header + filters (+ stats/overdue) render unconditionally; the list/season section
+owns its own loading/error/empty. Introducing a guard would hide filters during
+load (behavior change), so it was deliberately NOT added.
+
+### Wave-opening checkpoint (VatWorkItems split hooks) — RESOLVED: single hook
+
+The plan's Wave-5 checkpoint asked whether to (a) fold `useVatWorkItemGroups` into
+`useVatWorkItemsPage` or (b) classify it as a grouped-workflow variant. **Chose
+(a): single page hook.** `useVatWorkItemGroups` is now composed INSIDE
+`useVatWorkItemsPage` (mirrors Wave 4's `useWorkQueueActions` fold), so the page
+consumes ONE hook and reads `table.groups`. The list-data hook stays a separate
+file (still the query owner); only its call site moved into the page hook.
+
+Files changed:
+- `features/vatReports/hooks/useVatWorkItemsPage.ts`
+- `features/vatReports/hooks/useVatWorkItemGroups.ts` (now exposes `isFetching`)
+- `features/vatReports/pages/VatWorkItemsPage.tsx`
+- `features/annualReports/hooks/useAnnualReportsPage.ts`
+- `features/annualReports/pages/AnnualReportsPage.tsx`
+
+**VatWorkItemsPage** (167 → 67 lines, pure slot composition):
+1. **Grouped contract.** `useVatWorkItemsPage` now returns
+   `status`/`headerProps`/`stats`/`filters`/`table`/`modals`/`permissions` (+ the
+   pre-existing unconsumed `sendBackWithNote` kept at top level — unchanged public
+   surface, no scope creep). The old flat object (4 split `statsX` fields, raw
+   `setSearchParams`, modal/delete state, actions) is gone.
+2. **Second query folded in.** `useVatWorkItemGroups(...)` moved out of the page
+   into the hook; `table.groups` = the groups. `status.isLoading`/`isFetching`/
+   `error` are the **groups** query's (list loading); `statsLoading` is the
+   separate status-summary query and only drives `stats.visible`.
+3. **Columns into the hook.** `buildVatWorkItemColumns` + the filter→param mapping
+   (`toOptionalVatPeriodTypeFilter`, year/client coercion) moved into the hook; the
+   page imports neither `buildVatWorkItemColumns` nor `useVatWorkItemGroups`.
+   `canDeleteWorkItem` wrapped in `useCallback` (the columns memo depends on it —
+   same unstable-ref surfacing as Binders/Charges/WorkQueue).
+4. **Modal + URL state into the hook.** `showCreateModal` `useState`, the `create=1`
+   strip effect (`navigate({ search }, { replace, preventScrollReset })`),
+   `client_id`/`period` → modal initial values, and `useNavigate` moved into the
+   hook. Exposed as `modals.openCreate` / `modals.createProps` /
+   `modals.deleteConfirmProps` (danger variant). The page owns no
+   `useState`/`useEffect`/`useMemo`/`useNavigate`/`useSearchParams`.
+5. **`stats.visible`.** The `!statsLoading && groups.length > 0` gate moved into the
+   hook; the page renders the 4-card `StatsCards` grid when `stats.visible`.
+6. **`filters`.** `values`/`onFilterChange`/`onMultiFilterChange`/`resetFilters`
+   (converged `handleClearFilters` → `resetFilters`; stopped exposing raw
+   `setSearchParams`).
+7. **`table` (composite grouped cards, owns empty).** `groups`/`columns`/
+   `isLoading`/`error`/`onRowClick`/`groupFilters`/`emptyState`
+   (`buildVatEmptyStateTitle(filters)` title, advisor-gated empty action). The
+   `VatWorkItemsGroupedCards` composite owns list loading/error/empty rendering
+   (section-loading variant).
+
+EC preserved: create=1 strip + `preventScrollReset` + `client_id`/`period` initial
+values · `period_type` via `toOptionalVatPeriodTypeFilter` · stats visible only when
+`!statsLoading && groups.length > 0` · delete-confirm danger variant · grouped-cards
+empty title from `buildVatEmptyStateTitle` + advisor-gated empty action ·
+`isAdvisor` gates create + empty-action, `canDeleteWorkItem` gates delete · row →
+`/tax/vat/:id` · page keeps `<div className="space-y-6">`, no guard.
+
+**AnnualReportsPage** (88 → 75 lines; un-nested + grouped, NO guard):
+1. **Un-nested `season.*` → grouped contract.** `useAnnualReportsPage` now returns
+   `status`/`headerProps`/`stats`/`filters`/`table`/`banner`/`modals`. The nested
+   `season.*` object and flat fields are gone. `status` = `{ isLoading, error }`
+   (the already-derived combined loading/error, un-nested). The page keeps
+   section-level `PageLoading`/`Alert` driven by `status.*` — **NOT** wrapped in
+   `PageStateGuard` (this amends the plan's stale "switch to PageStateGuard" line;
+   filters must stay visible during load → variant applies).
+2. **`headerProps`.** Computed taxYear-dependent `title` (`taxYearLabel` derivation
+   moved into the hook) + `description`; `taxYear` carried in the slot so the
+   page-composed header action button stays disabled/labelled correctly.
+3. **`stats.summary`** → `SeasonSummaryCards` + `SeasonProgressBar` (rendered when
+   summary present).
+4. **`table`.** `reports`/`isLoading`/`taxYear`/`onSelect` (wraps `report →
+   openReport(report.id)` in the hook) + `emptyState` (the no-summary `StateCard`
+   config: `icon`/`variant`/taxYear-dependent `title`/`message`/`action` — all
+   hook-derived). The page branches on `stats.summary` presence (slot placement,
+   not logic): summary → cards+progress+table; no-summary → empty `StateCard`.
+5. **`banner`** = `{ overdue, onSelect: openReport }` → `OverdueBanner` (when
+   `overdue.length > 0`), renders regardless of loading.
+6. **`modals`** = `{ openCreate, createProps: { open, onClose, taxYear } }`.
+   Dropped the now-unused `handleMultiFilterChange` (no consumer).
+
+EC preserved: `taxYear` may be undefined → header action disabled + label fallback +
+`taxYearLabel='...'` · the four section states (loading / error / summary→cards+
+progress+table / no-summary→empty StateCard) preserved exactly · header + overdue +
+filters render regardless of loading (no guard) · `handleResetFilters` (preserves
+default year) · `openReport(id)` navigation.
+
+Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
+`npm run arch:check` (no violations) · `npm run build` (green; pre-existing
+large-chunk warning only) · `npm run test` (42 passed / 11 files). No vatReports /
+annualReports unit tests exist, and the repo still has no `renderHook` /
+Router+QueryClient hook harness — focused URL-state / create=1 tests were not cheap
+to add (same finding as Waves 1–4) and were not added. Behavior-preserving → diff
+review vs `main`; Atlas smoke recommended for both (`/tax/vat` stats-visibility +
+grouped empty; `/tax/reports` the four season states + taxYear-undefined header).
