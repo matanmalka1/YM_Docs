@@ -772,9 +772,10 @@ render unconditionally and `TaxCalendarGroupsContent` owns loading/error/empty.
 
 Grouped contract returned by `useTaxCalendarGroupsPage`:
 - `status` — `{ isLoading: groupsQuery.isPending, isFetching, error: groupsQuery.error,
-  errorFallback: 'שגיאה בטעינת יומן המס' }` — wired into the content section, NOT a
-  guard. (`status` is returned for contract completeness; the page reads the
-  equivalent values via `table.*` into `TaxCalendarGroupsContent`.)
+  errorFallback: 'שגיאה בטעינת יומן המס' }` — the page passes
+  `status.isLoading`/`status.error`/`status.errorFallback` into `TaxCalendarGroupsContent`
+  (NOT a guard). Single source of truth; `table` no longer duplicates these (fixed
+  post-Wave-6 — see below).
 - `headerProps` — `{ title: 'יומן מס', size: 'lg' }` (the `size` prop is preserved).
 - `stats` — `{ summary (defaults to a zeroed summary when undefined), linkedLabel:
   'לקוחות מקושרים', showGroupsCount: true }` → `TaxCalendarStatsSection`. The
@@ -783,9 +784,9 @@ Grouped contract returned by `useTaxCalendarGroupsPage`:
   handlers, `onReset: resetFilters(taxCalendarYearResetDefaults())`,
   `clientSearchText`, `includeEmpty`/`onIncludeEmptyChange`). The 350ms
   `useDebounce` + param mapping moved into the hook.
-- `table` — `{ groups, isLoading, error, errorFallback, clientSearchText, page,
-  pageSize: TAX_CALENDAR_GROUP_PAGE_SIZE, total, onPageChange }` →
-  `TaxCalendarGroupsContent`.
+- `table` — `{ groups, clientSearchText, page, pageSize: TAX_CALENDAR_GROUP_PAGE_SIZE,
+  total, onPageChange }` → `TaxCalendarGroupsContent`. (Loading/error now come from
+  `status`, not `table` — see post-Wave-6 fix below.)
 
 EC preserved: debounced client search (350ms) · `include_empty` `'true'`-string
 param · `resetFilters(taxCalendarYearResetDefaults())` · status `'all'`→`''`
@@ -804,6 +805,30 @@ smoke recommended (`/notifications`: filter panel incl. page_size + date-range,
 detail drawer, send modal, advisor gating; `/tax/calendar`: debounced search, reset,
 include-empty, content loading/empty).
 
+### Post-Wave-6 structural fixes (review follow-ups)
+
+Three structural issues raised in review, fixed before locking Wave 6. Behavior
+unchanged; `typecheck`/`lint`/`arch:check`/`build` all green.
+
+1. **Constants moved out of `pages/`.** `pages/NotificationsPage.constants.ts` →
+   `features/notifications/constants.ts` (feature level). Components/hooks must not
+   import from `pages/`; importers updated — `useNotificationsPage` (`../constants`),
+   `NotificationDetailDrawer` (`../constants`), `NotificationsColumns`
+   (`../../constants`). The constants file's own `@/features/notifications/api`
+   import was made relative (`./api`).
+2. **No same-feature root-barrel imports.** Replaced `@/features/notifications`
+   (feature root barrel) self-imports with direct relative imports:
+   `useNotificationsPage` now imports `useNotifications`/`useNotificationDetail` from
+   their hook modules and the trigger/status guards + `ListNotificationsParams` from
+   `../api`; `NotificationsPage` imports `SendNotificationModal` from
+   `../components/SendNotificationModal`. Opportunistically converted the remaining
+   `@/features/notifications/api` absolute self-imports in `NotificationDetailDrawer`
+   and `NotificationsColumns` to `../api` / `../../api`. Removes same-feature cycle risk.
+3. **TaxCalendar `status` now consumed.** The hook's `status` group was returned but
+   unused (the page read loading/error from a duplicated `table.*`). `table` no longer
+   carries `isLoading`/`error`/`errorFallback`; the page passes `status.*` into
+   `TaxCalendarGroupsContent`. Single source of truth, `status` wired (not dead).
+
 Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
 `npm run arch:check` (no violations) · `npm run build` (green; pre-existing
 large-chunk warning only) · `npm run test` (42 passed / 11 files). No vatReports /
@@ -812,3 +837,65 @@ Router+QueryClient hook harness — focused URL-state / create=1 tests were not 
 to add (same finding as Waves 1–4) and were not added. Behavior-preserving → diff
 review vs `main`; Atlas smoke recommended for both (`/tax/vat` stats-visibility +
 grouped empty; `/tax/reports` the four season states + taxYear-undefined header).
+
+## Wave 7 — Report Views (separate archetype: folder-convention fix)
+
+Scope: the four routed report pages
+(`AgingReportView`, `VatComplianceReportView`, `AnnualReportStatusView`,
+`AdvancePaymentReportView`) lived under `features/reports/components/` but are
+routed as top-level pages (`router/AppRoutes.tsx`). They are **read-only report
+pages, NOT the management-list archetype**. Per the plan this wave is a genuine
+convention correction, not a grouped-contract migration: the grouped contract was
+**deliberately not imposed**, no `useXReport` hook was renamed, no table was
+swapped. Behavior is byte-identical — this is a move, not a rewrite.
+
+What changed (pure move + import-path edits):
+- Moved all four `*ReportView.tsx` from `features/reports/components/` →
+  `features/reports/pages/` (`git mv`, rename-detected). Their support
+  components stayed in `components/` (`AgingReportTable`, `AgingReportHeader`,
+  `AnnualReportStatusTable`, `AdvancePaymentReportTable`; VatCompliance's inline
+  `ComplianceTable`/`StalePendingTable` move *with* the view — defined in-file).
+- Fixed intra-feature sibling imports after the move: `./AgingReportHeader`,
+  `./AgingReportTable`, `./AnnualReportStatusTable`,
+  `./AdvancePaymentReportTable` → `../components/…`. All other imports
+  (`../../../components/ui/…`, `../hooks/…`, `../api`, `@/…`) are unchanged —
+  `components/` and `pages/` sit at the same directory depth.
+- `VatComplianceReportView` is a **100% rename** (0 content lines changed — its
+  tables are in-file, its `../api` import stays valid).
+- Updated `features/reports/index.ts` barrel to re-export the four from
+  `./pages/…`. `router/AppRoutes.tsx` imports from the `@/features/reports`
+  barrel, so it needed no change — routes (`reports/aging|vat-compliance|
+  annual-status|advance-payments`) still resolve through the barrel.
+
+Explicitly NOT done (resolved decisions):
+- Hooks NOT renamed to `useXReportPage` — plan says rename "only if touched"; the
+  folder move is the convention fix, the hooks weren't restructured. They stay in
+  `features/reports/hooks/` under their existing names.
+- No `PaginationCard` → `PaginatedDataTable` swap — none fit naturally (Aging
+  uses a custom table + `PaginationCard`, VatCompliance is multi-table,
+  Annual/Advance have no pagination).
+- Grouped contract NOT imposed — these keep their `useXReport` shape,
+  export-actions, and `{data && (…)}` rendering.
+
+Dead surface noted (left in place — smallest change): `AgingReportView` has an
+unused `embedded?` prop and `AnnualReportStatusView` has an unused `taxYear?` prop;
+no caller passes either. Flagged for a future cleanup, not removed in this wave.
+
+### Verification
+
+`npm run arch:check` run **immediately after the move** per plan (import-boundary
+failures are cheapest to catch right away) — clean, the convention violation
+(page-role component outside `pages/`) is fixed. `npm run lint`
+(`--max-warnings=0`) clean. The reports diff is move-only (4 renames + 4
+sibling-import edits + 4-line barrel path swap) → diff review covers
+behavior-preservation; no reports unit tests exist to run.
+
+⚠️ Pre-existing, UNRELATED breakage blocks a clean whole-project `npm run typecheck`
+/ `npm run build`: an in-flight (uncommitted) notifications change staged a rename
+`features/notifications/pages/NotificationsPage.constants.ts → constants.ts` but left
+3 importers (`NotificationDetailDrawer.tsx`, `table/NotificationsColumns.tsx`,
+`hooks/useNotificationsPage.ts`) pointing at the old `pages/NotificationsPage.constants`
+path → `TS2307`. Zero errors originate in `features/reports/` — Wave 7 is type-clean.
+This is someone's open WIP (the file was open in the IDE), out of Wave 7 scope, and
+was deliberately not touched. Whole-project typecheck/build/Atlas smoke should be
+re-run once that notifications WIP resolves its import paths.
