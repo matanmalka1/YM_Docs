@@ -226,6 +226,9 @@ Type determines which hooks and components are expected.
 
 - Names must be explicit and domain-specific.
 - No generic names: `BaseCrudPage`, `GenericTable`, `usePageHook`.
+- Clickable stat bars that are built from `StatsCard`, wired to the page `stats` slot, and used as
+  status/filter toggles should be named `<Feature>StatsSection`. Non-interactive metric summaries
+  are not covered by this rule.
 - Do not rename files unless the rename is required by this standard.
 - Prefer moving logic over cosmetic reshuffling.
 
