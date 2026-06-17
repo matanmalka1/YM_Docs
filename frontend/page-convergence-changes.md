@@ -244,3 +244,126 @@ large-chunk warning only). No users unit tests exist, and the repo has no
 harness from scratch is out of scope for a behavior-preserving refactor).
 Behavior-preserving → diff review vs `main`; optional Atlas smoke of
 `/settings/users`.
+
+---
+
+## Wave 2 — ChargesPage
+
+Status: **done.** Behavior identical to `main`; automated verification passed.
+`ChargesPage` is now pure slot composition (~80 lines, no `useState`,
+no `useEffect`, no `useMemo`, no `useSearchParamFilters`, no `buildChargeColumns`
+import, no inline handler expressions) — except the one page-composed advisor-gated
+header button (sanctioned header-action exception).
+
+Files changed:
+- `features/charges/hooks/useChargesPage.ts`
+- `features/charges/pages/ChargesPage.tsx`
+
+Changes:
+1. **Grouped contract.** `useChargesPage` now returns
+   `status` / `headerProps` / `stats` / `filters` / `table` / `drawers` /
+   `modals` / `permissions`. The old flat object
+   (`charges`/`loading`/`error`/`setFilter`/`setPage`/`setSearchParams`/modal
+   setters/actions/`isAdvisor`) is gone. `status.isFetching` added (was absent);
+   `status.error: string | null` derived hook-side; `loadingMessage`
+   ('טוען חיובים...') moved into the hook.
+2. **Columns + `allIds` into the hook.** `buildChargeColumns` + `allIds` `useMemo`
+   moved out of the page; `table.columns` is consumed by the page, which no longer
+   imports `buildChargeColumns`. Column action callbacks (`onOpenDetail`,
+   `onSendNotification`) now reference hook-owned state/openers.
+3. **Selected-charge + modal state into the hook.** `selectedChargeId`,
+   `showCreateModal`, and `notificationContext` `useState`s moved out of the page.
+   The hook exposes `drawers.detail` (`chargeId`/`onClose`),
+   `modals.createProps` (open/createError/createLoading/onClose/onSubmit), and
+   `modals.notificationProps` (null when closed; pre-wired
+   open/onClose/clientRecordId/initialTrigger/entityId/disableTriggerChange when a
+   notification context exists). `openCreate`/`openNotification` openers are
+   hook-owned `useCallback`s; the notification opener is wired into the columns.
+4. **URL-param effects into the hook.** Both effects moved: the `charge_id`
+   deep-link (positive-int guard → opens detail drawer) and the `create=1`
+   deep-link (advisor-only → opens create modal then strips `create` via
+   `setSearchParams(next, { replace: true })`). `useSearchParamFilters` is now
+   internal to the hook — the page imports it not at all.
+5. **`filters` group.** `filters.values` / `filters.onFilterChange` (= `setFilter`)
+   / `filters.resetFilters`. The page's old inline clear
+   (`setSearchParams(new URLSearchParams())`) converged to `resetFilters` (now
+   wired to `ChargesFiltersCard.onClear`). Behavior identical — both clear all
+   params; `resetFilters` additionally sets `page=1` explicitly, which the prior
+   form achieved via the `page` default.
+6. **`stats` group.** `{ stats, isAdvisor, currentStatus: filters.status,
+   onStatusClick }` feeds `ChargesSummaryBar`; `onStatusClick` is the
+   `setFilter('status', …)` callback (toggle logic still lives in the bar).
+7. **`permissions.isAdvisor`.** Grouped under `permissions`; `isSecretary` stays
+   internal to the hook (feeds `canAct = isAdvisor || isSecretary`).
+
+Table slot shape (new this wave — see checkpoint): `table` holds
+`data` / `columns` / `pagination` / `selection` / `onOpenCharge` / `onCreateCharge`.
+`selection` (`selectedCount`/`bulkLoading`/`onBulkAction`/`onClearSelection`) is a
+nested sub-group inside `table`, NOT a separate top-level slot (see checkpoint
+decision). The page spreads these into the existing `ChargesTableBlock` (composite
+bulk-toolbar + `PaginatedDataTable` wrapper) — its flat prop interface was left
+unchanged (smallest change).
+
+Edge cases preserved: EC-1 (create=1 advisor-only + replace-strip),
+EC-2 (`charge_id` deep-link + `closeChargeDetail` clears via
+`setFilter('charge_id', '', false)` — page not reset), EC-3 (bulk selection set
+drives column checkboxes + toolbar), EC-4 (advisor gates header button +
+`submitCreate`), EC-5 (cross-feature `SendNotificationModal` with
+`disableTriggerChange`/`entityId`/`clientRecordId`), EC-6 (empty state stays
+component-owned in `ChargesTableBlock` — see checkpoint).
+
+Behavior-preserving side-effect:
+- Wrapped `chargeItems` in `useMemo` — moving the columns memo into the hook
+  surfaced the same unstable-ref lint warning Binders hit (the old page-level memo
+  masked it).
+
+Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
+`npm run arch:check` (no violations) · `npm run build` (green; pre-existing
+large-chunk warning only) · `npm run test` (42 passed / 11 files). No charges unit
+tests exist, and the repo still has no `renderHook` / Router+QueryClient hook
+harness — focused URL-state tests were not cheap to add (same finding as Wave 1)
+and were not added. Behavior-preserving → diff review vs `main`; optional Atlas
+smoke of `/charges`.
+
+---
+
+## CONTRACT CHECKPOINT (after Wave 2)
+
+Three real migrations now exist: Binders (reference), Users, Charges. Charges was
+the first to introduce a composite table wrapper (`ChargesTableBlock` = bulk
+toolbar + `PaginatedDataTable` + component-owned empty state) instead of a raw
+`PaginatedDataTable`, plus a bulk-selection concept and a cross-feature modal.
+Decisions:
+
+1. **Does `table` hold selection + composite-wrapper props cleanly, or does bulk
+   selection deserve its own slot?** — **Keep selection nested under `table`.**
+   Bulk selection is table-scoped (the checkbox column lives in the table columns;
+   the toolbar renders directly above the same table). Promoting it to a top-level
+   `selection` slot would split one cohesive concern across two slots and imply a
+   reusable cross-page selection contract we don't have. `table.selection`
+   (`selectedCount`/`bulkLoading`/`onBulkAction`/`onClearSelection`) reads cleanly
+   and keeps the contract's top level stable. Contract addition: `table` MAY carry
+   an optional feature-owned `selection` sub-group when a page has bulk actions.
+
+2. **Is `table.emptyState` still the right home when a wrapper owns empty
+   rendering?** — **No change forced; component-owned empty state is acceptable
+   when a composite wrapper already owns it.** Binders/Users render a raw
+   `PaginatedDataTable`, so the hook must supply `table.emptyState`
+   (`EmptyStateConfig`) — the page would otherwise derive empty copy. Charges
+   renders `ChargesTableBlock`, which already owns empty derivation internally
+   (`getChargesEmptyState`, gated on `isAdvisor`); the page never touches empty
+   copy regardless. Lifting it to `table.emptyState` would move copy out of the
+   wrapper only to thread it back in — no DoD benefit, and it would change which
+   layer owns the advisor-conditional message. Contract clarification:
+   `table.emptyState` is **required when the page renders a raw table**, and
+   **optional when a composite table wrapper already owns empty rendering** (the
+   DoD "page must not derive empty state" is satisfied either way). Empty
+   derivation must never live in the page.
+
+3. **Any contract revision needed before Wave 3+?** — **The contract holds.** Only
+   the two clarifications above (both additive, neither breaks Binders/Users):
+   - `table.selection?` optional sub-group for bulk-action pages.
+   - `table.emptyState` optional when a composite wrapper owns empty rendering.
+   No top-level slot changes. Wave 3 (`ClientsPage`) proceeds on the current shape;
+   it renders a raw table, so it must supply `table.emptyState` (preserve its
+   richer empty state) and has no bulk selection (no `table.selection`).
