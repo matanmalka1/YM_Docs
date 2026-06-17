@@ -43,6 +43,21 @@ Rules: hooks return config (not JSX); hooks compose smaller feature hooks rather
 than becoming dumping grounds; pages own no queries/URL parsing/columns/modal
 state/error conversion/empty derivation.
 
+### Sanctioned reference-page exceptions (read before copying for Wave 1+)
+
+The Binders reference is fully converged EXCEPT one deliberate, approved item — do
+NOT treat it as a pattern to replicate or "fix":
+
+- **Header action button is page-composed JSX.** The header "קליטת חומר" button
+  lives in `BindersPage` (label + icon), wired to a hook callback
+  (`drawers.openReceive`). `PageHeader.actions` takes a `ReactNode` today, and a
+  `headerProps.actions` config array + config→button mapper is NOT worth building
+  for a single button. Deferred to Wave 8 (reassess-extraction). When a later page
+  also needs header actions, that's the signal to revisit — not before.
+
+This is the only exception. Everything else (status/stats/filters/table/modals/
+drawers, columns, empty copy, error conversion) is hook-owned.
+
 ---
 
 ## Wave 0A — Binders reference page (contract-only)
@@ -110,3 +125,47 @@ confirmation. The bulk variant was already gated by its own dialog — unchanged
 
 Verification: lint + typecheck (binder-clean) · arch:check (no violations) ·
 `npm run build` (green).
+
+---
+
+## Wave 0B — Binders orchestration cleanup
+
+Status: **done.** Behavior identical to post-0A; automated verification passed.
+`BindersPage` is now pure slot composition (75 lines, no `useState`, no inline
+handler expressions, no copy beyond the one page-composed header action button).
+
+Files changed:
+- `features/binders/hooks/useBindersPage.ts`
+- `features/binders/pages/BindersPage.tsx`
+
+Changes:
+1. **Receive-drawer ownership → hook.** `useState(receiveOpen)` +
+   `useReceiveBinderDrawer(...)` moved out of the page into `useBindersPage`.
+   The hook exposes `drawers.openReceive` (used by the header button and the
+   empty-state action) and a pre-wired `drawers.receive` (open, onClose-with-reset,
+   plus all `ReceiveBinderDrawer` form props). The `onOpenReceive` param was
+   dropped — `useBindersPage()` now takes no arguments.
+2. **`drawers.detail` pre-wired in the hook.** The 9 conditional
+   `selectedBinder ? () => … : undefined` handler expressions moved out of the page;
+   the page renders `<BinderDetailDrawer {...drawers.detail} />`.
+3. **`modals.dialogsProps` pre-wired in the hook.** The full `BindersPageDialogs`
+   prop set (incl. `getBinderNumberLabel` pre-bound to `pageItems` + `selectedBinder`)
+   is assembled in the hook; the page renders `<BindersPageDialogs {...modals.dialogsProps} />`.
+   `useBindersPageDialogs` remains the internal state owner — no longer exposed raw.
+4. Table row-click moved to `table.onRowClick` (was `drawers.onSelect`).
+
+Ownership note: dialog / selection / receive **state** still lives in
+`useBindersPageDialogs` / `useBinderSelection` / `useReceiveBinderDrawer`. The hook
+only assembles ready-to-spread prop objects (config, not JSX), so the page composes
+JSX from slots.
+
+Accepted exception: the header "קליטת חומר" action button stays page-composed
+(JSX + label), wired to `drawers.openReceive`. Converting header actions to a
+config array (`headerProps.actions`) is deferred to Wave 8 — not worth a
+config→button mapper for a single button, and `PageHeader` takes `actions` as a
+ReactNode today.
+
+Verification: `npm run typecheck` (binder-clean) · `npm run lint` (binder files
+clean) · `npm run arch:check` (no violations) · `npm run build` (green). No binder
+unit tests exist. Behavior-preserving → diff review vs post-0A; live re-smoke
+optional.
