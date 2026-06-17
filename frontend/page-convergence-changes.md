@@ -367,3 +367,97 @@ Decisions:
    No top-level slot changes. Wave 3 (`ClientsPage`) proceeds on the current shape;
    it renders a raw table, so it must supply `table.emptyState` (preserve its
    richer empty state) and has no bulk selection (no `table.selection`).
+
+---
+
+## Wave 3 — ClientsPage
+
+Status: **done.** Behavior identical to `main`; automated verification passed.
+`ClientsPage` is now pure slot composition (~88 lines, no `useState`,
+no `useEffect`, no `useNavigate`/`useSearchParams`, no `buildClientColumns`/
+`useClientQuery` import, no empty-state derivation, no inline handler
+expressions) — except the two page-composed header action buttons and the
+view-only `Alert` (both sanctioned).
+
+Files changed:
+- `features/clients/hooks/useClientsPage.ts`
+- `features/clients/pages/ClientsPage.tsx`
+- `features/clients/components/list/ClientsStatsSection.tsx` (new)
+- `features/clients/components/edit/ClientEditDrawer.tsx` (new)
+- `features/clients/index.ts` (barrel exports for the two new components)
+
+Two sanctioned new components (the only ones for this wave):
+1. **`ClientsStatsSection`** — mirrors `BindersStatsSection`; replaces the inline
+   3× `StatsCard` grid (פעילים / מוקפאים / סגורים). Driven by the `stats` slot
+   (`values` / `selected` / `onStatusClick`). The status toggle
+   (`status === x ? '' : x`) lives in the hook's `onStatusClick`.
+2. **`ClientEditDrawer`** — `DetailDrawer` + `ClientEditForm` + `ModalFormActions`.
+   Returns `null` when `!open`. Driven by `drawers.edit`
+   (`open` / `onClose` / `client` / `isLoading` / `error` / `onSave` /
+   `updateLoading` / `formId`).
+
+Changes:
+1. **Grouped contract.** `useClientsPage` now returns
+   `status` / `isEmptyState` / `headerProps` / `stats` / `filters` / `table` /
+   `drawers` / `modals` / `permissions`. The old flat object
+   (`clients`/`error`/`loading`/`setPage`/modal setters/actions/`can`) is gone.
+   `status.isFetching` added (was absent); `status.error: string | null` and
+   `loadingMessage` ('טוען לקוחות...') moved into the hook.
+2. **Columns into the hook.** `buildClientColumns` built in a `useMemo` inside the
+   hook (edit action gated by `can.editClients`); the page no longer imports it.
+3. **Edit-drawer state + detail query into the hook.** `editingClientId`
+   `useState` + the second `useClientQuery({ clientId: editingClientId })` moved
+   out of the page; exposed pre-wired as `drawers.edit`. `onSave` updates then
+   closes; `EDIT_FORM_ID` ('client-edit-form-list') is hook-owned and threaded
+   through `drawers.edit.formId`.
+4. **Modal state + create=1 effect + navigation into the hook.**
+   `showCreateModal` / `showImportExport` `useState`s, the `?create=1` deep-link
+   effect (advisor-only → opens create then strips the param via
+   `navigate({ search }, { replace, preventScrollReset })`), and row-click
+   navigation moved into the hook. The hook now owns `useNavigate`; the page
+   imports neither `useNavigate` nor `useSearchParams`.
+5. **Pre-wired modal props.** `modals.createProps` (incl. the deleted-client
+   `onRestoreDeletedClient` → restore + navigate detail), `modals.importExportProps`,
+   `modals.deletedClientProps` (incl. `onDismiss` → dismiss + reopen create), plus
+   `modals.openCreate` / `modals.openImportExport` openers. The create↔deleted-dialog
+   interplay (`open: showCreateModal && !deletedClientDialogOpen`) is hook-owned.
+6. **`filters` group.** `values` / `onFilterChange` / `resetFilters` (= `handleReset`,
+   already existed via `ClientsFiltersBar.onReset` — converged naming, no new UI,
+   per Wave 1 EC-5 lesson) / `showAccountantFilter: can.editClients`.
+7. **`table` (raw `PaginatedDataTable`).** `data` / `columns` / `onRowClick` /
+   `pagination` (`page`/`pageSize`/`total`/`onPageChange`/`onPageSizeChange`) /
+   `emptyState`. `emptyState` is an `EmptyStateConfig` carrying
+   `isEmpty`/`isFiltered` + the full visual config (`icon`/`variant`/`title`/
+   `message`/`action`/`secondaryAction`); the page maps the visual subset into the
+   table's `emptyState` prop (no derivation page-side). No `table.selection`
+   (Clients has no bulk actions).
+8. **`permissions` slot.** `{ can, isAdvisor }` — the feature's `can` object kept
+   intact. `can.createClients` gates the create button + empty actions;
+   `can.editClients` gates the edit column action + accountant filter + view-only
+   Alert; `isAdvisor` threaded into the modal props.
+
+Edge cases preserved: EC-1 (rich empty state — `illustration` variant + create +
+import secondaryAction only when truly-empty AND `can.createClients`; header loses
+description/actions when `isEmptyState`; stats + filters hidden; filtered-empty /
+no-permission fall back to plain "לא נמצאו לקוחות"). EC-2 (`create=1` advisor-only +
+`replace`/`preventScrollReset` strip). EC-3 (deleted-client restore interplay —
+create modal open only when `!deletedClientDialogOpen`; restore→navigate;
+force-create dismiss; dismiss→reopen create). EC-4 (edit drawer loading/error/form;
+`onSave` updates then closes; `ModalFormActions` submits via `formId`). EC-5
+(permission gating, above). EC-6 (row click → `CLIENT_ROUTES.detail(id)`). EC-7
+(cross-feature `ImportExportModal` from `@/features/importExport`).
+
+Sanctioned exceptions kept page-side: the two header action buttons (ייבוא / ייצוא,
+לקוח חדש) stay page-composed JSX wired to `modals.openImportExport` /
+`modals.openCreate` (same header-action exception as Binders/Users/Charges; header
+content branches on the hook's `isEmptyState`); the view-only `Alert` ("צפייה
+בלבד…") stays a page-level branch on `permissions.can.editClients`.
+
+Verification: `npm run typecheck` · `npm run lint` (`--max-warnings=0`) ·
+`npm run arch:check` (no violations) · `npm run build` (green; pre-existing
+large-chunk warning only) · `npm run test` (42 passed / 11 files). No clients unit
+tests exist, and the repo still has no `renderHook` / Router+QueryClient hook
+harness — focused URL-state / create=1 / restore-flow tests were not cheap to add
+(same finding as Waves 1–2) and were not added. Behavior-preserving → diff review
+vs `main`; Atlas smoke of `/clients` strongly recommended (rich empty state +
+deleted-client restore flow break easily).
