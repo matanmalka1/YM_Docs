@@ -41,6 +41,40 @@ This document defines frontend ownership and dependency boundaries. Page composi
 - Extract code to shared ownership only after there are at least two real cross-feature consumers and
   the extracted API has no domain-specific behavior.
 
+## Feature file layout
+
+Every `src/features/<feature>/` slice must follow this layout and naming:
+
+```text
+src/features/<feature>/
+|-- api/
+|   |-- <feature>.api.ts      API call functions
+|   |-- contracts.ts          request/response types
+|   |-- endpoints.ts          URL builders
+|   |-- queryKeys.ts          (queryKeys.test.ts co-located)
+|   `-- index.ts              api sub-barrel
+|-- components/               .tsx ONLY, always grouped into area subfolders
+|   |-- list/ detail/ form/ dialogs/ shared/   canonical UI-role areas
+|   `-- <Feature><Thing>.tsx  PascalCase, always feature-prefixed
+|-- hooks/
+|   |-- use<Feature>Page.ts   canonical page hook (flat)
+|   |-- use<Feature><Ui>.ts   UI-state hooks, e.g. Selection/Filters (flat)
+|   |-- queries/              use<Feature><Read>.ts data-read hooks
+|   `-- mutations/            use<Feature><Write>.ts data-write hooks
+|-- pages/                    <Feature>Page.tsx, <Feature>DetailsPage.tsx
+|-- utils/                    always a folder, even for a single module
+|-- constants.ts  schemas.ts  types.ts  helpers.ts  index.ts
+```
+
+- `components/` and every subfolder under it contain `.tsx` files only. Hooks (`use*.ts`) and pure logic (`*.constants.ts`, `*.utils.ts`, `*.helpers.ts`, `*.schema.ts`) must never live under `components/` — they belong in `hooks/`, `constants.ts`/`constants/`, `utils/`, and `schemas.ts` respectively.
+- Components are PascalCase and always prefixed with the feature name. A feature with 5 or more components groups them into area subfolders under `components/`; smaller features may keep `components/` flat until they cross that threshold.
+- Area subfolders use the canonical UI-role vocabulary by default: `list/` (index view — table, columns, rows, row-actions, filters bar, stats/summary bar, bulk toolbar), `detail/` (single-item view — drawer, panels, info sections, tabs), `form/` (create + edit modals, form fields, wizard steps), `dialogs/` (small confirm/alert/delete dialogs), `shared/` (used across more than one area within the feature). Domain-named folders (e.g. annual-reports `tax/`, `season/`, `annex/`, `financials/`) are allowed only for genuinely distinct sub-domains; they are still `.tsx`-only.
+- Hooks are `useCamelCase.ts`. Data hooks split into `hooks/queries/` (reads) and `hooks/mutations/` (writes); the page hook (`use<Feature>Page`) and UI-state hooks stay flat in `hooks/`.
+- The `api/` layer is always a folder (never a flat `api.ts`): `<feature>.api.ts` plus bare role files (`contracts.ts`, `endpoints.ts`, `queryKeys.ts`, `index.ts`).
+- `utils/` is always a folder.
+- Feature-root files stay bare (`constants.ts`, `schemas.ts`, `types.ts`, `helpers.ts`, `index.ts`) — the folder is the namespace. This is intentionally asymmetric with the backend, where domain-slice files are prefixed (`docs/backend/architecture.md`).
+- `constants` may be a single `constants.ts` or, when a feature has multiple genuinely distinct constant groups, a `constants/` folder whose files use area names (`annexConstants.ts`, `visualizationTokens.ts`) — never feature-prefixed names.
+
 ## Dependency boundaries
 
 - Shared UI must not import feature APIs, React Query, auth/session state, or product-specific

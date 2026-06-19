@@ -25,10 +25,14 @@ app/<domain>/
 `-- models/
 ```
 
+- Every file inside a domain slice must be prefixed with the domain name; the folder names the layer, the prefix names the domain, and the suffix names the purpose. Examples: `vat/repositories/vat_invoice_repository.py`, `binders/services/binder_lifecycle_service.py`, `clients/api/clients_routes.py`.
+  - Layer/purpose suffixes are fixed: `_repository.py`, `_service.py`, `_guards.py`, `_router.py` / `_routers.py`, `_routes.py` / `_routes_<sub>.py`, `_responses.py`, `_serializers.py`, `_messages.py`, `_constants.py`.
+  - The primary model and primary schema may use the bare singular domain noun (`charges/models/charge.py`, `clients/schemas/client.py`); additional models/schemas add a purpose suffix (`binders/models/binder_handover.py`, `clients/schemas/client_requests.py`).
+  - No bare role-named files (`routes.py`, `responses.py`, `messages.py`, `constants.py`); prefix them (`vat_responses.py`, `vat_messages.py`).
 - Domain `schemas/` modules own Pydantic request and response models.
 - Paginated list response schemas must subclass `app.core.api_types.PaginatedResponse[T]` rather than re-declaring the `items`/`total`/`page`/`page_size` envelope by hand; add only the extra aggregate field (e.g. `summary`) in the subclass.
 - Domain `models/` modules own SQLAlchemy ORM declarations.
-- Domain `api/routers.py` assembles feature routers into the domain router registered by `app/router_registry.py`.
+- Domain `api/<domain>_routers.py` assembles feature routers into the domain router registered by `app/router_registry.py`.
 - Routers must parse requests, apply endpoint-level dependencies, call services, and return responses.
 - Route handlers should inject `CurrentUser` and `DBSession`, instantiate the service with the DB session, call one service method, and map the result to the response schema.
 - Routers must not contain business branching, orchestration, persistence logic, or DTO assembly beyond request/response wiring.
