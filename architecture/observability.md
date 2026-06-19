@@ -23,6 +23,8 @@ Source of truth: mandatory
 - `SQLAlchemyError` and unhandled exceptions must be logged at error level with exception context.
 - HTTP and request-validation exceptions may be logged at warning level.
 - User-facing errors must not expose stack traces.
+- Plain application logs render only the message string (text format) or `message` plus an explicit `structured_event` dict (JSON format); arbitrary `logger.*(..., extra={...})` keys are NOT emitted by `StructuredFormatter`, so any diagnostic value that must appear in logs goes in the message string itself.
+- Auth refresh rejections are logged at warning level with a `[reason=...]` tag (`no_cookie`, `decode_failed`, `bad_claims`, `user_missing`, `inactive`, `token_version_mismatch`) so a silent client logout can be traced to its cause; `token_version_mismatch` also logs `token_tv` and `user_tv`.
 - Request summary logs must include enough information to investigate latency and failures.
 - Request summary logs include HTTP metadata and SQL timing/count statistics collected during the request.
 - Request summary logs are emitted once per request by `get_db()` when DB activity exists or by request middleware when no DB activity exists.
