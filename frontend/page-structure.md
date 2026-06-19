@@ -19,31 +19,34 @@ Read this file before refactoring any page.
 
 ## Folder structure
 
-Every feature follows this layout:
+The canonical feature file layout and naming rules live in
+`docs/frontend/architecture.md` § Feature file layout (source of truth). Summary:
 
 ```
-features/<domain>/
-  api/
-    <domain>Api.ts       — HTTP calls only, no business logic
-    contracts.ts         — request/response types, Zod schemas
+features/<feature>/
+  api/                       — always a folder, never a flat api.ts
+    <feature>.api.ts         — HTTP calls only, no business logic
+    contracts.ts             — request/response types, Zod schemas
+    endpoints.ts  queryKeys.ts  index.ts
   pages/
-    <Domain>Page.tsx     — thin orchestrator, no API calls, no logic
+    <Feature>Page.tsx        — thin orchestrator, no API calls, no logic
   hooks/
-    use<Domain>Page.ts   — primary page hook: query, filters, mutations, derived state
-    use<Domain>Filters.ts  — filter shape + URL sync (when filter logic is complex)
-    use<Domain>Actions.ts  — mutations + confirmation state
-  components/
-    <Domain>PageHeader.tsx
-    <Domain>FiltersBar.tsx
-    <Domain>Table.tsx
-    <Domain>Drawer.tsx
-    <Domain>EmptyState.tsx
-  utils/
-    <domain>Formatters.ts  — pure formatting/display helpers
-  constants.ts             — feature-level constants/option arrays (NOT under pages/)
+    use<Feature>Page.ts      — primary page hook (flat); UI-state hooks flat
+    queries/  mutations/      — data-read / data-write hooks (when a feature
+                                has enough hooks to warrant the split)
+  components/                — .tsx ONLY (no hooks/constants/utils here)
+    list/ detail/ form/ dialogs/ shared/   — area subfolders; group when the
+                                feature has >=5 components, else keep flat
+    <Feature><Thing>.tsx     — PascalCase, feature-prefixed
+  utils/                     — always a folder
+  constants.ts               — bare (or constants/ folder for multiple groups)
+  schemas.ts  types.ts  index.ts
 ```
 
-Not every file is required. Create only what the domain actually needs.
+Feature-root files stay bare (folder is the namespace); `components/` and every
+subfolder under it hold `.tsx` only — pure logic lives in `hooks/`, `utils/`,
+`constants.ts`/`constants/`, `schemas.ts`. Not every file is required; create only
+what the domain actually needs.
 
 ---
 
