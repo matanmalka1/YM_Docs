@@ -37,8 +37,10 @@ When reviewing a code or docs change before approval: `docs/agent/code-review-pl
 ### Frontend
 
 - **Frontend change** → `docs/frontend/architecture.md` + `docs/frontend/page-structure.md`
+- **Reaching for a shared formatter, URL-state, query, or UI helper** → `docs/frontend/canonical-helpers.md` (use the listed helper; never hand-roll an equivalent)
+- **Refactoring an existing page** → `docs/frontend/page-refactor-status.md` first (do not re-refactor a page already marked compliant)
 - **Frontend UI / styling / interaction change** → also read `docs/frontend/ui-guidelines.md`
-- **Frontend completion verification** → `docs/frontend/testing.md` + `docs/workflow/verification.md`
+- **Frontend completion verification** → `docs/frontend/testing.md` + `docs/frontend/commands.md` + `docs/workflow/verification.md`
 
 ### Cross-cutting (both stacks)
 

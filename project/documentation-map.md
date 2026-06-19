@@ -73,6 +73,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/frontend/ui-guidelines.md` ★ — mandatory UI composition, Hebrew/RTL, accessibility, responsive, and interaction rules.
 - `docs/frontend/testing.md` ★ — frontend testing rules.
 - `docs/frontend/commands.md` ★ — frontend commands.
+- `docs/frontend/canonical-helpers.md` — lookup index of canonical display/URL/query/UI helpers; rules stay in the architecture/page-structure/ui-guidelines docs.
 - `docs/frontend/api-drift-ci.md` — frontend GitHub Actions drift check against the backend OpenAPI baseline.
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
