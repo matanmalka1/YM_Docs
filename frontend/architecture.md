@@ -84,6 +84,8 @@ src/features/<feature>/
 - A feature must not import from its own root barrel (`@/features/X` inside `features/X/**`); use
   direct relative imports internally. Self-imports through the root barrel risk same-feature cycles.
   (Importing a feature's own sub-barrel such as `../api` is fine.)
+- Barrels are the intended module boundary here, so react-doctor's `no-barrel-import` rule is
+  disabled (`frontend/doctor.config.json`). See `docs/adr/0005-react-doctor-no-barrel-import-disabled.md`.
 - Files under a feature's `components/` or `hooks/` must not import from that feature's `pages/`;
   shared constants/helpers belong at the feature root, not under `pages/`.
 - Cross-feature component composition is allowed when the consuming screen genuinely owns the
@@ -134,6 +136,7 @@ src/features/<feature>/
 - Frontend feature code must not keep a second in-memory source of truth for navigation state that already exists in the URL.
 - Frontend KPI cards, totals, counters, and sums must come from backend aggregate fields when the underlying dataset is paginated, filtered, or partially loaded.
 - Frontend code must not derive product-facing totals from a partial page of server data unless the screen contract explicitly defines the data as complete.
+- Destructure `useQuery`/`useMutation` results to the fields the scope reads (`const { data, isPending } = useQuery(...)`); do not bind the whole result (`const q = useQuery(...)`) and reach in via `q.data`. The whole-object binding subscribes the component to every field and defeats TanStack Query's tracked-property re-render optimization. The only exception is when the result is genuinely held as one value — spread (`return { ...query }`), returned whole from a hook, or forwarded as a single argument; leave those bound.
 - React Query updates must prefer `setQueryData` for direct cache edits and targeted invalidation for affected entities or exact query keys.
 - Do not use broad `invalidateQueries({ queryKey: ...all })` patterns as a default cache strategy when a narrower invalidation or cache update can express the change.
 - React Query `staleTime` must match the volatility of the data: effectively static reference data such as enums or config should use `Infinity`, while operational data should use an explicit bounded stale time chosen for that screen.
