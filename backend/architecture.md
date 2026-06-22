@@ -40,6 +40,9 @@ app/<domain>/
 - Routers instantiate a fresh service per request with the injected DB session; services are not singletons.
 - Services should be split by responsibility in large domains, such as separate read/list services and mutation/lifecycle services.
 - Services hold repository instances for the same request DB session.
+- Domain services should inherit from `BaseService` (`app/common/services/base_service.py`) when they need transaction helpers.
+- Services are the only layer that should call `commit()`, `rollback()`, or `transaction()`.
+- Recommended write pattern: validate inside `with self.transaction():`, call repositories, then map the persisted result to the response schema after the transaction block.
 - Known service-computed derived state includes `days_in_office`, `urgency`, `signals`, and action lists.
 - Services map repository output to Pydantic response schemas.
 - List services should prefer typed projection dataclasses for multi-table list reads instead of loading full ORM objects for every joined table.
@@ -72,6 +75,8 @@ app/<domain>/
 - Cross-domain writes must be orchestrated in services.
 - Cross-domain read aggregation must live only in explicit read-model/query domains or dedicated query services.
 - Cross-domain read joins are allowed in repositories only for scoping or typed read projections.
+- Use a specialized read repository when a query is domain-specific or needs runtime filters, permissions, pagination, or computed columns.
+- Use a database view only when the shape is stable, heavily reused outside one domain, and worth migrating through Alembic. Do not use a DB view for business logic or derived UX state such as `signals` or `urgency`.
 - UI-visible client-scoped list queries must apply the active-client scope where relevant.
 - Repository queries that need active-client scoping must use
   `app.clients.repositories.client_active_scope.scope_to_active_clients_stmt`; do not inline the
