@@ -9,6 +9,9 @@ Source of truth: mandatory
 
 # Git Workflow
 
+- The project is split into three git repositories: `backend/`, `docs/`, and `frontend/`.
+- The project root is not the git repository for code changes; run git commands from the relevant
+  repo directory or use `git -C backend`, `git -C docs`, or `git -C frontend`.
 - Check worktree status before staging and before finishing.
 - Treat existing uncommitted changes as user changes unless proven otherwise.
 - Do not revert user changes unless explicitly requested.

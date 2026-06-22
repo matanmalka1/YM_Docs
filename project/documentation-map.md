@@ -34,6 +34,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/project/backend-module-map.md` — where backend modules live.
 - `docs/project/domain-docs-inventory.md` — list of existing domain-specific docs.
 - `docs/project/config-reference.md` — index of backend env/config variables (source: `backend/app/config.py`).
+- `docs/project/tax-rules-config.md` ★ — standalone tax-rules package ownership and update rules.
 - `docs/project/glossary.md` — terminology disambiguation index (one definition + owner link per term); not a behavior source of truth.
 
 ## Architecture (cross-stack boundary)

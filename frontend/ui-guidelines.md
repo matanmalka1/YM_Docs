@@ -21,6 +21,8 @@ implementation rules.
 - Reuse existing components from `src/components/ui/` before creating a new primitive.
 - Reuse `PageHeader`, layout shells, drawers, dialogs, tables, feedback states, and form controls
   consistently across features.
+- Use `Card` from `src/components/ui/primitives/Card.tsx` for reusable titled content containers.
+  Do not put card-like Tailwind chrome around another component that already renders a `Card`.
 - Do not recreate a shared component with local Tailwind markup only to change spacing or color. Add
   a supported variant when the requirement is genuinely reusable.
 - Use Lucide icons through `lucide-react`. Do not add hand-drawn SVG icons when a matching icon
@@ -54,6 +56,10 @@ implementation rules.
 ## Forms and actions
 
 - Every input has a visible label or an equivalent accessible name.
+- Select dropdowns must use the shared `Select` component, not a plain `<select>`, when the shared
+  component covers the interaction.
+- Labeled checkbox controls must use the shared `Checkbox` primitive. Bare native checkboxes are
+  allowed only when intentionally unlabeled or hidden as part of another accessible control.
 - Validation messages appear next to the relevant field. The first invalid field should be reachable
   without hunting through the form.
 - Submit buttons show pending state and are disabled against duplicate submission.

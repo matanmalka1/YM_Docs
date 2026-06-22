@@ -55,9 +55,16 @@ app/<domain>/
 - Repositories flush after writes but must not commit transactions.
 - `BaseRepository` subclasses must set a class-level `model`.
 - Repositories must not re-implement a `BaseRepository` method (e.g. `get_by_id`, `soft_delete`) when the inherited behavior is identical; override only to add real, differing behavior such as a non-`deleted_at` soft-delete column.
+- `BaseRepository.get(..., include_deleted=True)` is the explicit way to preserve identity-map-style
+  lookup semantics for soft-deleted rows. Do not replace `Session.get()` with `get_by_id()` when the
+  caller must see deleted rows; `get_by_id()` excludes soft-deleted rows for soft-deletable models.
 - List repository methods should return `(items, count)` when pagination metadata is needed.
 - Pagination must use the shared helpers: `BaseRepository.apply_pagination` for SQL `select` statements and `app.core.pagination.paginate_sequence` for already-materialized in-memory lists. Do not hand-write `offset((page - 1) * page_size).limit(...)` or `seq[start:start + page_size]`.
 - Count queries must use the same filters as list queries, without pagination.
+- Repositories should keep one keyword-only filter builder per list/query shape and reuse it for the
+  matching list and count statements. Add a separate builder only when callers need different SQL
+  semantics, such as active-client-scoped organization lists versus path-scoped single-client detail
+  lists.
 - Repository method naming should use `get_by_id`, `list_by_*`, `list_*_paginated`, `count_*`, `map_*_by_*`, and `soft_delete` consistently.
 - Application query code must use SQLAlchemy ORM/select constructs.
 - Application code must not use raw SQL.
@@ -66,6 +73,9 @@ app/<domain>/
 - Cross-domain read aggregation must live only in explicit read-model/query domains or dedicated query services.
 - Cross-domain read joins are allowed in repositories only for scoping or typed read projections.
 - UI-visible client-scoped list queries must apply the active-client scope where relevant.
+- Repository queries that need active-client scoping must use
+  `app.clients.repositories.client_active_scope.scope_to_active_clients_stmt`; do not inline the
+  `ClientRecord` join and `deleted_at IS NULL` predicate or fork a local helper.
 - Background jobs must be idempotent.
 - Services that coordinate external I/O, such as file uploads or notification sends, must explicitly commit or roll back database changes before the external call.
 - Backend business-local current dates must use `app.utils.time_utils.israel_today()`.

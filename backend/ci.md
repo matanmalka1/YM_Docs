@@ -63,7 +63,10 @@ alembic downgrade base    # reverses all migrations
 alembic upgrade head      # re-applies — fails if downgrade left objects behind
 ```
 
-The roundtrip is what catches broken `downgrade()` functions. It already caught one real bug: `0001_initial` left 50 Postgres enum types behind on downgrade, because `op.drop_table` does not drop enum types. See [[project-alembic-enum-downgrade]] in agent memory and the fix in `alembic/versions/0001_initial.py`.
+The roundtrip is what catches broken `downgrade()` functions. It already caught one real bug:
+`0001_initial` left 50 Postgres enum types behind on downgrade, because `op.drop_table` does not
+drop enum types. See `docs/backend/migrations.md` for the binding enum-downgrade rule and the fix
+in `alembic/versions/0001_initial.py`.
 
 The head-divergence check (`alembic heads` must show exactly one head) needs no database and runs first.
 

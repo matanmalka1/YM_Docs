@@ -31,6 +31,7 @@ When reviewing a code or docs change before approval: `docs/agent/code-review-pl
 
 - **Backend change** → `docs/backend/architecture.md`
 - **DB / migration change** → `docs/backend/database.md` + `docs/backend/migrations.md`
+- **Tax deadline, VAT rate, threshold, obligation, or tax-rule config change** → `docs/project/tax-rules-config.md`
 - **Backend error-code / OpenAPI error-doc change** → `docs/backend/error-codes.md` + `docs/backend/error-doc-matrix.md`
 - **Backend completion verification** → `docs/backend/testing.md` + `docs/workflow/verification.md`
 

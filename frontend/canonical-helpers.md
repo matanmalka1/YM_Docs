@@ -50,6 +50,12 @@ A new display pattern none of these cover → add a named formatter routed throu
 Never `new URLSearchParams(searchParams)` + mutate + `setSearchParams` inline. Enum-backed params are
 untrusted strings — parse with a feature guard, never `as SomeEnum`.
 
+## Pagination — `src/utils/paginationUtils.ts`
+
+| Need | Helper | Never instead |
+|------|--------|---------------|
+| Total pages from `total` + `pageSize` | `getTotalPages(total, pageSize)` | `Math.max(1, Math.ceil(total / pageSize))` inline |
+
 ## React Query freshness — `src/lib/queryDefaults.ts`
 
 Use the `QUERY_STALE_TIME` buckets (`short`/`default`/`medium`/`long`/`static`). The `QueryClient`
@@ -69,6 +75,7 @@ Feature-owned status→variant maps stay with the owning feature's constants.
 
 | Need | Component | Path |
 |------|-----------|------|
+| Reusable card/container chrome | `Card` | `primitives/` |
 | Guarded page load/error wrap | `PageStateGuard` | `layout/` |
 | Section/page loading (wraps `TableSkeleton`) | `PageLoading` | `layout/` |
 | Paginated list table | `PaginatedDataTable` | `table/` |
@@ -79,8 +86,23 @@ Feature-owned status→variant maps stay with the owning feature's constants.
 | Detail/edit drawer | `DetailDrawer` | `overlays/` |
 | Focused create/confirm modal | `Modal` | `overlays/` |
 | Empty / error / no-results card | `StateCard` | `feedback/` |
-| Inline empty state | `InlineEmptyState` | `feedback/` |
+| Inline empty/error/no-results state inside an existing panel | `InlineState` | `feedback/` |
 | Unsaved-changes guard | `UnsavedChangesGuard` | `feedback/` |
+
+Use `Card`'s `disablePadding` and `bodyClassName` props for table/full-bleed content instead of
+wrapping a card in another card-like container or trying to cancel its body padding from the root.
+
+## Filters and form controls
+
+| Need | Component | Path |
+|------|-----------|------|
+| Standard filter/search/date/client toolbar | `FilterPanel` with `FilterFieldDef` | `src/components/ui/filters/FilterPanel.tsx` |
+| Select dropdown | `Select` | `src/components/ui/inputs/` |
+| Labeled checkbox | `Checkbox` | `src/components/ui/primitives/Checkbox.tsx` |
+
+Do not hand-roll a filter bar, plain `<select>`, or labeled raw checkbox when these components cover
+the interaction. Native radio inputs and hidden file inputs are allowed when the native control is
+intentional and accessible.
 
 ## Loading indicators (canonical shapes)
 
