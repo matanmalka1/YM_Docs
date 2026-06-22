@@ -184,7 +184,7 @@ None identified.
 ## Historical notes
 
 No legacy `backend/docs` file covers the dashboard domain specifically. Two files contain tangential dashboard references:
-- `backend/docs/frontend_screen_spec.md` — lists Dashboard as screen #2 in the navigation spec.
+- `backend/docs/frontend_screen_spec.md` — legacy unverified screen inventory; lists Dashboard as screen #2, but is not source of truth.
 - `backend/docs/domain_decisions_v3.md` — references `due_date_effective` as the source of truth for overdue signals (applies to advance-payments dashboard widget via advance-payment domain, not dashboard itself).
 
 No archive file is created for this domain (no legacy material to preserve).

@@ -146,10 +146,10 @@ No open known issues.
 
 ## Decisions (preserved)
 
-Still true from the historical work-queue spec in `backend/docs/backend/domains/work-queue.md`, verified against code:
+Still true from the canonical work-queue doc and verified against code:
 
-1. **Tasks are the manual work items of the office queue.** The shared `WorkQueueSourceType` reserves `TASK` specifically for user-created tasks, distinct from computed system items (`backend/docs/backend/domains/work-queue.md`, `backend/app/common/source_types.py:6-12`, `backend/app/work_queue/services/task_items.py:31-61`).
-2. **Open linked tasks merge into the source row; otherwise tasks stay standalone.** During work-queue assembly, an open task linked to a currently materialized source item is attached as `linked_tasks`; otherwise the task becomes its own `TASK` row, optionally enriched with source summary/warnings (`backend/docs/backend/domains/work-queue.md`, `backend/app/work_queue/services/work_queue_service.py:336-426`).
+1. **Tasks are the manual work items of the office queue.** The shared `WorkQueueSourceType` reserves `TASK` specifically for user-created tasks, distinct from computed system items (`docs/domains/work-queue.md`, `backend/app/common/source_types.py:6-12`, `backend/app/work_queue/services/task_items.py:31-61`).
+2. **Open linked tasks merge into the source row; otherwise tasks stay standalone.** During work-queue assembly, an open task linked to a currently materialized source item is attached as `linked_tasks`; otherwise the task becomes its own `TASK` row, optionally enriched with source summary/warnings (`docs/domains/work-queue.md`, `backend/app/work_queue/services/work_queue_service.py:336-426`).
 
 ## Future / planned
 

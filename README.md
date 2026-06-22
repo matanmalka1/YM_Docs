@@ -16,7 +16,8 @@ Start here:
 
 - `AGENTS.md`
 - `docs/agent/entry-point.md`
+- `docs/project/documentation-map.md`
 
 This repository owns project-wide agent, architecture, workflow, and documentation rules.
 
-Domain-specific product docs are not normalized here yet.
+Domain-specific product docs live in `docs/domains/README.md` and are canonical/code-verified unless explicitly marked otherwise.

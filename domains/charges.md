@@ -151,7 +151,7 @@ Still-true decisions preserved from shared legacy docs and verified against curr
 
 1. **Charges are office-managed internal billing records, not external invoice-provider events.** `BillingService.issue_charge()` only changes internal status/audit state; it does not call an external billing provider. (`backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md:95-108`, `backend/app/charges/services/billing_service.py:99-123`)
 2. **Invoice linkage is downstream and manual/internal.** The charge domain owns the charge lifecycle; invoice attachment is a separate concern and the charge model only exposes a nullable one-to-one `invoice` relationship. (`backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md:97-102`, `backend/app/charges/models/charge.py:94-96`)
-3. **Unpaid issued charges surface in the work queue as derived system items after the threshold passes.** Business scoping applies only to charge items; VAT, annual reports, and advance payments remain client-level in that queue view. (`backend/docs/backend/domains/work-queue.md:47-52`, `68-72`; `backend/app/work_queue/services/billing_items.py:58-92`)
+3. **Unpaid issued charges surface in the work queue as derived system items after the threshold passes.** Business scoping applies only to charge items; VAT, annual reports, and advance payments remain client-level in that queue view. Current behavior is documented in `docs/domains/work-queue.md`; charge-specific implementation lives in `backend/app/work_queue/services/billing_items.py:58-92`.
 
 ## Future / planned
 
@@ -159,4 +159,4 @@ Still-true decisions preserved from shared legacy docs and verified against curr
 
 ## Historical notes
 
-No `backend/docs` file exists that is dedicated to the charge domain, so this docs-only pass did not create `docs/archive/charge-legacy.md` and did not pointer-rewrite any legacy domain file. Historical rationale that still mentions charge remains in shared files such as `backend/docs/domain_decisions_v3.md`, `backend/docs/backend/domains/work-queue.md`, `backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md`, and `backend/docs/history-vs-timeline.md`, which were left untouched to avoid cross-domain conflicts.
+No `backend/docs` file exists that is dedicated to the charge domain, so this docs-only pass did not create `docs/archive/charge-legacy.md`. Historical rationale that still mentions charge remains in shared files such as `backend/docs/domain_decisions_v3.md`, `docs/archive/work-queue-legacy.md`, and `backend/docs/domain_model/DOMAIN_MODEL_REVIEW_SUMMARY.md`.

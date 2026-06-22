@@ -159,4 +159,4 @@ These items are explicitly not current behavior:
 
 ## Historical notes
 
-No dedicated `backend/docs` tax-calendar legacy file exists for this domain. Historical rationale still lives in the shared decision log `backend/docs/domain_decisions_v3.md` and shared screen-spec notes `backend/docs/frontend_screen_spec.md`, but those shared files were not archived or pointer-rewritten in this domain-only pass to avoid cross-domain conflicts.
+No dedicated `backend/docs` tax-calendar legacy file exists for this domain. Historical rationale still lives in the shared decision log `backend/docs/domain_decisions_v3.md`; legacy screen-spec notes live in `backend/docs/frontend_screen_spec.md` and are not source of truth.

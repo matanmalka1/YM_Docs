@@ -150,7 +150,7 @@ No open known issues.
 
 ## Decisions (preserved)
 
-From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and `backend/docs/backend/domains/advance_payments_spec.md`:
+From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived legacy spec at `docs/archive/advance-payments-legacy.md`:
 
 1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. `paid_late` is similarly computed from `paid_at` versus the effective due date. Decision confirmed in advance_payments_spec.md §Closed Decisions and current schemas.
 
@@ -185,4 +185,4 @@ These items are explicitly **not yet implemented**. Do not describe as current b
 
 Legacy spec archived at `docs/archive/advance-payments-legacy.md`.
 
-Original location: `backend/docs/backend/domains/advance_payments_spec.md` (now a pointer).
+Historical source archived at `docs/archive/advance-payments-legacy.md`.

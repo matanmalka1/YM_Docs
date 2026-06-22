@@ -191,8 +191,4 @@ Explicitly not-yet-implemented behavior. Never describe as current.
 
 Legacy VAT domain material archived at `docs/archive/vat-reports-legacy.md`.
 
-Original legacy files now point here:
-- `backend/docs/backend/domains/vat_report/VAT_DEFINITIONS.md`
-- `backend/docs/backend/domains/vat_report/source-map.md`
-- `backend/docs/backend/domains/vat_report/vat_reports_deep_summary.md`
-- `backend/docs/backend/domains/vat_report/vat_reports_domain_summary.md`
+Original legacy VAT material is archived at `docs/archive/vat-reports-legacy.md`.

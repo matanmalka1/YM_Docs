@@ -189,4 +189,4 @@ The following items appear in legacy notes or README but are **not yet implement
 Legacy files for this domain:
 - `backend/app/timeline/README.md` — replaced by pointer; historical content preserved at `docs/archive/timeline-legacy.md`.
 - `backend/docs/history-vs-timeline.md` — replaced by pointer; still reference-grade.
-- `backend/docs/backend/domains/history-map.md` — replaced by pointer; historical frontend history/audit surface map preserved at `docs/archive/timeline-legacy.md`.
+- Historical frontend history/audit surface map preserved at `docs/archive/timeline-legacy.md`.

@@ -1,7 +1,10 @@
-# API TODO — בוצע (ארכיון)
-_פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) | יוני 2026_
+> **Historical completed backlog. Not active API source of truth.**
+> Current API contract rules live in `docs/architecture/api-contracts.md`; active backlog decisions live in `docs/api-todo.md`.
 
-**מקרא:** ✅ = בוצע · AC = Acceptance Criteria. פריטי "לא למימוש"/"לא נדרש" (החלטות מוצר) נשארים ב-[api-todo.md](api-todo.md), לא כאן.
+# API TODO — בוצע (ארכיון)
+_פריטים שהושלמו (✅), הועברו מ-[api-todo.md](../api-todo.md) | יוני 2026_
+
+**מקרא:** ✅ = בוצע · AC = Acceptance Criteria. פריטי "לא למימוש"/"לא נדרש" (החלטות מוצר) נשארים ב-[api-todo.md](../api-todo.md), לא כאן.
 
 ---
 
@@ -104,7 +107,7 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 
 #### 42. Response envelopes לא עקביים ✅ בוצע
 **בעיה:** 4 וריאנטים שונים של רשימה.
-**החלטה:** הסטנדרט הוא `PaginatedResponse[T]` = `{items, page, page_size, total}` לפי [api-contracts.md](architecture/api-contracts.md). `total_pages` **מוסר** (נגזר מ-`total/page_size`, מחושב בצד לקוח); aliases אסורים (ADR 0001 / entry-point.md).
+**החלטה:** הסטנדרט הוא `PaginatedResponse[T]` = `{items, page, page_size, total}` לפי [api-contracts.md](../architecture/api-contracts.md). `total_pages` **מוסר** (נגזר מ-`total/page_size`, מחושב בצד לקוח); aliases אסורים (ADR 0001 / entry-point.md).
 **AC:**
 - [x] `VatWorkItemListResponse` — `items/total/page/page_size` (guard: `backend/tests/vat/test_vat_list_envelope_schema.py`)
 - [x] `VatInvoiceListResponse` — `items/total/page/page_size` (collection child bounded; envelope לעקביות; guard באותו קובץ)
@@ -120,8 +123,8 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] משויך ל-responses השגיאה בכל ה-endpoints
 - [x] ה-frontend מסתמך על מבנה ידוע דרך `getApiErrorBody()`
 
-**בוצע (sweep מלא):** המטריצה הקנונית של סטטוס-שגיאה לכל endpoint תועדה ב-[backend/error-doc-matrix.md](backend/error-doc-matrix.md) (נגזרה מ-raise sites אמיתיים, מאומתת מול `exception_handlers.py`). מנגנון כפול:
-- **`401`/`403` מוזרקים גלובלית** ב-`build_openapi` ([app/core/openapi.py](../backend/app/core/openapi.py)): `401` לכל op שאינו public (לפי `public_endpoints.py`); `403` לכל op עם dependency של `require_role(...)` (זוהה דרך הליכה על `route.dependant`). 188/201 ה-ops הם role-gated. שני ה-ops הלא-public היחידים ללא `require_role` (`GET /auth/me`, `POST /auth/logout`) לא מגיעים ל-`ForbiddenError` בשירות.
+**בוצע (sweep מלא):** המטריצה הקנונית של סטטוס-שגיאה לכל endpoint תועדה ב-[backend/error-doc-matrix.md](../../backend/error-doc-matrix.md) (נגזרה מ-raise sites אמיתיים, מאומתת מול `exception_handlers.py`). מנגנון כפול:
+- **`401`/`403` מוזרקים גלובלית** ב-`build_openapi` ([app/core/openapi.py](../../backend/app/core/openapi.py)): `401` לכל op שאינו public (לפי `public_endpoints.py`); `403` לכל op עם dependency של `require_role(...)` (זוהה דרך הליכה על `route.dependant`). 188/201 ה-ops הם role-gated. שני ה-ops הלא-public היחידים ללא `require_role` (`GET /auth/me`, `POST /auth/logout`) לא מגיעים ל-`ForbiddenError` בשירות.
 - **`400`/`404`/`409`/`500` מתועדים per-route** דרך ה-helpers מ-`core/openapi_responses.py`. `404` כבר נסחף (פריט 25). `500` מתועד רק ב-`DOCUMENT.UPLOAD_FAILED` (upload/replace); export-ים של excel/PDF נשארים ללא 500 מתועד (env `ImportError`, לא חוזה עסקי).
 - **בדיקות רגרסיה:** `test_openapi_auth_error_docs.py` (הזרקת 401/403 + exclusion ל-public + רפרנס ל-`ErrorEnvelope`), `test_error_doc_coverage_matrix.py` (כל op מתעד בדיוק את ה-400/409/500 מהמטריצה — אין חסר ואין עודף), בנוסף ל-`test_error_openapi_schema.py` הקיים.
 - `openapi.json` + frontend `generated.ts` יוצאו מחדש; backend scoped suite + frontend typecheck/lint/format/test ירוקים.
@@ -294,7 +297,7 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] בדיקה: `period` לא חוקי מוחזר עם `422`
 
 **מה בוצע:**
-- `PeriodStr` + `PERIOD_PATTERN` נוספו ל-[app/core/api_types.py](../backend/app/core/api_types.py).
+- `PeriodStr` + `PERIOD_PATTERN` נוספו ל-[app/core/api_types.py](../../backend/app/core/api_types.py).
 - `VatWorkItemCreateRequest` — inline `field_validator` הוסר ומוחלף ב-`PeriodStr`.
 - `ChargeCreateRequest` — inline `field_validator` + `PERIOD_REGEX` הוסרו ומוחלפים ב-`PeriodStr | None`.
 - `AdvancePaymentCreateRequest` — `Field(..., pattern=...)` מוחלף ב-`PeriodStr`.
@@ -312,11 +315,11 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] בדיקה: endpoint חדש ללא הגדרת security מקבל אימות אוטומטית
 
 **מה בוצע:**
-- `build_openapi()` ב-[app/core/openapi.py](../backend/app/core/openapi.py) קובע `security: [{HTTPBearer: []}]` גלובלי + `securitySchemes.HTTPBearer`, ומחיל `security: []` על ה-public endpoints בלבד. מחובר ל-app דרך `custom_openapi` ב-[app/main.py](../backend/app/main.py).
-- allowlist יחיד ב-[app/core/public_endpoints.py](../backend/app/core/public_endpoints.py) (source of truth, משותף ל-spec ולטסט).
-- **אכיפת runtime** (לא רק תיעוד): [tests/core/test_endpoint_auth_guard.py](../backend/tests/core/test_endpoint_auth_guard.py) נכשל אם endpoint מחוץ ל-allowlist חסר `get_current_user`/`require_role` (רקורסיבי — תופס גם `require_role` מקונן). בנוסף מוודא ש-public ops מסומנים `security: []` ושאף non-public לא.
+- `build_openapi()` ב-[app/core/openapi.py](../../backend/app/core/openapi.py) קובע `security: [{HTTPBearer: []}]` גלובלי + `securitySchemes.HTTPBearer`, ומחיל `security: []` על ה-public endpoints בלבד. מחובר ל-app דרך `custom_openapi` ב-[app/main.py](../../backend/app/main.py).
+- allowlist יחיד ב-[app/core/public_endpoints.py](../../backend/app/core/public_endpoints.py) (source of truth, משותף ל-spec ולטסט).
+- **אכיפת runtime** (לא רק תיעוד): [tests/core/test_endpoint_auth_guard.py](../../backend/tests/core/test_endpoint_auth_guard.py) נכשל אם endpoint מחוץ ל-allowlist חסר `get_current_user`/`require_role` (רקורסיבי — תופס גם `require_role` מקונן). בנוסף מוודא ש-public ops מסומנים `security: []` ושאף non-public לא.
 - `logout` עבר לדרוש אימות (הוסר מה-allowlist + קיבל auth dependency).
-- `openapi.json` יוצא מחדש ו-`check_contract_sync` ירוק. תיעוד: כלל ב-[docs/architecture/security.md](architecture/security.md).
+- `openapi.json` יוצא מחדש ו-`check_contract_sync` ירוק. תיעוד: כלל ב-[docs/architecture/security.md](../architecture/security.md).
 
 ## Pagination / Audit
 
@@ -379,11 +382,11 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 **בעיה:** `stats`/`counters`/`summary` רק בחלק מה-responses.
 **AC:**
 - [x] בירור: כל 5 בלוקי ה-metadata (BinderListResponse.counters, ChargeListResponse.stats, ClientRecordListResponse.stats, WorkQueueListResponse.summary, TaxCalendarGroupListResponse.summary) חיוניים למסך ונצרכים ב-UI — אף אחד לא הוסר.
-- [x] מדיניות תועדה ב-[api-contracts.md](architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
+- [x] מדיניות תועדה ב-[api-contracts.md](../architecture/api-contracts.md): aggregate metadata רק כשה-UI צריך; שם מועדף ל-API חדשים = `summary`; `stats`/`counters` קיימים נשארים כשמוצדקים. לא נכפה `summary` על כל list, לא הוסף `summary: {}` ריק, ולא שונה שם לשם טוהר.
 
 #### 44. `sort_order` vs `order` ✅ בוצע
 **בעיה:** שני שמות לאותו param.
-**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](architecture/api-contracts.md) — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
+**החלטה:** הסטנדרט הוא **`order`** (לא `sort_order`), לפי source-of-truth [api-contracts.md](../architecture/api-contracts.md) — list endpoints חייבים `page,page_size,sort_by,order`; aliases כמו `sort_dir`/`sort_order` חייבים להגר ל-`order`. ה-AC המקורי ("שם אחיד `sort_order`") היה הפוך ותוקן.
 **AC:**
 - [x] שם אחיד אחד (`order`) בכל ה-endpoints: annual-reports, binders, correspondence כבר השתמשו ב-`order`. הוסף guard `Literal["asc","desc"]` ל-binders.
 - [x] `clients` (`GET /clients`, `GET /clients/sidebar`) הוגר מ-`sort_order` ל-`order` (route+service+frontend+URL state), ללא alias תאימות; `order` מתועד ב-OpenAPI דרך schema משותף `SortOrder`.
@@ -422,9 +425,9 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] DTO רזה (`XxxListItem`) לכל אחד מה-4: `VatWorkItemListItem`, `ClientRecordListItem`, `ChargeListItem`, `NotificationListItem`
 - [x] endpoints של LIST עוברים ל-DTO הרזה (vat work-items + grouped + by-client, clients, charges, notifications)
 - [x] ה-DTO השמן נשאר רק ב-`GET /{id}` — וב-notifications נוסף `GET /notifications/{id}` חדש (לא היה detail endpoint)
-- [x] מדידה: [performance/list-dto-payloads.md](performance/list-dto-payloads.md) (VAT −56.9%, clients −66.0%, charges −32.7%, notifications −31.6%)
+- [x] מדידה: [performance/list-dto-payloads.md](../performance/list-dto-payloads.md) (VAT −56.9%, clients −66.0%, charges −32.7%, notifications −31.6%)
 
-**הושלם** (2026-06-11). חוק contract חדש ב-[architecture/api-contracts.md](architecture/api-contracts.md). תיעוד דומיינים עודכן (vat/charges/clients/notifications). הערה: notifications list שומר `content_snapshot`/`subject_snapshot`/`business_name` כי ה-bell drawer/tab מציגים preview inline.
+**הושלם** (2026-06-11). חוק contract חדש ב-[architecture/api-contracts.md](../architecture/api-contracts.md). תיעוד דומיינים עודכן (vat/charges/clients/notifications). הערה: notifications list שומר `content_snapshot`/`subject_snapshot`/`business_name` כי ה-bell drawer/tab מציגים preview inline.
 
 #### 35. שדות כפולים חשודים ב-`AnnualReportDetailResponse` ✅ בוצע
 **בעיה:** שלושה זוגות שנראו שרידי מיגרציה — `refund_due`+`tax_refund_amount`, `tax_due`+`tax_due_amount`, `assessment_amount`+`final_balance`.
@@ -474,7 +477,7 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 #### 40. שדות נסתרים ב-`ClientUpdateRequest` ✅ בוצע
 **בעיה:** `status`, `annual_revenue`, `advance_rate_updated_at` קיימים ב-Update אבל לא ב-Create.
 **AC:**
-- [x] בירור: `status` + `annual_revenue` נשארים user-editable; `advance_rate_updated_at` הפך server-owned (מתועד ב-[update-request-conventions.md](architecture/update-request-conventions.md))
+- [x] בירור: `status` + `annual_revenue` נשארים user-editable; `advance_rate_updated_at` הפך server-owned (מתועד ב-[update-request-conventions.md](../architecture/update-request-conventions.md))
 - [x] ה-frontend חושף `status`/`annual_revenue`; `advance_rate_updated_at` הוסר מ-update payload (frontend + taxProfile) ונשאר read-only ב-response
 
 #### 41. UpdateRequest ללא validation ✅ בוצע
@@ -485,12 +488,12 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] התנהגות מתועדת + validation בהתאם
 
 **מה בוצע (38–41):**
-- `NonEmptyUpdateMixin` ([app/core/schemas/validation.py](../backend/app/core/schemas/validation.py)) — `extra="forbid"` (שדה לא מוכר → 422) + דחיית `{}` ריק → 422. הוחל על כל 15 ה-`*UpdateRequest` (14 קיימים + `BinderIntakeUpdateRequest` ששמו שונה).
-- `NonBlankStr` ([app/core/api_types.py](../backend/app/core/api_types.py)) — strip + `min_length=1`, על שדות טקסט עסקיים-נדרשים: `title`, `subject`, `business_name`, `name`, `full_name` (client+user), `note`.
+- `NonEmptyUpdateMixin` ([app/core/schemas/validation.py](../../backend/app/core/schemas/validation.py)) — `extra="forbid"` (שדה לא מוכר → 422) + דחיית `{}` ריק → 422. הוחל על כל 15 ה-`*UpdateRequest` (14 קיימים + `BinderIntakeUpdateRequest` ששמו שונה).
+- `NonBlankStr` ([app/core/api_types.py](../../backend/app/core/api_types.py)) — strip + `min_length=1`, על שדות טקסט עסקיים-נדרשים: `title`, `subject`, `business_name`, `name`, `full_name` (client+user), `note`.
 - explicit-null נדחה (422) על שדות non-nullable לפי עמודת המודל (לא לפי Create-optionality); שדות nullable אמיתיים מתנקים ע"י null.
 - חריגים מתועדים (single-payload required): `EntityNoteUpdateRequest.note`, `AnnexDataUpdateRequest.data`. `DeadlineUpdateRequest` הפך partial (POST, deadline_type אופציונלי).
 - VAT invoice update עבר ל-`exclude_unset` semantics מלא + ולידציה של ה-counterparty pair האפקטיבי (merged) בשירות.
-- תיעוד: [docs/architecture/update-request-conventions.md](architecture/update-request-conventions.md) (רשום ב-documentation-map). OpenAPI + frontend `generated.ts` יוצאו מחדש.
+- תיעוד: [docs/architecture/update-request-conventions.md](../architecture/update-request-conventions.md) (רשום ב-documentation-map). OpenAPI + frontend `generated.ts` יוצאו מחדש.
 - בדיקות: סוויטת backend מלאה ירוקה; frontend typecheck/lint/build ירוקים.
 
 #### 46. `updated_at` חסר על Response schemas ✅ בוצע
@@ -502,4 +505,4 @@ _פריטים שהושלמו (✅), הועברו מ-[api-todo.md](api-todo.md) |
 - [x] `ChargeResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0002. מתעדכן ב-issue/pay/cancel/soft-delete.
 - [x] `BinderResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0003. מתעדכן בשינויי lifecycle/handover/capacity/soft-delete.
 - [x] `SignatureRequestResponse` — נוספה עמודה `updated_at` (nullable, `onupdate=utcnow`) + migration 0004. מתעדכן ב-send/sign/decline/cancel/expire/soft-delete. `SignatureAuditEvent` נשאר append-only ללא `updated_at`.
-- [x] `CorrespondenceResponse` — **החלטת דומיין: correspondence הוא mutable**. ה-PATCH path אמיתי ונשאר; נוספה עמודה `updated_at` (nullable, `onupdate=utcnow_aware`) + migration 0005, ה-docstring המיושן ("No updated_at"/immutable) ו-[docs/domains/communications.md](domains/communications.md) תוקנו.
+- [x] `CorrespondenceResponse` — **החלטת דומיין: correspondence הוא mutable**. ה-PATCH path אמיתי ונשאר; נוספה עמודה `updated_at` (nullable, `onupdate=utcnow_aware`) + migration 0005, ה-docstring המיושן ("No updated_at"/immutable) ו-[docs/domains/communications.md](../domains/communications.md) תוקנו.

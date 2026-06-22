@@ -24,6 +24,7 @@ Archived from `backend/app/notification/README.md` during the canonical domain-d
 ## Archived original content
 
 The full pre-migration README content is preserved below for historical reference.
+Archived copy below may contain old source-of-truth labels. Those labels are no longer active.
 
 ---
 

@@ -25,9 +25,11 @@ All paths exist in `backend/openapi.json`.
 | POST | /api/v1/auth/login | Public | Authenticate; returns access token + sets HttpOnly refresh cookie |
 | POST | /api/v1/auth/refresh | Cookie | Exchange refresh cookie for a new access token |
 | GET | /api/v1/auth/me | Bearer | Return current user's id, full_name, role, email |
-| POST | /api/v1/auth/logout | Cookie | Bump token_version (invalidate all tokens); clear refresh cookie |
+| POST | /api/v1/auth/logout | Bearer | Bump token_version (invalidate all tokens); clear refresh cookie |
 | POST | /api/v1/auth/forgot-password | Public | Request password reset email (always returns generic message) |
 | POST | /api/v1/auth/reset-password | Public | Consume one-time token; set new password; bump token_version |
+
+Security policy, token storage, and refresh-cookie rules are canonical in `docs/architecture/security.md`.
 
 ### User management (ADVISOR only)
 
@@ -187,7 +189,7 @@ No open known issues.
 
 - **Token invalidation via `token_version` (not token revocation list).** Chosen to avoid the need for a server-side revocation store. The version integer is embedded in every JWT payload and re-checked against the DB on every request. Any single bump invalidates all previously issued tokens for that user simultaneously. This is intentional for logout, deactivation, and password reset scenarios.
 
-- **Dual-path logout.** `POST /api/v1/auth/logout` resolves the user from the refresh cookie (if present) and bumps token_version. If no cookie is present, it still clears the cookie header on the response. This allows logout to succeed even in degraded cookie states.
+- **Bearer-auth logout.** `POST /api/v1/auth/logout` requires the current user from the bearer token, bumps that user's `token_version`, and clears the refresh cookie on the response. Refresh-cookie storage policy remains owned by `docs/architecture/security.md`.
 
 - **ADVISOR-only user management.** SECRETARY role has no user-management capability by design. Role guard is enforced at both router-level dependency and service level.
 

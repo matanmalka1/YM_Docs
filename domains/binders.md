@@ -260,7 +260,7 @@ No broken imports found in the binders module.
 
 ## Decisions (preserved)
 
-From `backend/docs/backend/domains/binder_lifecycle_refactor_spec.md` (completed refactor, still true):
+From the archived binder lifecycle refactor spec in `docs/archive/binders-legacy.md` (completed refactor, still true):
 
 - **Two-field lifecycle model.** `location_status` and `capacity_status` are separate concepts. `open` is capacity only; intake eligibility is strictly `in_office + open`.
 - **`BinderLifecycleService` as sole owner.** No router, repo, or external service mutates `location_status`/`capacity_status` directly. This is enforced by design, not just convention.

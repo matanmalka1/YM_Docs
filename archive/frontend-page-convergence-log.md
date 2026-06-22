@@ -1,3 +1,6 @@
+> **Historical frontend refactor log. Not source of truth.**
+> Current page-structure rules live in `docs/frontend/page-structure.md`; current page status lives in `docs/frontend/page-refactor-status.md`.
+
 ## Scope
 
 This file owns only:

@@ -1,3 +1,7 @@
+> **Historical inventory only. Not source of truth.**
+> Use `docs/project/documentation-map.md` for documentation ownership and `docs/domains/README.md` for canonical domain docs.
+> This archived inventory may contain stale source-of-truth claims and old paths preserved for historical context.
+
 ## Scope
 
 This file owns only:

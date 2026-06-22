@@ -34,13 +34,16 @@ Each captured the old `backend/app/<domain>/README.md` (or equivalent legacy spe
 
 ### Historical TODOs and planning docs
 
+- `api-todo-done.md` — historical completed API backlog. Current active backlog: `docs/api-todo.md`; current API rules: `docs/architecture/api-contracts.md`.
 - `annual-reports-todo.md` — historical annual-reports task list. Current annual-report behavior: `docs/domains/annual-reports.md`; live backlog: `docs/api-todo.md`.
 - `frontend-alignment-todo.md` — historical frontend/backend alignment task list. Archived after remaining items were resolved or no longer active. Current frontend rules: `docs/frontend/*`; current backend/API backlog: `docs/api-todo.md`.
+- `frontend-page-convergence-log.md` — historical frontend page-convergence changelog. Current frontend page rules: `docs/frontend/page-structure.md`; current refactor status: `docs/frontend/page-refactor-status.md`.
 - `migration-phases.md` — historical backend domain migration execution plan (structural migration complete). Replaced by `docs/project/backend-module-map.md` (package inventory) and `docs/domains/*` (canonical behavior).
 
 ### Historical generated scans / gap analyses
 
 - `actual-domains-v1.md` — generated scan of `backend/app/` endpoints/services/repositories. Replaced by `docs/project/backend-module-map.md` (current inventory) and `docs/domains/*` (behavior); archived because it drifted from code.
+- `domain-docs-inventory-legacy.md` — historical pre-migration domain-doc ownership inventory. Current ownership map: `docs/project/documentation-map.md`; current domain index: `docs/domains/README.md`.
 - `gap-target-vs-actual-v1.md` — target-vs-actual domain gap analysis and build-order plan. Replaced by current domain docs and `docs/project/backend-module-map.md`. It refers to a `target-domains-v1.md` planning file that no longer exists in this repo; that reference is historical only and has No current canonical replacement identified.
 
 ## Policy
