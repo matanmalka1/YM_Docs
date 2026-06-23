@@ -104,6 +104,16 @@ Do not hand-roll a filter bar, plain `<select>`, or labeled raw checkbox when th
 the interaction. Native radio inputs and hidden file inputs are allowed when the native control is
 intentional and accessible.
 
+`FilterPanel` supports `title`/`subtitle`/`icon` (header row; icon defaults to a funnel when `title`
+is set) and `size` (defaults to `'sm'` = compact density across Select/DatePicker/search/client-picker
+fields; pass `size="md"` to opt out). Default `gridClass` flows all fields into one row at `xl`
+(`xl:grid-cols-none xl:grid-flow-col xl:auto-cols-fr`), 2-col below — don't pass per-bar `gridClass`
+unless a bar genuinely needs a different layout. Every standalone list-page filter bar passes a
+`title`+`subtitle` and inherits this; result is uniform compact, single-line, headed bars. **Sanctioned exception:** `search/SearchFiltersBar` stays
+hand-rolled — it is a collapsible advanced-filters drawer with an active-count badge and immediate
+plain-text inputs (id_number / binder_number / filename), which `FilterPanel` does not model
+(no collapsible mode, no immediate `text` field type). Do not re-flag it as filter-bar drift.
+
 ## Loading indicators (canonical shapes)
 
 | Need | Use | Path |
