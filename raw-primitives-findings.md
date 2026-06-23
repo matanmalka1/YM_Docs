@@ -267,18 +267,18 @@ Search pattern targeted `rounded-full` with pill sizing, label text sizes, boldn
 
 Search pattern targeted `rounded-full` progress tracks/bars and small status dots.
 
-- [ ] `frontend/src/features/dashboard/components/panels/TaxInsightsRow.tsx:28`
-- [ ] `frontend/src/features/signatureRequests/components/shared/SignatureRequestsDashboardPanel.tsx:142`
-- [ ] `frontend/src/features/annualReports/components/season/SeasonProgressBar.tsx:16`
-- [ ] `frontend/src/features/signing/components/SigningForm.tsx:41`
-- [ ] `frontend/src/features/signing/components/SigningForm.tsx:63`
-- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceRow.tsx:79`
-- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceEditRow.tsx:106`
-- [ ] `frontend/src/features/annualReports/components/tax/DeductionsTab.tsx:50`
-- [ ] `frontend/src/features/annualReports/components/panel/ReadinessCheckPanel.tsx:50`
-- [ ] `frontend/src/features/annualReports/components/panel/ReadinessCheckPanel.tsx:52`
-- [ ] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:66`
-- [ ] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:68`
+- [x] `frontend/src/features/dashboard/components/panels/TaxInsightsRow.tsx:28`
+- [x] `frontend/src/features/signatureRequests/components/shared/SignatureRequestsDashboardPanel.tsx:142`
+- [x] `frontend/src/features/annualReports/components/season/SeasonProgressBar.tsx:16`
+- [x] `frontend/src/features/signing/components/SigningForm.tsx:41`
+- [x] `frontend/src/features/signing/components/SigningForm.tsx:63`
+- [x] `frontend/src/features/vatReports/components/list/VatInvoiceRow.tsx:79`
+- [x] `frontend/src/features/vatReports/components/list/VatInvoiceEditRow.tsx:106`
+- [x] `frontend/src/features/annualReports/components/tax/DeductionsTab.tsx:50`
+- [x] `frontend/src/features/annualReports/components/panel/ReadinessCheckPanel.tsx:50`
+- [x] `frontend/src/features/annualReports/components/panel/ReadinessCheckPanel.tsx:52`
+- [x] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:66`
+- [x] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:68`
 
 ## Clickable Non-Button Patterns
 
