@@ -236,32 +236,32 @@ Search pattern targeted `rounded-xl` / `rounded-2xl` / `rounded-3xl` plus border
 
 Search pattern targeted `rounded-full` with pill sizing, label text sizes, boldness, min-width counters, or tabular numbers.
 
-- [ ] `frontend/src/features/dashboard/components/kpi/VatStatCard.tsx:70`
-- [ ] `frontend/src/components/layout/Navbar/Navbar.tsx:47`
-- [ ] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:76`
-- [ ] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:109`
+- [x] `frontend/src/features/dashboard/components/kpi/VatStatCard.tsx:70`
+- [x] `frontend/src/components/layout/Navbar/Navbar.tsx:47`
+- [x] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:76`
+- [x] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:109`
 - [ ] `frontend/src/features/dashboard/components/shared/DashboardOnboardingEmptyState.tsx:21`
 - [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:188`
 - [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:225`
-- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:319`
-- [ ] `frontend/src/features/dashboard/components/panels/AttentionBoard.tsx:94`
-- [ ] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:36`
-- [ ] `frontend/src/features/search/components/SearchFiltersBar.tsx:41`
-- [ ] `frontend/src/features/search/components/DocumentResultsSection.tsx:95`
-- [ ] `frontend/src/features/tasks/components/list/TaskListColumns.tsx:72`
-- [ ] `frontend/src/features/signatureRequests/components/shared/SignatureRequestsDashboardPanel.tsx:142`
+- [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:319`
+- [x] `frontend/src/features/dashboard/components/panels/AttentionBoard.tsx:94`
+- [x] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:36`
+- [x] `frontend/src/features/search/components/SearchFiltersBar.tsx:41`
+- [x] `frontend/src/features/search/components/DocumentResultsSection.tsx:95`
+- [x] `frontend/src/features/tasks/components/list/TaskListColumns.tsx:72`
+- [x] `frontend/src/features/signatureRequests/components/shared/SignatureRequestsDashboardPanel.tsx:142`
 - [ ] `frontend/src/features/auth/pages/LoginPage.tsx:188`
 - [ ] `frontend/src/features/notes/components/NotesCard.tsx:123`
-- [ ] `frontend/src/features/notifications/components/list/NotificationListItem.tsx:12`
+- [x] `frontend/src/features/notifications/components/list/NotificationListItem.tsx:12`
 - [ ] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:28`
 - [ ] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:35`
-- [ ] `frontend/src/features/vatReports/components/shared/VatProgressBar.tsx:14`
-- [ ] `frontend/src/features/clients/pages/ClientDetailsPage.tsx:98`
-- [ ] `frontend/src/features/timeline/components/TimelineCard.tsx:45`
-- [ ] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:139`
-- [ ] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:165`
-- [ ] `frontend/src/features/documents/components/detail/DocumentVersionsPanel.tsx:36`
-- [ ] `frontend/src/features/clients/components/createClientModal/CreateClientReviewStep.tsx:95`
+- [x] `frontend/src/features/vatReports/components/shared/VatProgressBar.tsx:14`
+- [x] `frontend/src/features/clients/pages/ClientDetailsPage.tsx:98`
+- [x] `frontend/src/features/timeline/components/TimelineCard.tsx:45`
+- [x] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:139`
+- [x] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:165`
+- [x] `frontend/src/features/documents/components/detail/DocumentVersionsPanel.tsx:36`
+- [x] `frontend/src/features/clients/components/createClientModal/CreateClientReviewStep.tsx:95`
 
 ## Progress Or Dot Primitive Drift
 
