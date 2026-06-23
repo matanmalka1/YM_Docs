@@ -25,6 +25,16 @@ implementation rules.
   Do not put card-like Tailwind chrome around another component that already renders a `Card`.
 - Do not recreate a shared component with local Tailwind markup only to change spacing or color. Add
   a supported variant when the requirement is genuinely reusable.
+- When replacing raw markup with a shared primitive, use the primitive's public API first
+  (`variant`, `size`, `shape`, `icon`, and similar props). Do not carry over the old raw
+  `className` just to preserve pixel-level styling; if the primitive cannot express a recurring need,
+  extend the primitive instead of reintroducing local styling.
+- A surface that navigates must render a real `Link` (or `ActionSurfaceLink`), not a
+  `Button` with `navigate(...)` in `onClick`. Preserve browser link behavior, including opening
+  destinations in a new tab and exposing an `href`.
+- Keep shared surface variants cohesive: add a variant only after at least two consumers share the
+  same structural pattern. Feature-specific animation belongs to the feature, not a generic surface
+  variant.
 - Use Lucide icons through `lucide-react`. Do not add hand-drawn SVG icons when a matching icon
   exists.
 - Use semantic status variants for success, warning, error, and informational states. Do not encode
@@ -96,6 +106,8 @@ implementation rules.
 - Use semantic HTML first. Clickable `div` and `span` elements are not substitutes for buttons and
   links.
 - All workflows must be operable by keyboard with a visible focus state.
+- The interactive root element of every shared UI primitive must include `focus-ring`; consumers
+  must not need to supply focus styling themselves.
 - Do not disable ESLint accessibility rules to finish a component unless the exception is documented
   and the equivalent accessibility behavior is implemented.
 - Form errors, async failures, and success feedback that affect task completion must be available to
