@@ -59,6 +59,13 @@ Broader reinvention buckets:
 | Badge primitive style signature reinvention | 17 |
 | Card primitive style signature reinvention | 6 |
 | Input/container field style signature reinvention | 14 |
+| MonoValue reinvention (raw font-mono / direct tone classes) | 22 |
+| DefinitionList reinvention (raw dl/dt/dd) | 3 |
+| Divider reinvention candidates (border-t separators) | 30 |
+
+Re-grep 2026-06-23: raw native elements now down to 6 hits — all intentional (5 hidden RHF
+`<input type="hidden">` + 1 comment in `ClientEditForm.tsx:24`). Action-button / table / file-input /
+textarea migrations from the original sweep are complete.
 
 ## Raw Native Elements
 
@@ -536,6 +543,91 @@ Count: 14
 - [ ] `frontend/src/features/clients/components/details/ClientRelatedData.tsx:40`
 - [ ] `frontend/src/features/clients/components/details/ClientRelatedData.tsx:50`
 - [ ] `frontend/src/features/clients/components/details/ClientRelatedData.tsx:156`
+
+## MonoValue Reinvention
+
+`primitives/MonoValue.tsx` exists (`value` / `tone` / `format="amount"|"days"`, neutral/positive/negative/
+warning/critical tone classes) but is adopted in only 4 files. Meanwhile ~45 raw
+`font-mono ... tabular-nums` spans/cells render amounts and IDs by hand, and many reach straight into
+`semanticMonoToneClasses.*` — exactly the tone logic MonoValue encapsulates.
+
+Search:
+
+```sh
+rg -n "font-mono" frontend/src/features frontend/src/components/layout frontend/src/components/shared --glob '*.tsx'
+rg -n "semanticMonoToneClasses" frontend/src/features --glob '*.tsx' | grep -v MonoValue.tsx
+```
+
+Strong candidates (raw mono amount span, often with manual tone):
+
+- [ ] `frontend/src/features/vatReports/components/detail/VatSummaryTab.tsx:21`
+- [ ] `frontend/src/features/vatReports/components/detail/VatBreakdownCards.tsx:56`
+- [ ] `frontend/src/features/vatReports/components/detail/VatBreakdownCards.tsx:63`
+- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceTable.tsx:260`
+- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceTable.tsx:261`
+- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceTable.tsx:265`
+- [ ] `frontend/src/features/vatReports/components/list/VatInvoiceEditRow.tsx:151`
+- [ ] `frontend/src/features/vatReports/components/list/VatWorkItemColumns.tsx:64`
+- [ ] `frontend/src/features/vatReports/components/list/VatWorkItemColumns.tsx:96`
+- [ ] `frontend/src/features/annualReports/components/shared/CreateReportModalParts.tsx:53`
+- [ ] `frontend/src/features/annualReports/components/shared/CreateReportModalParts.tsx:66`
+- [ ] `frontend/src/features/annualReports/components/season/SeasonReportsTable.tsx:66`
+- [ ] `frontend/src/features/annualReports/components/season/SeasonReportsTable.tsx:81`
+- [ ] `frontend/src/features/search/components/DocumentResultsSection.tsx:20`
+- [ ] `frontend/src/features/search/components/DocumentResultsSection.tsx:45`
+
+Direct `semanticMonoToneClasses.*` use without `font-mono` (tone reinvention; MonoValue would carry tone
++ mono together, or a `tone` prop belongs on the consuming primitive):
+
+- [ ] `frontend/src/features/annualReports/components/panel/ReportHistoryTable.tsx:51`
+- [ ] `frontend/src/features/annualReports/components/panel/ReportHistoryTable.tsx:56`
+- [ ] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:36`
+- [ ] `frontend/src/features/annualReports/components/financials/AnnualPLSummary.tsx:37`
+- [ ] `frontend/src/features/annualReports/components/tax/DeductionsTab.tsx:37`
+- [ ] `frontend/src/features/annualReports/components/tax/DeductionsTab.tsx:62`
+- [ ] `frontend/src/features/annualReports/components/statusTransition/TimelineEvent.tsx:50`
+
+Not reinvention (leave): DataTable column `className: 'font-mono tabular-nums'` string configs
+(`VatCategoryTable`, `VatInvoiceTable` column defs, `TaxCalendarGroupsTable:134`) — a component can't
+drop into a className slot; `<Input className="font-mono">` invoice-number fields; `<Badge className="font-mono">`
+short codes; cases that already pass tone via `valueClassName=` into a primitive (`SeasonSummaryWidget:274/281`).
+
+## DefinitionList Reinvention
+
+`layout/DefinitionList.tsx` exists (`items` of `{label,value,fullWidth}`, `layout="grid"|"stacked"`,
+`columns`, `emptyValue`) and is adopted in 6 files. These hand-roll raw `<dl>/<dt>/<dd>` label-value
+lists instead:
+
+```sh
+rg -n "<(dl|dt|dd)\b" frontend/src/features frontend/src/components/layout frontend/src/components/shared --glob '*.tsx'
+```
+
+- [ ] `frontend/src/features/signing/components/SigningForm.tsx:101` — stacked label/value list
+- [ ] `frontend/src/features/clients/components/createClientModal/CreateClientIdentityStep.tsx:93` — grid (2-col) inside warning box
+- [ ] `frontend/src/features/annualReports/components/tax/TaxCalculationPanel.tsx:20` — local `Row`/`Section` dl wrappers; `divide-y` stacked variant. Reconcile with `DefinitionList layout="stacked"` or document as a divergence (it adds `muted` rows + dividers DefinitionList lacks).
+
+Also review `grid-cols-2 gap` label/value blocks (25 hits) that are dl-shaped without semantic tags.
+
+## Divider Reinvention Candidates
+
+`primitives/Divider.tsx` (hairline `role="separator"`) is adopted in only 2 files. ~30 inline
+`border-t border-gray-100/200` separators exist. Note: most are **structural card-section dividers**
+(`border-t ... pt-X` opening a footer/section with its own padding), which Divider does not replace.
+True standalone-rule candidates are the minority; this bucket is for review, not blanket conversion.
+
+```sh
+rg -n 'className="[^"]*\bborder-t\b' frontend/src/features frontend/src/components/layout frontend/src/components/shared --glob '*.tsx' | grep -v 'border-t-'
+```
+
+Sample (footer/section separators — verify standalone vs structural before converting):
+
+- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:126`
+- [ ] `frontend/src/features/dashboard/components/panels/SeasonInsightsCarousel.tsx:94`
+- [ ] `frontend/src/features/notes/components/NotesCard.tsx:75`
+- [ ] `frontend/src/features/documents/components/list/DocumentCard.tsx:85`
+- [ ] `frontend/src/features/documents/components/list/DocumentCard.tsx:97`
+- [ ] `frontend/src/features/reports/components/AdvancePaymentReportTable.tsx:69`
+- [ ] `frontend/src/features/clients/components/edit/ClientEditForm.tsx:169`
 
 ## Strict Primitive Checks
 
