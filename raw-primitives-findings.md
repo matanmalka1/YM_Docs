@@ -252,9 +252,9 @@ Search pattern targeted `rounded-full` with pill sizing, label text sizes, boldn
 - [x] `frontend/src/components/layout/Navbar/Navbar.tsx:47`
 - [x] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:76`
 - [x] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:109`
-- [ ] `frontend/src/features/dashboard/components/shared/DashboardOnboardingEmptyState.tsx:21`
-- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:188`
-- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:225`
+- [x] `frontend/src/features/dashboard/components/shared/DashboardOnboardingEmptyState.tsx:21`
+- [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:188`
+- [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:225`
 - [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:319`
 - [x] `frontend/src/features/dashboard/components/panels/AttentionBoard.tsx:94`
 - [x] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:36`
@@ -262,11 +262,11 @@ Search pattern targeted `rounded-full` with pill sizing, label text sizes, boldn
 - [x] `frontend/src/features/search/components/DocumentResultsSection.tsx:95`
 - [x] `frontend/src/features/tasks/components/list/TaskListColumns.tsx:72`
 - [x] `frontend/src/features/signatureRequests/components/shared/SignatureRequestsDashboardPanel.tsx:142`
-- [ ] `frontend/src/features/auth/pages/LoginPage.tsx:188`
-- [ ] `frontend/src/features/notes/components/NotesCard.tsx:123`
+- [x] `frontend/src/features/auth/pages/LoginPage.tsx:188`
+- [x] `frontend/src/features/notes/components/NotesCard.tsx:123`
 - [x] `frontend/src/features/notifications/components/list/NotificationListItem.tsx:12`
-- [ ] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:28`
-- [ ] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:35`
+- [x] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:28`
+- [x] `frontend/src/features/vatReports/components/detail/VatWorkItemHeaderActions.tsx:35`
 - [x] `frontend/src/features/vatReports/components/shared/VatProgressBar.tsx:14`
 - [x] `frontend/src/features/clients/pages/ClientDetailsPage.tsx:98`
 - [x] `frontend/src/features/timeline/components/TimelineCard.tsx:45`
@@ -274,6 +274,11 @@ Search pattern targeted `rounded-full` with pill sizing, label text sizes, boldn
 - [x] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:165`
 - [x] `frontend/src/features/documents/components/detail/DocumentVersionsPanel.tsx:36`
 - [x] `frontend/src/features/clients/components/createClientModal/CreateClientReviewStep.tsx:95`
+
+Disposition: Login feature labels and the VAT assignee are now rendered with `Badge`; NotesCard was
+already using `ChipLabel`. The VAT binder remains a real `Link` so normal navigation semantics are
+preserved, and the dashboard onboarding item is a CTA link rather than a badge. The three
+`SeasonSummaryWidget` entries are stale because that component no longer exists.
 
 ## Progress Or Dot Primitive Drift
 

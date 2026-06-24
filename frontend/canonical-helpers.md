@@ -62,6 +62,28 @@ Use the `QUERY_STALE_TIME` buckets (`short`/`default`/`medium`/`long`/`static`).
 owns `default`; do not restate it on a hook. Pick the bucket from data volatility, not endpoint shape.
 Full policy + bucket table in `architecture.md`.
 
+## Semantic colors — `src/utils/semanticColors.ts`
+
+Single source of truth for all color decisions. Import from here; never redefine color maps in feature or primitive code.
+
+| Need | Export | Key type |
+|------|--------|----------|
+| Tone type | `SemanticTone` | `'neutral' \| 'info' \| 'positive' \| 'warning' \| 'negative'` |
+| Badge variant type | `BadgeVariant` | `SemanticTone \| 'primary' \| 'purple'` |
+| Badge solid classes | `badgeVariantClasses` | `BadgeVariant` |
+| Badge signal (ring) classes | `badgeSignalVariantClasses` | `BadgeVariant` |
+| Badge soft (no ring) classes | `badgeSoftSignalVariantClasses` | `BadgeVariant` |
+| Dot / fill indicator color | `semanticDotClasses` | `SemanticTone` |
+| Icon container bg+text | `semanticStatToneClasses[tone].iconBg` | `SemanticTone` |
+| Mono/tabular value color | `semanticMonoToneClasses` | `SemanticTone` |
+| Text value color | `semanticStatToneClasses[tone].value` | `SemanticTone` |
+
+**Rules:**
+- Use semantic names (`positive`/`negative`/`warning`) not color names (`green`/`red`/`amber`).
+- When a primitive has a `tone` prop — pass `SemanticTone` directly; do not extract the class and pass it as `className`.
+- Identity maps (`neutral: 'neutral'`) are noise — pass the value directly; only map genuine exceptions.
+- `SemanticTone` is for semantic meaning only; `primary`/`purple` are brand-only and live in `badgeExtras` inside `semanticColors.ts`.
+
 ## Status badges / labels — `src/utils/labels.ts`
 
 | Need | Helper |
