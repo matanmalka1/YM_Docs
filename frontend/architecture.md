@@ -113,6 +113,36 @@ src/features/<feature>/
   its own resource.
 - User-facing copy must be Hebrew where relevant. Internal identifiers, API fields, and code remain
   English.
+- Hebrew UI strings are centralized in message catalogs, never re-declared inline at the usage site.
+  Cross-cutting strings reused by shared/ui primitives (action labels, loading, pagination, common
+  empty/aria text) live in `src/messages.ts` as `GLOBAL_UI_MESSAGES`; feature-specific copy lives in
+  `src/features/<feature>/messages.ts` as `<FEATURE>_MESSAGES`. Both are plain `as const` objects
+  grouped by area (this is centralization, not an i18n library — no `t()` / locale switching).
+  Reference a constant at the call site (`label={CLIENTS_MESSAGES.business.nameLabel}`); a feature
+  catalog must reuse `GLOBAL_UI_MESSAGES` for a global string rather than redeclare it. Interpolated
+  copy is a typed function entry (`reportedRatio: (filed: number, total: number) => \`...\``), never a
+  parameter typed `unknown`. Do NOT "extract" a string by wrapping the literal in `{'...'}` /
+  `={"..."}` — that is a no-op that leaves the string hardcoded and only adds noise; the literal must
+  actually move into the catalog. Migrate by reuse/structural value, not blindly: a string genuinely
+  used once in throwaway markup may stay inline.
+- Placement decision rule for any Hebrew string — pick the most specific home, do not duplicate:
+  - Appears in (or could appear in) more than one feature → `GLOBAL_UI_MESSAGES` (`src/messages.ts`).
+    Reuse it; never redeclare a generic action/label/pagination string inside a feature catalog.
+    Obvious generic action/pagination labels converge to `GLOBAL_UI_MESSAGES` even at a minor copy
+    cost (a compact `'הקודם'` pager becomes `pagination.previousPage`). When a feature string differs
+    from the global one only in copy, flag it before converging rather than silently changing visible
+    text — but do not over-clean field labels inside feature sections; those stay feature-local.
+  - Enum / status / type / month / period label → the feature `constants` (or `labels`) file as a
+    `Record<Value, string>` plus a `makeLabelGetter`, NOT `messages.ts`. Reuse shared label sources
+    (e.g. `MONTH_NAMES` from `@/constants/periodOptions.constants`) instead of re-listing months.
+  - Formats a value (currency, percent, count, date) → a formatter util in `@/utils/utils`, NOT
+    `messages.ts`. Do not create a standalone one-line wrapper file; add it alongside the other
+    canonical formatters (`formatAdvanceRatePercent` lives there).
+  - Belongs to one screen/flow (titles, dialog/empty/aria/feedback copy) → that feature's
+    `messages.ts`.
+  - Error / validation / business-failure message → that feature's `errorMessages.ts`.
+- `errorMessages.ts` files are formatted multiline: one key per line, no giant single-line objects
+  packing multiple keys. Single-key wrappers and typed function entries may stay on one line.
 
 ## Server state and API access
 
