@@ -86,6 +86,15 @@ src/features/<feature>/
   (Importing a feature's own sub-barrel such as `../api` is fine.)
 - Barrels are the intended module boundary here, so react-doctor's `no-barrel-import` rule is
   disabled (`frontend/doctor.config.json`). See `docs/adr/0005-react-doctor-no-barrel-import-disabled.md`.
+- Re-export only to define a deliberate public module boundary, never as an internal import
+  shortcut. Inside a feature, always import from the real source file (direct relative path) so
+  ownership stays clear and cycles are easier to avoid — do not add a re-export just to shorten a
+  path. The feature's public boundary is its root `index.ts` (this codebase's "public API" file);
+  it must export only the components, hooks, types, and utilities meant for external use.
+- The boundary barrel uses explicit named exports only. Do not use `export *` — it hides
+  dependencies, risks name collisions, and makes symbols hard to trace to their source.
+- Re-export a component's related types only when they are part of the feature's public contract,
+  not casually alongside the component.
 - Files under a feature's `components/` or `hooks/` must not import from that feature's `pages/`;
   shared constants/helpers belong at the feature root, not under `pages/`.
 - Cross-feature component composition is allowed when the consuming screen genuinely owns the
