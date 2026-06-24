@@ -205,39 +205,44 @@ Raw textarea:
 
 Search pattern targeted `rounded-xl` / `rounded-2xl` / `rounded-3xl` plus border and white/gray/slate surface classes.
 
-- [ ] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:142`
-- [ ] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:179`
-- [ ] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:199`
-- [ ] `frontend/src/components/layout/NotificationBell.tsx:17`
-- [ ] `frontend/src/components/layout/Navbar/NavbarMoreMenu.tsx:112`
-- [ ] `frontend/src/components/layout/Navbar/Navbar.tsx:58`
-- [ ] `frontend/src/components/layout/Navbar/Navbar.tsx:86`
-- [ ] `frontend/src/features/signing/pages/SigningPage.tsx:6`
-- [ ] `frontend/src/features/signing/components/SigningForm.tsx:96`
-- [ ] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:14`
-- [ ] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:28`
-- [ ] `frontend/src/features/dashboard/components/kpi/VatStatCard.tsx:51`
-- [ ] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:94`
-- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:95`
-- [ ] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:157`
-- [ ] `frontend/src/features/dashboard/components/panels/OpenChargesCard.tsx:15`
-- [ ] `frontend/src/features/dashboard/components/panels/QuickActionsPanel.tsx:11`
-- [ ] `frontend/src/features/dashboard/components/panels/QuickActionsPanel.tsx:51`
-- [ ] `frontend/src/features/binders/components/sections/BinderHandoverPanel.tsx:76`
-- [ ] `frontend/src/features/annualReports/components/shared/ClientAnnualReportsTab.tsx:29`
-- [ ] `frontend/src/features/annualReports/components/tax/TaxCalculationPanel.tsx:103`
-- [ ] `frontend/src/features/auth/pages/ResetPasswordPage.tsx:95`
-- [ ] `frontend/src/features/auth/pages/ResetPasswordPage.tsx:110`
-- [ ] `frontend/src/features/auth/pages/ForgotPasswordPage.tsx:74`
-- [ ] `frontend/src/features/auth/pages/LoginPage.tsx:75`
-- [ ] `frontend/src/features/auth/pages/LoginPage.tsx:86`
-- [ ] `frontend/src/features/auth/pages/LoginPage.tsx:102`
-- [ ] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:70`
-- [ ] `frontend/src/features/reports/components/AgingReportCards.tsx:42`
-- [ ] `frontend/src/features/timeline/components/TimelineEventItem.tsx:187`
-- [ ] `frontend/src/features/documents/components/list/DocumentCard.tsx:38`
-- [ ] `frontend/src/features/annualReports/components/panel/AnnualReportFullPanel.tsx:91`
-- [ ] `frontend/src/features/annualReports/components/panel/AnnualReportFullPanel.tsx:113`
+- [x] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:142`
+- [x] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:179`
+- [x] `frontend/src/components/layout/ClientSidebar/ClientSidebar.tsx:199`
+- [x] `frontend/src/components/layout/NotificationBell.tsx:17`
+- [x] `frontend/src/components/layout/Navbar/NavbarMoreMenu.tsx:112`
+- [x] `frontend/src/components/layout/Navbar/Navbar.tsx:58`
+- [x] `frontend/src/components/layout/Navbar/Navbar.tsx:86`
+- [x] `frontend/src/features/signing/pages/SigningPage.tsx:6`
+- [x] `frontend/src/features/signing/components/SigningForm.tsx:96`
+- [x] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:14`
+- [x] `frontend/src/features/tasks/components/list/TasksListSummary.tsx:28`
+- [x] `frontend/src/features/dashboard/components/kpi/VatStatCard.tsx:51`
+- [x] `frontend/src/features/dashboard/components/shared/DashboardLayout.tsx:94`
+- [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:95`
+- [x] `frontend/src/features/dashboard/components/panels/SeasonSummaryWidget.tsx:157`
+- [x] `frontend/src/features/dashboard/components/panels/OpenChargesCard.tsx:15`
+- [x] `frontend/src/features/dashboard/components/panels/QuickActionsPanel.tsx:11`
+- [x] `frontend/src/features/dashboard/components/panels/QuickActionsPanel.tsx:51`
+- [x] `frontend/src/features/binders/components/sections/BinderHandoverPanel.tsx:76`
+- [x] `frontend/src/features/annualReports/components/shared/ClientAnnualReportsTab.tsx:29`
+- [x] `frontend/src/features/annualReports/components/tax/TaxCalculationPanel.tsx:103`
+- [x] `frontend/src/features/auth/pages/ResetPasswordPage.tsx:95`
+- [x] `frontend/src/features/auth/pages/ResetPasswordPage.tsx:110`
+- [x] `frontend/src/features/auth/pages/ForgotPasswordPage.tsx:74`
+- [x] `frontend/src/features/auth/pages/LoginPage.tsx:75`
+- [x] `frontend/src/features/auth/pages/LoginPage.tsx:86`
+- [x] `frontend/src/features/auth/pages/LoginPage.tsx:102`
+- [x] `frontend/src/features/timeline/components/TimelineCommandBar.tsx:70`
+- [x] `frontend/src/features/reports/components/AgingReportCards.tsx:42`
+- [x] `frontend/src/features/timeline/components/TimelineEventItem.tsx:187`
+- [x] `frontend/src/features/documents/components/list/DocumentCard.tsx:38`
+- [x] `frontend/src/features/annualReports/components/panel/AnnualReportFullPanel.tsx:91`
+- [x] `frontend/src/features/annualReports/components/panel/AnnualReportFullPanel.tsx:113`
+
+Disposition: all candidates have now been reviewed. The migrated reusable surfaces use `Card` above.
+The remaining entries are intentionally specialized: navigation/actions and overlay/menu chrome,
+semantic alert/state boxes (covered by the alert group), form/field containers, timeline event content,
+or existing `ActionSurface` interactions. `SeasonSummaryWidget.tsx` no longer exists; its entries were stale.
 
 ## Badge, Chip, Or Pill Reinvention
 
