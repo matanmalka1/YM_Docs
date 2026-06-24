@@ -27,6 +27,8 @@ This document defines frontend ownership and dependency boundaries. Page composi
   to bypass a contract problem.
 - Use the `@/` alias for imports rooted at `src/`. Relative imports are appropriate within the same
   small module folder.
+- Define components, hooks, and module functions as arrow-function `const` bindings, not `function`
+  declarations. This matches existing code (`src/utils/utils.ts`) and keeps a single style.
 
 ## Ownership
 
