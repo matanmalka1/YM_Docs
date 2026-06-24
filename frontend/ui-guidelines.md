@@ -41,6 +41,24 @@ implementation rules.
   product status using arbitrary colors.
 - Use `cn()` for conditional classes. Avoid inline styles unless the value is truly dynamic and
   cannot be represented by existing classes or component props.
+- The narrow display/layout primitives (`SegmentedControl`, `Chip`/`ChipLabel`, `ActionSurface`,
+  `MonoValue`, `DefinitionList`, `Divider`) are scoped deliberately. Convert to one **only** when the
+  markup matches its actual shape; do not force-fit. Known boundaries where raw markup is correct:
+  - **`MonoValue`** renders a fixed `font-mono text-sm tabular-nums` toned span (5-tone map only). It
+    does not fit a `DataTable` column `className:` string (a className slot can't host a component),
+    an oversized heading, a cell with child elements, a muted lighter-than-neutral ID, or a span that
+    only borrows a tone *color* on otherwise non-mono text (converting would wrongly add monospace).
+  - **`DefinitionList`** applies one `valueClassName` to every `<dd>`; per-row value tone goes through
+    the `ReactNode` `value` (a pre-styled `<span>`), not a class. It has no label-color hook, so a
+    themed label/value block (e.g. warning-colored `<dt>`) stays raw. It uses `border-b` rows, not a
+    `divide-y` + muted-row variant — keep a local list when those extra capabilities are needed.
+  - **`Divider`** is a standalone sibling rule. A `border-t ... pt-X` that opens a padded
+    footer/section is *structural* (the border belongs to that content block) and is not a `Divider`.
+  - **`SegmentedControl`** exposes selection via `aria-current`/`aria-pressed`; it does not implement
+    the full `role="tab"` roving-tabindex keyboard pattern. A real combobox/listbox or `role="menu"`
+    widget with its own keyboard handling is not a SegmentedControl and stays as-is.
+  - A primitive is worth *extending* only when ≥2 consumers share the gap; a single lossy caller is
+    not justification to widen the primitive — keep that one local and note the divergence.
 
 ## Hebrew and RTL
 

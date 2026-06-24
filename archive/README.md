@@ -45,6 +45,7 @@ Each captured the old `backend/app/<domain>/README.md` (or equivalent legacy spe
 - `actual-domains-v1.md` — generated scan of `backend/app/` endpoints/services/repositories. Replaced by `docs/project/backend-module-map.md` (current inventory) and `docs/domains/*` (behavior); archived because it drifted from code.
 - `domain-docs-inventory-legacy.md` — historical pre-migration domain-doc ownership inventory. Current ownership map: `docs/project/documentation-map.md`; current domain index: `docs/domains/README.md`.
 - `gap-target-vs-actual-v1.md` — target-vs-actual domain gap analysis and build-order plan. Replaced by current domain docs and `docs/project/backend-module-map.md`. It refers to a `target-domains-v1.md` planning file that no longer exists in this repo; that reference is historical only and has No current canonical replacement identified.
+- `raw-primitives-findings.md` — one-time grep-based audit (2026-06-23) of raw native elements and design-system reinvention in `frontend/src`, with a per-file TODO checklist. All buckets were dispositioned/resolved before archiving. The durable, non-obvious learnings (which narrow primitives exist and the boundaries where raw markup is correct) were extracted into `docs/frontend/canonical-helpers.md` ("Display & layout primitives") and `docs/frontend/ui-guidelines.md` ("Design-system usage"); those are the current source of truth. The checklist itself is historical only.
 
 ## Policy
 

@@ -158,6 +158,21 @@ not a loader.
 `useMutationWithToast` does not fit inline-error, optimistic, conditional-invalidate, modal-sequence,
 or result-inspection mutations — keep those as raw `useMutation` with the shared error/toast helpers.
 
+## Display & layout primitives — `src/components/ui/primitives/`, `layout/`
+
+| Need | Component | Path |
+|------|-----------|------|
+| Single-select among options (tab bar / toggle / choice group) | `SegmentedControl` | `primitives/` |
+| Interactive filter toggle (`Chip`) / display tag (`ChipLabel`) | `Chip` / `ChipLabel` | `primitives/` |
+| Clickable card/row that **navigates** | `ActionSurfaceLink` | `primitives/ActionSurface` |
+| Clickable card/row for an **in-page action** | `ActionSurfaceButton` | `primitives/ActionSurface` |
+| Monospace amount/ID value with semantic tone | `MonoValue` | `primitives/` |
+| Label/value definition list (grid or stacked) | `DefinitionList` | `layout/` |
+| Standalone hairline rule between siblings | `Divider` | `primitives/` |
+
+These are narrow primitives — see `ui-guidelines.md` ("Design-system usage") for the boundaries on
+when each does *not* apply, so they are not force-fit.
+
 ## Class composition
 
 `cn()` from `src/utils/utils.ts` (wraps `clsx` + `tailwind-merge`, last-wins). Never concatenate
