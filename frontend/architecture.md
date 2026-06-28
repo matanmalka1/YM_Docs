@@ -130,9 +130,10 @@ src/features/<feature>/
   empty/aria text) live in `src/messages.ts` as `GLOBAL_UI_MESSAGES`; feature-specific copy lives in
   `src/features/<feature>/messages.ts` as `<FEATURE>_MESSAGES`. Both are plain `as const` objects
   grouped by area (this is centralization, not an i18n library — no `t()` / locale switching).
-  Reference a constant at the call site (`label={CLIENTS_MESSAGES.business.nameLabel}`); a feature
-  catalog must reuse `GLOBAL_UI_MESSAGES` for a global string rather than redeclare it. Interpolated
-  copy is a typed function entry (`reportedRatio: (filed: number, total: number) => \`...\``), never a
+  Reference a constant at the call site (`label={CLIENTS_MESSAGES.business.nameLabel}`). For a global
+  string, the call site must import and reference `GLOBAL_UI_MESSAGES` directly; feature catalogs must
+  not redeclare, wrap, or alias global entries. Interpolated copy is a typed function entry
+  (`reportedRatio: (filed: number, total: number) => \`...\``), never a
   parameter typed `unknown`. Do NOT "extract" a string by wrapping the literal in `{'...'}` /
   `={"..."}` — that is a no-op that leaves the string hardcoded and only adds noise; the literal must
   actually move into the catalog. Migrate by reuse/structural value, not blindly: a string genuinely
