@@ -44,7 +44,8 @@ implementation rules.
 - Use Lucide icons through `lucide-react`. Do not add hand-drawn SVG icons when a matching icon
   exists.
 - Use semantic status variants for success, warning, error, and informational states. Do not encode
-  product status using arbitrary colors.
+  product status using arbitrary colors. `StatsCard`'s `variant` uses semantic tone names
+  (`info|positive|negative|warning|purple|neutral`), not color names — pass the tone, never a color.
 - Use `cn()` for conditional classes. Avoid inline styles unless the value is truly dynamic and
   cannot be represented by existing classes or component props.
 - The narrow display/layout primitives (`SegmentedControl`, `Chip`/`ChipLabel`, `ActionSurface`,
@@ -58,6 +59,8 @@ implementation rules.
     the `ReactNode` `value` (a pre-styled `<span>`), not a class. It has no label-color hook, so a
     themed label/value block (e.g. warning-colored `<dt>`) stays raw. It uses `border-b` rows, not a
     `divide-y` + muted-row variant — keep a local list when those extra capabilities are needed.
+    `layout="stacked"` is the canonical drawer-detail row (the removed `DrawerField` duplicated it);
+    build the rows as an `items` array inside `DrawerSection`, with conditional rows spread in.
   - **`Divider`** is a standalone sibling rule. A `border-t ... pt-X` that opens a padded
     footer/section is _structural_ (the border belongs to that content block) and is not a `Divider`.
   - **`SegmentedControl`** exposes selection via `aria-current`/`aria-pressed`; it does not implement

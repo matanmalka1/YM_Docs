@@ -20,28 +20,21 @@ remaining items are API-surface / taste changes — open as deliberate work, not
 
 Risk legend: 🟡 additive (no caller breaks) · 🔴 decision/visual/taste.
 
+## Done (2026-06-28 pass)
+
+- **F10** — `Button` gained `size="xs"` (`text-xs`, tighter padding + square variant); 3 `text-xs` faker
+  call sites migrated. Icon-only mode already existed as `shape="square"`, so F10 is fully closed.
+- **F11** — `StatVariant` renamed color-names → `info|positive|negative|warning|purple|neutral`; all
+  stat-section callers migrated (object-literal and inline-ternary, single- and double-quoted).
+- **F14** — `Tooltip.text` and `Alert.message` widened to `React.ReactNode`; `Alert.onRetry` button now
+  draws from the variant palette (warning retry no longer red). `Tooltip` `placement?` NOT added (the
+  portal positioner only does above/below auto-flip — deferred).
+- **F15** — `DatePicker.minDate` added (mirrors `maxDate`, wired through `DatePickerCalendar` disabled
+  matchers). `compact`→`size` rename NOT done (deferred).
+- **F16** — `DrawerField` deleted; all 7 callers migrated to `DefinitionList layout="stacked"`.
+  `DrawerSection` kept.
+
 ## Items
-
-### F10 — `Button` size scale too narrow; no icon-only mode · 🔴
-
-- Sizes `sm|md` both `text-sm`; callers fake small with `className="text-xs"`. No square/icon-only mode.
-- **Fix:** add `xs` size (`text-xs`, tighter padding); optionally `iconOnly?: boolean` (square padding,
-  requires `aria-label`).
-- **text-xs faker call sites → `size="xs"`:** `features/search/components/SearchFiltersBar.tsx:109`,
-  `features/annualReports/components/financials/FinancialLineFormParts.tsx:20`,
-  `features/annualReports/components/panel/ReportAlertBanners.tsx:47`.
-- **icon-only (broad; optional):** `features/binders/components/sections/BinderDocumentsSection.tsx:73`
-  and most RowActions icon buttons.
-
-### F11 — StatsCard variant → semantic tones · 🔴 **FULL RENAME (locked)**
-
-- **DECISION (locked):** change `StatVariant` from color-names to `info|positive|negative|warning|purple|neutral`
-  (map blue→info, green→positive, red→negative, orange→warning; keep `purple` = sanctioned violet accent,
-  keep `neutral`).
-- Then migrate **all ~16** stat-section helpers' `variant: '<color>' as const` literals to the tone names.
-- **Grep entry point:** `grep -rn "variant: '" features/**/*StatsSection*` + every `<StatsCard>` caller
-  (clients/charges/workQueue/annualReports/taxDashboard/binders/advancedPayments/reports …).
-- Update memory `reference_design_system_source_of_truth` if the naming convention is documented.
 
 ### F13 — `StatusBadge` drops Badge's `dot`/`ring`/`onClick` · 🟡
 
