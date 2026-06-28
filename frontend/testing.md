@@ -38,9 +38,9 @@ Source of truth: mandatory
 
 ## Browser tooling in IDE sessions
 
-- When Codex runs from an IDE session, the in-app Browser may be listed as available but still have no
-  active browser instance. If connecting reports that the in-app Browser is unavailable, report that
-  limitation and do not claim browser QA was completed.
+- When Codex runs from an IDE session, do not attempt to use the in-app Browser. IDE sessions do not
+  provide an active in-app Browser instance. Report that rendered browser QA is unavailable in the
+  IDE session and do not claim browser QA was completed.
 - Use the Chrome plugin from IDE sessions only after verifying that its browser connection works. If
   Chrome is installed and the Codex Chrome Extension is enabled but the plugin still cannot connect,
   report the Chrome connection failure instead of treating Chrome as the verified browser path.
