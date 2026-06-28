@@ -29,6 +29,12 @@ implementation rules.
   (`variant`, `size`, `shape`, `icon`, and similar props). Do not carry over the old raw
   `className` just to preserve pixel-level styling; if the primitive cannot express a recurring need,
   extend the primitive instead of reintroducing local styling.
+- Drive a primitive's color through its semantic `tone` prop, not a raw `className` color
+  override or `fillClassName`/`trackClassName` escape-hatch. `ProgressBar` single-fill bars take
+  `tone` (`primary|info|positive|warning|negative|neutral`); segmented/stacked bars stay plain divs.
+- Use `Badge` size `2xs` (11px / `text-2xs`) for the smallest neutral count chips instead of a
+  hand-rolled `rounded-full bg-gray-100 text-2xs` span. The `2xs` token + `progress.tone-*` are
+  mirrored in the static `design-system/` demo — re-sync the demo when adding a new size/tone class.
 - A surface that navigates must render a real `Link` (or `ActionSurfaceLink`), not a
   `Button` with `navigate(...)` in `onClick`. Preserve browser link behavior, including opening
   destinations in a new tab and exposing an `href`.
