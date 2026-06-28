@@ -47,17 +47,17 @@ implementation rules.
   - **`MonoValue`** renders a fixed `font-mono text-sm tabular-nums` toned span (5-tone map only). It
     does not fit a `DataTable` column `className:` string (a className slot can't host a component),
     an oversized heading, a cell with child elements, a muted lighter-than-neutral ID, or a span that
-    only borrows a tone *color* on otherwise non-mono text (converting would wrongly add monospace).
+    only borrows a tone _color_ on otherwise non-mono text (converting would wrongly add monospace).
   - **`DefinitionList`** applies one `valueClassName` to every `<dd>`; per-row value tone goes through
     the `ReactNode` `value` (a pre-styled `<span>`), not a class. It has no label-color hook, so a
     themed label/value block (e.g. warning-colored `<dt>`) stays raw. It uses `border-b` rows, not a
     `divide-y` + muted-row variant — keep a local list when those extra capabilities are needed.
   - **`Divider`** is a standalone sibling rule. A `border-t ... pt-X` that opens a padded
-    footer/section is *structural* (the border belongs to that content block) and is not a `Divider`.
+    footer/section is _structural_ (the border belongs to that content block) and is not a `Divider`.
   - **`SegmentedControl`** exposes selection via `aria-current`/`aria-pressed`; it does not implement
     the full `role="tab"` roving-tabindex keyboard pattern. A real combobox/listbox or `role="menu"`
     widget with its own keyboard handling is not a SegmentedControl and stays as-is.
-  - A primitive is worth *extending* only when ≥2 consumers share the gap; a single lossy caller is
+  - A primitive is worth _extending_ only when ≥2 consumers share the gap; a single lossy caller is
     not justification to widen the primitive — keep that one local and note the divergence.
 
 ## Hebrew and RTL
@@ -84,6 +84,11 @@ implementation rules.
 ## Forms and actions
 
 - Every input has a visible label or an equivalent accessible name.
+- Shared field wrappers must associate labels and validation messages with the real interactive
+  control, not a layout wrapper. When a field primitive wraps an `input`, `textarea`, `button`, or
+  custom trigger in extra markup, pass generated `id`/ARIA metadata down to that control explicitly.
+  Do not rely on cloning the wrapper element. Use `aria-describedby` for trigger-button error text;
+  keep `aria-invalid` only on roles/elements that support it.
 - Select dropdowns must use the shared `Select` component, not a plain `<select>`, when the shared
   component covers the interaction.
 - Labeled checkbox controls must use the shared `Checkbox` primitive. Bare native checkboxes are
