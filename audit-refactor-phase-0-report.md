@@ -118,7 +118,7 @@ No check was modified to pass. `unused (4)` / `schema (43)` are pre-existing, un
 
 | Backend change | Frontend consumers | Migrate in |
 |---|---|---|
-| Generic `/audit/{type}/{id}` gains fields | `src/features/audit/` (`api/audit.api.ts`, `api/contracts.ts`, `hooks/useEntityAuditTrail.ts`, `useEntityAuditTrailSection.ts`, `components/AuditTrailTable.tsx`, `EntityAuditTrailSection.tsx`); used by `BusinessDetailsCard.tsx`, `ChargeDetailDrawer.tsx` | Phase 2 (additive) + Phase 10 |
+| Generic `/audit/{type}/{id}` — `old_value`/`new_value` change string→JSON object (+ actor fields) | `src/features/audit/` (`api/audit.api.ts`, `api/contracts.ts`, `hooks/useEntityAuditTrail.ts`, `useEntityAuditTrailSection.ts`, `components/AuditTrailTable.tsx`, `EntityAuditTrailSection.tsx`, old/new-value formatters); used by `BusinessDetailsCard.tsx`, `ChargeDetailDrawer.tsx` | **Phase 1** (the string→object change ships with its frontend); final sync Phase 10 |
 | `/vat/work-items/{id}/audit` deleted | `features/vatReports/` (`api/endpoints.ts`, `api/vatReports.api.ts`, `api/contracts.ts:VatAuditTrailResponse`, `hooks/useVatHistory.ts`, `components/detail/VatHistoryTab.tsx`) | **Phase 3** |
 | `/annual-reports/{id}/audit` deleted | `features/annualReports/components/statusTransition/StatusAuditTimeline.tsx` | **Phase 4** |
 | `/binders/{id}/audit` deleted | `features/binders/` (`components/drawer/BinderAuditSection.tsx`, `BinderDetailDrawer.tsx`, `api/endpoints.ts`, `api/queryKeys.ts`, `api/binders.api.ts`, `types.ts`) | **Phase 5** |

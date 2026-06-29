@@ -84,8 +84,8 @@ Progress log:
 | Phase | Name | Status | Summary | Report |
 |---|---|---|---|---|
 | Pre-Phase 0 | Setup progress log | In progress | Create this context/progress file | docs/audit-refactor-progress.md |
-| Phase 0 | Baseline, exact inventory, enum audit | Completed | Two review rounds; counts 30/63/73, 29 legacy-model/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
-| Phase 1 | Schema add/alter only | Not started | Alter EntityAuditLog/UserAuditLog only; no legacy drops | TBD |
+| Phase 0 | Baseline, exact inventory, enum audit | Completed | Three review rounds; counts 30/63/73, 20 legacy-model-class/13 consumer/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
+| Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Approved, not started | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b, serializer/reader JSON-object switch, thread actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regen generic-audit OpenAPI/types/frontend, docs/domains/audit.md | TBD |
 | Phase 2 | Writer/repository + registry/authz | Not started | Add writer/repo APIs and AuditEntityRegistry | TBD |
 | Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
 | Phase 4 | Replace AnnualReportStatusHistory | Not started | Move status + child actions to EntityAuditLog | TBD |
@@ -94,7 +94,7 @@ Progress log:
 | Phase 7 | Rebuild timeline/dashboard | Not started | Single-source registry, no duplicates | TBD |
 | Phase 8 | Add missing audit writes | Not started | Add remaining domain audit coverage | TBD |
 | Phase 9 | Cleanup migration + seeds | Not started | Drop legacy tables, update seeds | TBD |
-| Phase 10 | OpenAPI/frontend regen + verification | Not started | Regenerate contracts and update frontend | TBD |
+| Phase 10 | Final full verification + contract sync | Not started | Final repo-wide contract sync + full verification (frontend consumers already migrated per-phase 1/3/4/5/6) | TBD |
 
 ## Current Files Created
 
@@ -297,3 +297,11 @@ Next safe step:
   - Fixed stale statements: §15 Phase 1 no longer says "performed_by stays nullable on downgrade" — it now uses the fail-safe Option A downgrade (assert no performed_by IS NULL, else fail). §4a line no longer says signature frontend regenerates in Phase 10 — drawer + generated types migrate in Phase 6, with Phase 10 only the final full sync.
   - Phase 0 report count scoping fixed: legacy-model class-reference files = 20 (word-boundary grep), legacy repo/schema/consumer files = 13, test files = 38; the earlier single "29" label that didn't match its list is replaced by two exactly-counted sets.
 - Phase 1 APPROVED post-sync. Still not started.
+
+### Plan sync round 3 (2026-06-29)
+
+- Separated EntityAuditLog vs UserAuditLog in the Phase-1 serializer/reader spec: UserAuditLogResponse has NO old_value/new_value and NO actor_type; it exposes `metadata` as a JSON object + actor_display_name/target_display_name snapshots. EntityAuditLog gets actor_type, actor_display_name, JSON old/new/metadata. Phase 1 also updates existing UserAuditLog writers (user_auth_service, user_management_service, password-reset) to capture the display-name snapshots (no actor_type).
+- Phase 0 report: generic-audit frontend update moved from "Phase 2/10" to Phase 1 (the old_value/new_value string→object change ships with its frontend).
+- Progress log: phase table corrected — Phase 0 legacy count now 20 legacy-model-class files (+13 consumer files), not 29; Phase 1 row expanded; Phase 10 relabelled "final full verification + contract sync" (frontend consumers already migrated per-phase), not a frontend-update step.
+- Added docs/domains/audit.md update to Phase 1 (documentation-ownership rule: primary audit docs there; architecture.md only if a rule changes).
+- Phase 1 spans project root (backend + frontend + docs), not backend-only.
