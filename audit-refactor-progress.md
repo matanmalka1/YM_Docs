@@ -2,16 +2,16 @@
 
 ## Current Status
 
-Status: Phase 0 BLOCKED pending inventory corrections (Phase 0 review found gaps). Phase 1 NOT started.
+Status: Phase 0 COMPLETED (two review rounds; all corrections applied, 4 open items decided). Phase 1 APPROVED, not yet started.
 
 Current phase:
-- Phase 0 — Baseline, exact inventory, enum audit (Blocked / In progress — corrections applied, awaiting acceptance)
+- Phase 0 — Baseline, exact inventory, enum audit (Completed)
 
 Next phase:
-- Phase 1 — Schema add/alter only (migrations 1a→1b); blocked until Phase 0 accepted
+- Phase 1 — Schema add/alter only (migrations 1a→1b); approved, not started
 
 Phase 0 report:
-- docs/audit-refactor-phase-0-report.md (revised; status BLOCKED)
+- docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
 
 Main plan file:
 - docs/audit-refactor-implementation-plan.md
@@ -84,7 +84,7 @@ Progress log:
 | Phase | Name | Status | Summary | Report |
 |---|---|---|---|---|
 | Pre-Phase 0 | Setup progress log | In progress | Create this context/progress file | docs/audit-refactor-progress.md |
-| Phase 0 | Baseline, exact inventory, enum audit | Blocked | Review found count/baseline/DDL/matrix gaps; report revised, awaiting acceptance | docs/audit-refactor-phase-0-report.md |
+| Phase 0 | Baseline, exact inventory, enum audit | Completed | Two review rounds; counts 30/63/73, 29 legacy-model/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
 | Phase 1 | Schema add/alter only | Not started | Alter EntityAuditLog/UserAuditLog only; no legacy drops | TBD |
 | Phase 2 | Writer/repository + registry/authz | Not started | Add writer/repo APIs and AuditEntityRegistry | TBD |
 | Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
@@ -120,7 +120,7 @@ Progress log:
 ## Phase 0 — Baseline, exact inventory, enum audit
 
 Status:
-- Blocked (review found gaps; report revised, awaiting acceptance)
+- Completed (two review rounds; corrections applied; 4 open items decided; Phase 1 approved)
 
 Date:
 - 2026-06-29
@@ -160,14 +160,19 @@ Important findings:
 - scope_to_active_clients_stmt is a deleted-client FILTER, not per-user authorization; audit history must stay readable after delete (resolve scope with include_deleted / audit metadata).
 - actor_display_name source absent everywhere — decide Phase 2 (thread from current_user vs write-time users lookup).
 
-Decisions made:
-- None final. Open items flagged: (1) signature sensitive forensic visibility per role; (2) actor_display_name sourcing; (3) charge.created/deleted action reconciliation; (4) AR double-write collapse.
+Decisions made (4 open items resolved):
+- (1) Signature forensic fields visible to BOTH ADVISOR and SECRETARY (preserve current behavior; stricter rule = separate permission change).
+- (2) actor_display_name = thread current_user.full_name explicitly with actor_id; system/external-signer labels explicit.
+- (3) Charges: create→charge.created, issue→charge.issued, pay→charge.paid, cancel→charge.canceled, delete→charge.deleted.
+- (4) Annual reports: remove legacy AnnualReportStatusHistory writes in Phase 4; preserve create→annual_report.created, status→annual_report.status_changed, deadline→annual_report.deadline_updated, child→semantic actions.
+
+Round-2 corrections: counts 30/63/73; legacy-model reference files 29 (was 22); audit test files 38 (was mislabelled 29); missing-actor functions corrected to 11 (added invoice attach [route lacks CurrentUser], task update/bulk_assign/delete, correspondence update_entry, reminder cancel_reminder); AR does NOT use ACTION_METADATA_UPDATED; charge.created/deleted are genuine; business.*/signature_request.* are shorthand not binding lists.
 
 Risks/blockers:
-- BLOCKER: Phase 0 not accepted until corrected inventory + 4 open items are signed off. Risks carried as in §15 of the report.
+- No blockers. Risks carried as in §15 of the report.
 
 Next safe step:
-- Obtain acceptance of the revised Phase 0 report + decisions on the 4 open items. Do NOT start Phase 1 until then.
+- Phase 1 — schema add/alter (migrations 1a→1b) + serializer/reader changes + writer actor support (actor_display_name threaded). No legacy table drops.
 
 ## Phase Update Template
 
@@ -274,3 +279,12 @@ Next safe step:
   - Full legacy-model (22), legacy-repo (13), and audit test (29) reference lists added.
 - Four open items flagged for sign-off: signature forensic visibility per role; actor_display_name sourcing; charge.created/deleted reconciliation; AR double-write collapse.
 - Phase 1 NOT started; blocked until the revised report is accepted.
+
+### Phase 0 — COMPLETED after review round 2 (2026-06-29)
+
+- Round-2 review found remaining factual errors; corrected in docs/audit-refactor-phase-0-report.md:
+  - Reference counts fixed: legacy-model reference files = 29 (was 22, now includes module-name imports + consumers); audit test files = 38 (the list already had 38 paths, mislabelled 29).
+  - Actor inventory corrected: "five missing surfaces" was wrong. Confirmed-missing actor now = 11 functions: advance_payment create + update, authority_contact add + update, permanent_document delete, invoice attach/create (route also lacks CurrentUser), task update, task bulk_assign, task delete, correspondence update_entry, reminder cancel_reminder (+ legal_entity/person/link threading).
+  - Action matrix corrected: charge.created and charge.deleted are genuine actions (not issue/paid aliases); annual_reports does NOT use ACTION_METADATA_UPDATED (that is VAT-only); deadline → annual_report.deadline_updated; business.*/signature_request.* labelled shorthand, not binding persisted lists.
+- Four open items DECIDED: signature forensic visible to both roles; actor_display_name threaded from current_user.full_name with actor_id; charge action names (created/issued/paid/canceled/deleted); AR legacy history removed in Phase 4 with create/status_changed/deadline_updated/child semantic actions preserved.
+- Status: Phase 0 COMPLETED. Phase 1 APPROVED. Phase 1 not yet started.

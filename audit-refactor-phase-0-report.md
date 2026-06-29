@@ -3,20 +3,21 @@
 Date: 2026-06-29
 Scope: **inventory + baseline only.** Outputs: this report + `docs/audit-refactor-progress.md`.
 
-## STATUS: BLOCKED — pending inventory corrections (revised after Phase 0 review)
+## STATUS: COMPLETED (revised twice after review; all corrections accepted, 4 open items decided)
 
-Phase 0 review found the first draft incomplete/inaccurate. This revision corrects: write-site counts (now include direct `EntityAuditWriter.append()` + charge audit helper), baseline provenance (which checks actually ran in Phase 0 vs external), a disclosed **state mutation** from an authenticated health check, exact per-table cleanup DDL, persisted action names + raw-string inventory, an un-grouped registry/scope/visibility matrix, a full actor inventory, and complete legacy/repo/test reference lists. **Phase 1 must NOT start until these are accepted.**
+Two review rounds corrected: write-site counts (now include direct `EntityAuditWriter.append()` + charge audit helper), baseline provenance, a disclosed **state mutation** from an authenticated health check, exact per-table cleanup DDL, persisted action names + raw-string inventory, an un-grouped registry/scope/visibility matrix, a full actor inventory, corrected reference counts, and the four open decisions (§14). **Phase 1 is approved.**
 
-## 0. Corrections applied in this revision
+## 0. Corrections applied (review rounds 1 + 2)
 
 1. **Write-site counts corrected** — existing EntityAuditLog write sites are **30** (14 `record_*` + 13 direct `EntityAuditWriter.append()` in annual_reports + 3 charge via `record_charge_status_audit`), not 14. Business-target = **63**, total = **73** (was 47/57).
-2. **Baseline provenance** — pytest (1517) and the frontend suite were **NOT run during Phase 0**; they are **external/user-confirmed**. Only vulture/pyright/ruff/audit-scripts were run in Phase 0.
-3. **Health-check state mutation disclosed** — the authenticated health-check results (login, /me) were from an **external run, not Phase 0**; login **mutates `users.last_login_at` and writes a `UserAuditLog` login_success row** → not read-only. Phase-0/read-only health checks must be **unauthenticated** (/health, /info only).
-4. **Cleanup DDL enumerated** per table; corrected the false claim that every legacy table has a timestamp index (**only `signature_audit_events` does**).
-5. **Action matrix** now lists **persisted action names** (bare values today) + missing actions + a **raw action/entity string inventory**.
-6. **Registry/scope/visibility** matrix un-grouped (one row per entity_type), with the clarification that `scope_to_active_clients_stmt` is a **deleted-client filter, not per-user authorization**, plus explicit deleted-history readability and per-role visibility.
-7. **Actor inventory** covers every audited mutation + the `actor_display_name` source (currently absent everywhere).
-8. **Full legacy/repo/test reference lists** added (§17).
+2. **Baseline provenance** — pytest (1517) and the frontend suite were **NOT run during Phase 0**; external/user-confirmed. Only vulture/pyright/ruff/audit-scripts ran in Phase 0.
+3. **Health-check state mutation disclosed** — authenticated health-check (login, /me) was external, not Phase 0; login **mutates `users.last_login_at` and writes a `UserAuditLog` login_success row** → not read-only. Read-only health checks must be **unauthenticated** (/health, /info only).
+4. **Cleanup DDL enumerated** per table; corrected the false "every legacy table has a timestamp index" (**only `signature_audit_events` does**).
+5. **Action matrix** lists **persisted action names** + missing actions + a **raw action/entity string inventory**. (Round 2: charge.created/deleted are genuine, not issue/paid ambiguities; AR does **not** use `ACTION_METADATA_UPDATED`; deadline → `annual_report.deadline_updated`; `business.*`/`signature_request.*` shown as shorthand, not binding lists.)
+6. **Registry/scope/visibility** un-grouped per entity_type; `scope_to_active_clients_stmt` clarified as a deleted-client filter, not per-user authz; deleted-history readability explicit.
+7. **Actor inventory** covers every audited mutation + `actor_display_name` source. (Round 2: corrected "five missing surfaces" — also missing are **invoice creation** (route has no `CurrentUser`), **task update / bulk_assign / delete**, **correspondence update_entry**, **reminder cancel_reminder**.)
+8. **Reference counts corrected** (Round 2): legacy-model reference files = **29** (incl. module-name imports + consumers); audit test files = **38** (the list had 38 paths, mislabelled 29).
+9. **Four open items decided** (§14) — signature forensic visibility, actor_display_name sourcing, charge action names, AR history removal.
 
 ## 1. Executive summary
 
@@ -69,9 +70,10 @@ No check was modified to pass. `unused (4)` / `schema (43)` are pre-existing, un
 | Audit/history/timeline/dashboard/signature read routes | 9 | §5 |
 | Seed builders writing legacy audit | 5 | §8 |
 | Frontend audit consumer areas | 5 | §6 |
-| Legacy-model reference files (non-test) | 22 | §17 |
+| Legacy-model reference files (non-test, incl. module imports + consumers) | 29 | §17 |
 | Legacy-repo usage files (non-test) | 13 | §17 |
-| Test files referencing audit core | 29 | §17 |
+| Test files referencing audit core | 38 | §17 |
+| Mutation services missing an actor (functions) | 11 | §13 (+ legal_entity/person/link threading) |
 
 ## 4. Audit model inventory
 
@@ -159,8 +161,8 @@ Today persisted `action` values are **bare** (e.g. `"created"`, `"status_changed
 |---|---|---|---|---|---|
 | clients | client | `ACTION_CREATED`="created", `ACTION_UPDATED`="updated", `ACTION_DELETED`="deleted", `ACTION_RESTORED`="restored", **`ACTION_ENTITY_TYPE_CHANGED`="entity_type_changed"** | client.created/updated/deleted/restored/entity_type_changed | client_record_id | user |
 | businesses | business | created/updated/deleted/restored | business.* | client_record_id, business_id | user |
-| charges | charge | **`ACTION_CREATED`="created"** (issue), **`ACTION_DELETED`="deleted"** (mark-paid path), `ACTION_ISSUED`="issued", `ACTION_PAID`="paid", `ACTION_CANCELED`="canceled" | charge.issued/paid/canceled (+ created/deleted reconciled) | client_record_id, business_id | user |
-| annual_reports | annual_report | `ACTION_STATUS_CHANGED`, `ACTION_CREATED`, `ACTION_ANNUAL_REPORT_DETAIL_UPDATED`, **`ACTION_ANNUAL_REPORT_DEADLINE_UPDATED`**, `ACTION_METADATA_UPDATED` | annual_report.created/updated/status_changed/submitted/deleted | client_record_id, tax_year | user |
+| charges | charge | `ACTION_CREATED`="created" (create), `ACTION_ISSUED`="issued" (issue), `ACTION_PAID`="paid" (pay), `ACTION_CANCELED`="canceled" (cancel), `ACTION_DELETED`="deleted" (delete) | **charge.created / charge.issued / charge.paid / charge.canceled / charge.deleted** (create & delete are genuine, not issue/paid aliases — decided §14) | client_record_id, business_id | user |
+| annual_reports | annual_report | `ACTION_CREATED`, `ACTION_STATUS_CHANGED`, `ACTION_ANNUAL_REPORT_DETAIL_UPDATED`, **`ACTION_ANNUAL_REPORT_DEADLINE_UPDATED`** (AR does **not** use `ACTION_METADATA_UPDATED` — that is VAT-only) | annual_report.created / status_changed / **deadline_updated** / updated / submitted / deleted | client_record_id, tax_year | user |
 | AR child: income | annual_report | `ACTION_INCOME_ADDED/UPDATED/DELETED` | annual_report.income_line_added/updated/deleted | + section, line_id | user |
 | AR child: expense | annual_report | `ACTION_EXPENSE_ADDED/UPDATED/DELETED` | annual_report.expense_line_added/updated/deleted | + section, line_id | user |
 | AR child: annex | annual_report | **`ACTION_ANNEX_LINE_ADDED/UPDATED/DELETED`** | annual_report.annex_line_added/updated/deleted | + schedule_id, line_number | user |
@@ -171,7 +173,9 @@ Today persisted `action` values are **bare** (e.g. `"created"`, `"status_changed
 | signature_requests | signature_request | RAW `event_type`="created/sent/viewed/signed/declined/canceled/expired/annual_report_signed" | signature_request.* | per §8a forensic | user/external_signer/system |
 | legal_entities/persons/links/authority_contacts/notes/advance_payments/invoices/binder_handovers/tasks/correspondence/notifications/reminders/tax_calendar/deadline_rules | resp. | **NO audit today** (new) | new actions per §9 (plan) | client_record_id (where applicable) | user/system |
 
-Missing-action items explicitly recovered (were absent from first draft): `client.entity_type_changed`, `charge.created`/`charge.deleted`, `annual_report.deadline_updated`, `annual_report.annex_line_added`.
+Missing-action items explicitly recovered: `client.entity_type_changed`, `charge.created`/`charge.deleted` (genuine, decided §14), `annual_report.deadline_updated`, `annual_report.annex_line_added`.
+
+**Shorthand notice:** entries written as `business.*`, `signature_request.*`, `vat_work_item.*` etc. above are **shorthand for readability, not the binding persisted-action list.** The binding per-action names are enumerated in §9 (current persisted value column) + the decisions in §14; the full target constant set is finalized in Phase 2 against this matrix.
 
 ### 9a. Raw action / entity string inventory
 
@@ -205,14 +209,14 @@ Missing-action items explicitly recovered (were absent from first draft): `clien
 | binder_intake | BinderIntake | binder→client | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | binder_handover | BinderHandover | client_record_id | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | document | PermanentDocument | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard | no | n/a |
-| signature_request | SignatureRequest | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard (hard via audit metadata) | **YES** | **OPEN — Phase 2 decision:** today both roles can open the signature drawer (no per-role gate exists). Default proposal: ip/user_agent/content_hash visible to both ADVISOR and SECRETARY (preserving current behavior), redaction applied only if a stricter rule is approved. Must be confirmed before Phase 6. |
+| signature_request | SignatureRequest | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard (hard via audit metadata) | YES (data class) | **DECIDED (§14): preserve current behavior — ip/user_agent/content_hash visible to BOTH ADVISOR and SECRETARY.** No per-role redaction in this refactor; any stricter rule is a separate permission change. |
 | task | Task | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard | no | n/a |
 | notification | Notification | client_record_id | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | reminder | Reminder | source→client | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | tax_calendar | TaxCalendarEntry | firm-level | ADVISOR, SECRETARY | firm-level (no client filter) | n/a | no | n/a |
 | deadline_rule | DeadlineRule | firm-level | ADVISOR, SECRETARY | firm-level | n/a | no | n/a |
 
-Scope cases covered: firm-level, one client, multi-client (legal_entity/person), soft-deleted, hard-deleted (audit-metadata). **Open item:** the only unresolved visibility decision is the signature_request sensitive forensic fields per role (above) — flagged for Phase 2 sign-off.
+Scope cases covered: firm-level, one client, multi-client (legal_entity/person), soft-deleted, hard-deleted (audit-metadata). Signature forensic visibility is **decided** (both roles; §14) — no open visibility items remain.
 
 ## 11. Signature audit replacement inventory
 
@@ -235,7 +239,7 @@ Scope cases covered: firm-level, one client, multi-client (legal_entity/person),
 
 ## 13. Actor availability inventory (every audited mutation)
 
-`actor_display_name` source: **no service currently passes a display name.** Two sourcing options (decide Phase 2): (A) thread `actor_display_name=current_user.full_name` from the route alongside `actor_id`; (B) writer looks up `users.full_name` by `performed_by` at write time (single source; null for system/external_signer where the writer uses a system label / signer name). Recommendation: **B for user actors** (one place), explicit label for system/external_signer.
+`actor_display_name` source: **no service currently passes a display name.** **DECIDED (§14): thread `actor_display_name=current_user.full_name` explicitly from the route alongside `actor_id`** (Option A). System and external-signer labels remain **explicit** (system label / signer name); not derived from a user join.
 
 | Domain | Function(s) | Has actor id? | Param | actor_type | Fix |
 |---|---|---|---|---|---|
@@ -250,7 +254,7 @@ Scope cases covered: firm-level, one client, multi-client (legal_entity/person),
 | advance_payments | `create_payment_for_client:117` / `update_payment_for_client:193` | **NO** | — | user | **add `actor_id`** |
 | advance_payments | `delete_payment_for_client:238` | yes | `actor_id` | user | reuse |
 | charges | issue/pay/cancel | yes | `created_by`/`issued_by`/`paid_by`/`canceled_by` | user | reuse |
-| invoices | create | yes (model fields) | — | user | wire to writer |
+| invoices | `attach_invoice_to_charge` (create) | **NO** | — | user | **add actor; route also lacks `CurrentUser` → must inject it** |
 | vat_work_items | create/status/filed/override/delete | yes | `created_by`/`performed_by` | user | reuse |
 | vat_invoices | add/update/delete | yes | `created_by` | user | reuse |
 | annual_reports | create/status/detail/deadline | yes | `created_by`/`changed_by`/`actor_id` | user | reuse |
@@ -264,23 +268,31 @@ Scope cases covered: firm-level, one client, multi-client (legal_entity/person),
 | signature_requests | advisor actions (create/sent/cancel) | yes | current_user | user | reuse |
 | signature_requests | signer actions (viewed/signed/declined) | n/a (external) | — | external_signer | performed_by=None, name→actor_display_name |
 | signature_requests | system (expired/annual_report_signed) | n/a | — | system | performed_by=None, system label |
-| tasks | create/assign/complete/cancel/delete | yes | `created_by_user_id`/completed/canceled fields | user | reuse |
-| correspondence | create/update/delete | yes | `created_by` | user | reuse |
+| tasks | `create:38` | yes | `created_by_user_id` | user | reuse |
+| tasks | `complete:155` / `cancel:168` / `bulk_complete:193` | yes | `completed_by`/`canceled_by` | user | reuse |
+| tasks | **`update:113`** | **NO** | — | user | **add `actor_id`** |
+| tasks | **`bulk_assign:241`** | **NO** (`assignee_user_id` = target, not actor) | — | user | **add `actor_id`** |
+| tasks | **`delete:181`** | **NO** | — | user | **add `actor_id`** |
+| correspondence | `add_entry:72` | yes | `created_by` | user | reuse |
+| correspondence | `delete_entry:125` | yes | `actor_id` | user | reuse |
+| correspondence | **`update_entry:105`** | **NO** | — | user | **add `actor_id`** |
 | notifications | send | yes/system | `triggered_by` | user/system | reuse; system→None |
-| reminders | created/fired/failed | system (fired) / user (manual) | `created_by_user_id` | system/user | system label for fired |
+| reminders | `create_from_request:23` | yes | `created_by_user_id` | user | reuse |
+| reminders | **`cancel_reminder:48`** | **NO** | — | user | **add `actor_id`** |
+| reminders | fired/failed | n/a | — | system | system label |
 | tax_calendar | generate/manual edit | system/user | — | system/user | system label for generation |
 | deadline_rules | edit (if UI) | user | — | user | route actor |
 
-**Missing-actor fixes (5 surfaces, confirmed):** advance_payment create + update, authority_contact add + update, permanent_document delete. **Plus actor-threading needed** for legal_entity / person / person_legal_entity_link mutations (no dedicated actor param; flow through client/business routes).
+**Missing-actor fixes — corrected (11 service functions):** advance_payment create, advance_payment update, authority_contact add, authority_contact update, permanent_document delete, **invoice attach/create (route also lacks `CurrentUser`)**, **task update**, **task bulk_assign**, **task delete**, **correspondence update_entry**, **reminder cancel_reminder**. The earlier "five surfaces" was wrong. **Plus actor-threading** for legal_entity / person / person_legal_entity_link mutations (no dedicated actor param; flow through client/business routes). `actor_display_name=current_user.full_name` must be threaded with `actor_id` everywhere (§14 decision).
 
-## 14. Blockers
+## 14. Decisions (the four open items — now RESOLVED)
 
-This report itself was **blocked** on the inaccuracies now corrected (§0). With those corrections, the remaining **open items requiring decision before the relevant phase** are:
-1. **Signature sensitive forensic visibility per role** (§10) — Phase 2/6.
-2. **`actor_display_name` sourcing** (A vs B) (§13) — Phase 2.
-3. **`charge.created`/`charge.deleted` vs `record_charge_status_audit`** action reconciliation (§9) — Phase 2/3.
-4. **AR double-write** (EntityAuditLog + AnnualReportStatusHistory) collapse without losing data semantics — Phase 4.
-No baseline failure exists.
+1. **Signature forensic field visibility** — **preserve current behavior:** both ADVISOR and SECRETARY can view ip/user_agent/content_hash. No per-role redaction in this refactor; any stricter rule is a separate permission change.
+2. **`actor_display_name` sourcing** — **thread `current_user.full_name` explicitly** alongside `actor_id` from the route. System and external-signer labels remain explicit (system label / signer name).
+3. **Charge actions** — `create → charge.created`, `issue → charge.issued`, `pay → charge.paid`, `cancel → charge.canceled`, `delete → charge.deleted`. (create & delete are genuine, distinct actions.)
+4. **Annual reports** — **remove the legacy AnnualReportStatusHistory writes in Phase 4** and preserve: `create → annual_report.created`, status transition → `annual_report.status_changed`, deadline update → `annual_report.deadline_updated`, child operations → their semantic actions (income/expense/annex/schedule). The current double-write collapses to EntityAuditLog only.
+
+No baseline failure exists. No open blockers remain.
 
 ## 15. Risks (carried into implementation)
 
@@ -288,14 +300,16 @@ Signature forensic/legal parity (embedded drawer + timeline); timeline duplicate
 
 ## 16. Recommendation
 
-**Deferred — Phase 0 is BLOCKED** pending acceptance of the corrections in §0 and decisions on the four open items in §14. Phase 1 must NOT start until this revised inventory is accepted. Once accepted with the counts in §3 (30/63/73), the enum result (zero drops), the per-table cleanup DDL (§8), and the actor/registry matrices, Phase 1 (schema add/alter 1a→1b + serializer/reader + writer actor support, no legacy drops) is technically ready.
+**Phase 0 COMPLETED. Phase 1 APPROVED.** All review corrections are applied and the four open items (§14) are decided. Confirmed basis: counts 30/63/73 (§3), zero enum drops (§7), per-table cleanup DDL (§8), 11 missing-actor functions + link threading (§13), `actor_display_name` threaded with `actor_id`, signature forensic visible to both roles, charge action names finalized, AR legacy history removed in Phase 4.
+
+**Next step:** Phase 1 — schema add/alter (migrations 1a→1b) + serializer/reader changes + writer actor support (incl. `actor_display_name`), **no legacy table drops.**
 
 ## 17. Full reference lists (requested by Phase 0)
 
-**Legacy-model reference files (non-test, 22):** annual_reports/models/__init__.py, annual_reports/models/annual_report_status_history.py, annual_reports/repositories/annual_report_status_audit_repository.py, binders/models/binder_intake_edit_log.py, binders/models/binder_lifecycle_log.py, binders/repositories/binder_intake_edit_log_repository.py, binders/repositories/binder_lifecycle_log_repository.py, binders/services/binder_audit_service.py, dashboard/services/dashboard_recent_activity_service.py, seed/builders/demo/binders.py, seed/builders/demo/reports.py, seed/builders/demo/signature_requests.py, seed/builders/demo/vat.py, signature_requests/models/signature_request.py, signature_requests/repositories/signature_request_audit.py, signature_requests/repositories/signature_request_repository.py, timeline/repositories/timeline_repository.py, vat/api/vat_routes_queries.py, vat/models/vat_audit_log.py, vat/repositories/vat_audit_log_repository.py, vat/repositories/vat_work_item_write_repository.py, vat/schemas/vat_audit.py.
+**Legacy-model reference files (non-test, 29 — incl. module-name imports + consumers):** annual_reports/models/__init__.py, annual_reports/models/annual_report_status_history.py, annual_reports/repositories/annual_report_repository.py, annual_reports/repositories/annual_report_status_audit_repository.py, annual_reports/schemas/annual_report_responses.py, annual_reports/services/annual_report_create_service.py, annual_reports/services/annual_report_query_service.py, annual_reports/services/annual_report_status_service.py, binders/models/binder_intake_edit_log.py, binders/models/binder_lifecycle_log.py, binders/repositories/binder_intake_edit_log_repository.py, binders/repositories/binder_lifecycle_log_repository.py, binders/services/binder_audit_service.py, dashboard/services/dashboard_recent_activity_service.py, model_registry.py, seed/builders/demo/binders.py, seed/builders/demo/reports.py, seed/builders/demo/signature_requests.py, seed/builders/demo/vat.py, seed/orchestrator.py, signature_requests/models/signature_request.py, signature_requests/repositories/signature_request_audit.py, signature_requests/repositories/signature_request_repository.py, signature_requests/signature_request_response_builder.py, timeline/repositories/timeline_repository.py, vat/api/vat_routes_queries.py, vat/models/vat_audit_log.py, vat/repositories/vat_audit_log_repository.py, vat/repositories/vat_work_item_write_repository.py, vat/schemas/vat_audit.py. (Also touches `signature_requests/schemas/signature_request.py`, `timeline/services/timeline_service.py`, `timeline/timeline_binder_event_builders.py` — counted under repo-usage / consumer overlap.)
 
 **Legacy-repo usage files (non-test, 13):** annual_reports/repositories/annual_report_repository.py, annual_reports/repositories/annual_report_status_audit_repository.py, binders/repositories/binder_intake_edit_log_repository.py, binders/repositories/binder_lifecycle_log_repository.py, binders/services/binder_audit_service.py, binders/services/binder_intake_edit_service.py, binders/services/binder_lifecycle_service.py, dashboard/services/dashboard_recent_activity_service.py, signature_requests/repositories/signature_request_audit.py, signature_requests/repositories/signature_request_repository.py, timeline/services/timeline_service.py, vat/repositories/vat_audit_log_repository.py, vat/repositories/vat_work_item_write_repository.py.
 
 **Seed builders writing legacy audit (5):** seed/orchestrator.py:214 (`create_vat_audit_logs`), seed/builders/demo/vat.py:465,483, seed/builders/demo/binders.py:173 (BinderLifecycleLog), :341,355 (BinderIntakeEditLog), seed/builders/demo/signature_requests.py:229 (SignatureAuditEvent), seed/builders/demo/reports.py:625 (AnnualReportStatusHistory).
 
-**Test files referencing audit core (29):** tests/annual_reports/api/test_annual_report_audit.py, tests/annual_reports/api/test_annual_report_create_read_additional.py, tests/annual_reports/service/test_annual_report_generic_audit.py, tests/annual_reports/service/test_annual_report_query_service.py, tests/annual_reports/service/test_financial_audit_snapshots.py, tests/annual_reports/service/test_vat_import_service.py, tests/audit/test_audit_endpoint.py, tests/audit/test_audit_endpoint_filters.py, tests/audit/test_entity_audit_writer.py, tests/auth/api/test_logout_invalidation.py, tests/binders/api/test_binder_audit.py, tests/binders/api/test_binders.py, tests/binders/service/test_binder_intake_edit_service.py, tests/binders/service/test_binder_intake_vat_auto_advance.py, tests/binders/service/test_binder_lifecycle_service.py, tests/businesses/service/test_business_service_additional.py, tests/charges/service/test_billing_audit.py, tests/clients/service/test_entity_type_change_guard.py, tests/core/test_error_doc_coverage_matrix.py, tests/core/test_openapi_audit_paths.py, tests/regression/test_readonly_endpoints_no_side_effects.py, tests/signature_requests/api/test_signature_request_updated_at.py, tests/signature_requests/api/test_signature_requests.py, tests/signature_requests/api/test_signature_requests_cancel_and_client_list.py, tests/signature_requests/repository/test_signature_request_repository.py, tests/signature_requests/service/test_signature_requests.py, tests/timeline/service/test_timeline_operational_policy.py, tests/timeline/service/test_timeline_signature_lifecycle.py, tests/users/api/test_user_audit_logs.py, tests/users/services/test_audit_log_service.py, tests/users/services/test_auth_service_additional.py, tests/users/services/test_user_management_service_list_reset.py, tests/vat/api/test_vat_reports_audit.py, tests/vat/api/test_vat_reports_filing.py, tests/vat/api/test_vat_work_item_mutations.py, tests/vat/repository/test_vat_work_item_repository.py, tests/vat/service/test_vat_report_service_queries.py, tests/vat/service/test_vat_work_item_metadata.py.
+**Test files referencing audit core (38):** tests/annual_reports/api/test_annual_report_audit.py, tests/annual_reports/api/test_annual_report_create_read_additional.py, tests/annual_reports/service/test_annual_report_generic_audit.py, tests/annual_reports/service/test_annual_report_query_service.py, tests/annual_reports/service/test_financial_audit_snapshots.py, tests/annual_reports/service/test_vat_import_service.py, tests/audit/test_audit_endpoint.py, tests/audit/test_audit_endpoint_filters.py, tests/audit/test_entity_audit_writer.py, tests/auth/api/test_logout_invalidation.py, tests/binders/api/test_binder_audit.py, tests/binders/api/test_binders.py, tests/binders/service/test_binder_intake_edit_service.py, tests/binders/service/test_binder_intake_vat_auto_advance.py, tests/binders/service/test_binder_lifecycle_service.py, tests/businesses/service/test_business_service_additional.py, tests/charges/service/test_billing_audit.py, tests/clients/service/test_entity_type_change_guard.py, tests/core/test_error_doc_coverage_matrix.py, tests/core/test_openapi_audit_paths.py, tests/regression/test_readonly_endpoints_no_side_effects.py, tests/signature_requests/api/test_signature_request_updated_at.py, tests/signature_requests/api/test_signature_requests.py, tests/signature_requests/api/test_signature_requests_cancel_and_client_list.py, tests/signature_requests/repository/test_signature_request_repository.py, tests/signature_requests/service/test_signature_requests.py, tests/timeline/service/test_timeline_operational_policy.py, tests/timeline/service/test_timeline_signature_lifecycle.py, tests/users/api/test_user_audit_logs.py, tests/users/services/test_audit_log_service.py, tests/users/services/test_auth_service_additional.py, tests/users/services/test_user_management_service_list_reset.py, tests/vat/api/test_vat_reports_audit.py, tests/vat/api/test_vat_reports_filing.py, tests/vat/api/test_vat_work_item_mutations.py, tests/vat/repository/test_vat_work_item_repository.py, tests/vat/service/test_vat_report_service_queries.py, tests/vat/service/test_vat_work_item_metadata.py.
