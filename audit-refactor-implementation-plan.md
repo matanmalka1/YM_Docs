@@ -1,18 +1,20 @@
 # Audit Refactor — Implementation Plan
 
-Status: **planning only**. No code, migration, model, schema, seed, OpenAPI, or frontend change is made by this document.
+Status: **planning only**. This document changes no production code, migration, model, schema, seed, generated file, or frontend. DB is dev/seed-only → no data backfill, no dual-write, no backward compatibility, no legacy aliases.
 
-DB is dev/seed-only → **no backfill, no dual-write, no backward compatibility, no legacy aliases**. Target end state: exactly **two** audit models.
+Target end state: exactly **two** audit models.
 
-- **EntityAuditLog** — every business mutation **plus selected evidence events** (state-machine / legal-evidence transitions: `signature_request.viewed/signed/declined`, `annual_report.submitted`, `charge.paid`, `binder.handed_over`, …). Business mutation = a field/state change on a domain entity; evidence event = a point-in-time fact worth proving even when no field "diff" is interesting on its own.
+- **EntityAuditLog** — every business mutation **plus selected evidence events** (state-machine / legal-evidence transitions such as `signature_request.viewed/signed/declined`, `annual_report.submitted`, `charge.paid`, `binder.handed_over`).
 - **UserAuditLog** — auth/security/admin-access only (login, logout, password reset, user create/activate/deactivate/role-change).
 
 `VatAuditLog`, `AnnualReportStatusHistory`, `BinderLifecycleLog`, `BinderIntakeEditLog`, `SignatureAuditEvent` are deleted and merged into `EntityAuditLog`.
 
+> **Counts in this document are provisional.** Where a number appears it is the best current grep/scan reading, not a guarantee. **Phase 0 regenerates the exact inventory** (writers, readers, routes, tests, tables, enums) before any code is written. Do not treat counts as authoritative until Phase 0 confirms them.
+
 ### Locked decisions
-- **Read routes — collapse to generic.** Delete per-domain audit read routes; expand the single `GET /audit/{entity_type}/{entity_id}` to cover all entity types, one response schema.
-- **Action granularity — rich semantic.** Specific verbs (`vat_invoice.amount_changed`, `advance_payment.marked_paid`, `signature_request.signed`) + `domain.created/updated/deleted` for plain edits. Field diffs always in `old_value`/`new_value`.
-- **Migration — additive, not a rewrite.** The repo has a single initial migration (`alembic/versions/3e2669e69e32_initial.py`). It is **not** rewritten. A **new** migration alters `entity_audit_logs` and drops the five old audit tables.
+- **Read routes — collapse to generic**, gated by a real authorization layer (§3a). Per-domain audit read routes are deleted; `GET /audit/{entity_type}/{entity_id}` becomes the single entity-audit read route — but only after the `AuditEntityRegistry` resolver/authorization plan (§3a) is in place. The **signature detail drawer is a special case** (§4a).
+- **Action granularity — rich semantic.** Specific verbs + `domain.created/updated/deleted` for plain edits. Annual-report child operations keep rich semantic actions (§7a). Field diffs always in `old_value`/`new_value`.
+- **Migration — staged, never a rewrite of the initial migration** (§1a). Phase 1 only adds/alters the two surviving tables; legacy tables are dropped only after their writers/readers/routes/tests are gone (one cleanup migration after Phases 3–7, or per-phase).
 
 ---
 
@@ -23,305 +25,388 @@ DB is dev/seed-only → **no backfill, no dual-write, no backward compatibility,
 id, entity_type:str, entity_id:int,
 action:str,                       # rich semantic "domain.action"
 performed_by:int|None (FK users.id, nullable),
-actor_type:str,                   # user | system | external_signer
+actor_type:str (NOT NULL),        # user | system | external_signer
+actor_display_name:str|None,      # immutable actor snapshot (§5)
 old_value:JSONB|None, new_value:JSONB|None, metadata_json:JSONB|None,
 note:str|None, performed_at:datetime
 ```
-Delta vs today: `old_value`/`new_value` Text→JSONB; **add** `actor_type`, `metadata_json`; `performed_by` → Integer FK `users.id`, **nullable** (was non-null). Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`.
+Delta vs today: `old_value`/`new_value` Text→JSON; **add** `actor_type` (NOT NULL), `actor_display_name` (nullable), `metadata_json` (JSON); `performed_by` → Integer FK `users.id`, **nullable** (was non-null). Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the client-context expression index (§8b).
 
-**UserAuditLog** (`app/users/models/user_audit_log.py`, table `user_audit_logs`): keep. Only change: `metadata_json` Text→JSONB. Keep `action`/`status` as the existing closed enums (`AuditAction`/`AuditStatus`). Existing columns suffice.
+**Model column type (portability).** Model-level JSON columns use the portable form `JSON().with_variant(JSONB, "postgresql")` (or the repo's equivalent convention) — **not** a bare `JSONB` column type, which would break SQLite `create_all` in dev/tests. PostgreSQL gets JSONB at runtime; SQLite gets JSON/TEXT. Alembic migrations stay PostgreSQL-specific with explicit `USING` casts (§1b).
 
-**Decision — user activate/deactivate stays UserAuditLog-only.** User create/activate/deactivate/role-change are admin/security-access events and remain in `UserAuditLog` exclusively. **No dual-write** to `EntityAuditLog`. There is **no `ENTITY_USER` constant** in the final entity_type set (§6). Auditing user-entity changes in `EntityAuditLog` is explicitly out of scope; it would be a future, separate decision tied to a genuine business-facing user-profile screen.
+**UserAuditLog** (`app/users/models/user_audit_log.py`, table `user_audit_logs`): keep. Changes: `metadata_json` Text→JSONB; **add `actor_display_name` + `target_display_name`** nullable snapshots (§5). Keep `action`/`status` as the existing closed enums (`AuditAction`/`AuditStatus`).
+
+**Decision — user activate/deactivate stays UserAuditLog-only.** No dual-write to `EntityAuditLog`; **no `ENTITY_USER` constant** (§6). Auditing user-entity changes in `EntityAuditLog` is out of scope.
 
 ---
 
-## 1. Audit models inventory (exact)
+## 1. Audit models inventory (provisional — Phase 0 confirms)
 
-7 models found (target 2). Verified by class scan.
+7 models found (target 2).
 
-| Model | File | Table | Writers (sites) | Readers | API | Tests | Target |
-|---|---|---|---|---|---|---|---|
-| **EntityAuditLog** | `app/audit/models/audit_entity_audit_log.py` | `entity_audit_logs` | `EntityAuditWriter` (14 `record_*` sites) | `AuditTrailService`, timeline aggregator, dashboard recent-activity | `GET /audit/{type}/{id}` | `tests/audit/*` (3) | **KEEP + upgrade** |
-| **UserAuditLog** | `app/users/models/user_audit_log.py` | `user_audit_logs` | `AuditLogService.log` (10 sites) | `AuditLogService.list_logs` | `GET /users/audit-logs` | `tests/users/...audit*` (2) | **KEEP** (metadata_json→JSONB) |
-| **VatAuditLog** | `app/vat/models/vat_audit_log.py` | `vat_audit_logs` | `work_item_repo.append_audit` (12 sites) | `VatReportService.get_audit_trail_enriched` | `GET /vat/work-items/{id}/audit` | `tests/vat/api/test_vat_reports_audit.py` | **DELETE → EntityAuditLog** |
-| **AnnualReportStatusHistory** | `app/annual_reports/models/annual_report_status_history.py` | `annual_report_status_history` | `append_status_audit_entry` (4 sites) | `AnnualReportService.get_report_audit`, timeline | `GET /annual-reports/{id}/audit` | `tests/annual_reports/api/test_annual_report_audit.py` | **DELETE → EntityAuditLog** |
-| **BinderLifecycleLog** | `app/binders/models/binder_lifecycle_log.py` | `binder_lifecycle_logs` | `BinderLifecycleService._append_log` (9 sites) | `BinderAuditService`, timeline, dashboard | `GET /binders/{id}/audit` | `tests/binders/api/test_binder_audit.py`, `tests/binders/service/test_binder_lifecycle_*` | **DELETE → EntityAuditLog** |
-| **BinderIntakeEditLog** | `app/binders/models/binder_intake_edit_log.py` (+ `binder_intake_edit_log_repository.py`, `binder_intake_edit_service.py`) | `binder_intake_edit_logs` | `edit_intake` (2 sites) | none (no read route) | written via `PATCH /binders/{id}/intakes/{id}` | none direct | **DELETE → EntityAuditLog** |
-| **SignatureAuditEvent** | `app/signature_requests/models/signature_request.py` | `signature_audit_events` | `SignatureRequestAuditMixin.append_audit_event` (10 sites) | `TimelineRepository.list_signature_lifecycle_events` | timeline only (no dedicated audit route) | `tests/timeline/service/test_timeline_signature_lifecycle.py` | **DELETE → EntityAuditLog** |
+| Model | File | Table | Writer sites (provisional) | Readers | API | Target |
+|---|---|---|---|---|---|---|
+| **EntityAuditLog** | `app/audit/models/audit_entity_audit_log.py` | `entity_audit_logs` | `EntityAuditWriter.record_*` (14) | `AuditTrailService`, timeline, dashboard | `GET /audit/{type}/{id}` | **KEEP + upgrade** |
+| **UserAuditLog** | `app/users/models/user_audit_log.py` | `user_audit_logs` | `AuditLogService.log` (10) | `AuditLogService.list_logs` | `GET /users/audit-logs` | **KEEP** (JSONB + snapshots) |
+| **VatAuditLog** | `app/vat/models/vat_audit_log.py` | `vat_audit_logs` | `work_item_repo.append_audit` (12) | `VatReportService.get_audit_trail_enriched` | `GET /vat/work-items/{id}/audit` | **DELETE → EntityAuditLog** |
+| **AnnualReportStatusHistory** | `app/annual_reports/models/annual_report_status_history.py` | `annual_report_status_history` | `append_status_audit_entry` (**3**) | `AnnualReportService.get_report_audit`, timeline | `GET /annual-reports/{id}/audit` | **DELETE → EntityAuditLog** |
+| **BinderLifecycleLog** | `app/binders/models/binder_lifecycle_log.py` | `binder_lifecycle_logs` | `BinderLifecycleService._append_log` (**7**) | `BinderAuditService`, timeline, dashboard | `GET /binders/{id}/audit` | **DELETE → EntityAuditLog** |
+| **BinderIntakeEditLog** | `app/binders/models/binder_intake_edit_log.py` | `binder_intake_edit_logs` | `BinderIntakeEditService` (2) | none (no read route) | written via `PATCH /binders/{id}/intakes/{id}` | **DELETE table/repo → EntityAuditLog; KEEP `BinderIntakeEditService`** (§10b) |
+| **SignatureAuditEvent** | `app/signature_requests/models/signature_request.py` | `signature_audit_events` | `append_audit_event` (**9**) | `TimelineRepository.list_signature_lifecycle_events` **+ advisor detail `audit_trail`** | embedded in `GET /signature-requests/{id}` (§4a) | **DELETE → EntityAuditLog** |
 
-Repos/services kept/extended: `EntityAuditLogRepository`, `EntityAuditWriter`, `AuditTrailService`, `UserAuditLogRepository`, `AuditLogService`.
-Repos/services/schemas deleted: `VatAuditLogRepository` + `vat/schemas/vat_audit.py`; `AnnualReportStatusAuditRepository` + `AnnualReportAuditEntry`/`AnnualReportAuditListResponse`; `BinderLifecycleLogRepository` + `BinderAuditService` + `BinderAuditEntry`/`BinderAuditResponse`; `BinderIntakeEditLogRepository` + `BinderIntakeEditService` write path; `SignatureRequestAuditMixin` + `SignatureAuditEventResponse`/`SignatureRequestWithAuditResponse`.
+Deleted repos/services/schemas: `VatAuditLogRepository` + `vat/schemas/vat_audit.py`; `AnnualReportStatusAuditRepository` + `AnnualReportAuditEntry`/`AnnualReportAuditListResponse`; `BinderLifecycleLogRepository` + `BinderAuditService` + `BinderAuditEntry`/`BinderAuditResponse`; `BinderIntakeEditLogRepository` (but **keep `BinderIntakeEditService`**); `SignatureRequestAuditMixin` + `SignatureAuditEventResponse` (the per-item shape). **`SignatureRequestWithAuditResponse` is KEPT** and its `audit_trail` re-sourced from EntityAuditLog with a new embedded item schema (§4a).
 
-## 2. Call-site map (exact counts)
+### 1a. Migration ordering (correction #1)
 
-Write call-sites (verified by grep, excluding tests):
+- **The initial migration `alembic/versions/3e2669e69e32_initial.py` is never rewritten.**
+- **Phase 1 migration** adds/alters **only** the two surviving tables (`entity_audit_logs`, `user_audit_logs`). It does **not** drop any legacy audit table.
+- **Legacy tables are dropped only after their final writer/reader/route/test is replaced.** Either drop each table at the end of its own replacement phase (3–7) or — preferred — a **single cleanup migration after Phases 3–7** drops all five at once.
+- **Migration round-trip target is PostgreSQL.** SQLite may be used for dev convenience, but **do not claim JSONB round-trip on SQLite** — SQLite stores JSON as TEXT. PostgreSQL is the authority for up+down round-trip in CI (Phase 0 + Phase 10).
+
+### 1b. Migration details (correction #2)
+
+Phase 1 is **safe-sequenced** so existing audit writes never break (correction #1). It pairs the schema change with the serializer/reader change (correction #2) and splits NOT-NULL enforcement into a final substep after writers are updated. Implement as **migration 1a + 1b** (two Alembic revisions in the same phase):
+
+**Step A — schema + writer/reader (additive, no NOT NULL yet) [migration 1a]:**
+- `entity_audit_logs.old_value`, `.new_value`: Text → JSONB via explicit PostgreSQL `USING`:
+  `op.alter_column("entity_audit_logs", "old_value", type_=postgresql.JSONB(), postgresql_using="old_value::jsonb")` (same for `new_value`). Existing seed values are JSON strings; the cast succeeds on PostgreSQL.
+- Add `metadata_json` JSONB nullable; add `actor_display_name` String nullable.
+- Add `actor_type` with a **temporary `server_default="user"`** and **nullable** for now (existing rows + any in-flight writes stay valid).
+- `performed_by`: make nullable.
+- `user_audit_logs.metadata_json`: Text → JSONB (`USING metadata_json::jsonb`); add `actor_display_name`, `target_display_name` nullable.
+- Add indexes from Target models + the §8b expression index.
+- **Serializer/reader changes in the same step (correction #2):**
+  - `EntityAuditWriter._serialize_value` stops calling `json.dumps`; it returns the **normalized dict/list/JSON value directly** (JSONB column stores the object). Keep `_normalize_value` (Decimal/date/enum → JSON-safe) but drop the surrounding `json.dumps`.
+  - `UserAuditLogRepository.create` writes `metadata` as a **dict directly** (drop `json.dumps`).
+  - Readers stop `json.loads`: `AuditLogService._to_dict` reads `log.metadata_json` as an object (drop `json.loads`); `AuditTrailService` + the `EntityAuditLogResponse`/`UserAuditLogResponse` schemas type `old_value`/`new_value`/`metadata_json` as **JSON objects** (`dict | list | None`), not strings.
+  - Existing writers (client/business/charge/annual-report + the auth/user writers) are updated **in this step** to pass `actor_type` + `actor_display_name` on every write.
+  - Add **JSON-object round-trip tests** (write dict → read dict, both tables; runtime response schema shows objects not strings).
+
+**Step B — enforce NOT NULL (after writers populate it) [migration 1b]:**
+- Once all writers pass `actor_type`, `op.alter_column("entity_audit_logs", "actor_type", nullable=False)` and **drop the temporary `server_default`** (`server_default=None`). New rows must pass `actor_type` explicitly (enforced by the §5a validation matrix in the writer).
+
+**Phase-1 downgrade — clean, fail-safe (correction #6, Option A):**
+- JSONB → Text reverse conversion with explicit cast on both tables: `op.alter_column(..., type_=sa.Text(), postgresql_using="old_value::text")` (and `new_value`, `metadata_json`); drop the added columns/indexes; restore `actor_type` default if reversing 1b.
+- **`performed_by` restore is fail-safe, not silently asymmetric:** before re-imposing `NOT NULL`, the downgrade **asserts no rows have `performed_by IS NULL`**. If null-actor rows exist (system/external_signer), the **downgrade fails with a clear error message** rather than silently leaving the schema changed or destroying rows. This is a clean, deterministic round-trip: it either fully reverses or refuses with a explicit message. (Reversing 1b before 1a also restores `actor_type` nullable + default in the correct order.)
+
+**Cleanup migration (after Phases 3–7):**
+- `DROP TABLE` the five legacy audit tables.
+- **Downgrade must fully recreate** each dropped table with its original columns, indexes, FKs, and constraints (copy definitions from `3e2669e69e32_initial.py`). A non-reversible downgrade is not acceptable.
+- `DROP TYPE` **only for Postgres enum types owned exclusively by the dropped tables.** Do **not** drop shared enums — e.g. `AnnualReportStatus` is shared with the surviving `annual_reports` table (`from_status`/`to_status` reference it but don't own it) and must stay. Phase 0 enumerates, per dropped table, which enums it owns vs shares.
+
+## 2. Call-site map (provisional)
+
+Write call-sites (grep, excluding tests) — **to be reconfirmed in Phase 0**:
 
 | Source | Sites |
 |---|---|
-| `EntityAuditWriter.record_*` (EntityAuditLog today) | 14 |
+| `EntityAuditWriter.record_*` (EntityAuditLog) | 14 |
 | `work_item_repo.append_audit` → VatAuditLog | 12 |
-| `BinderLifecycleService._append_log` → BinderLifecycleLog | 9 |
-| `append_audit_event` → SignatureAuditEvent | 10 |
-| `append_status_audit_entry` → AnnualReportStatusHistory | 4 |
-| `edit_intake` → BinderIntakeEditLog | 2 |
-| **Business-target write sites (→ EntityAuditLog)** | **51** |
+| `append_audit_event` → SignatureAuditEvent | **9** |
+| `BinderLifecycleService._append_log` → BinderLifecycleLog | **7** |
+| `append_status_audit_entry` → AnnualReportStatusHistory | **3** |
+| `BinderIntakeEditService` → BinderIntakeEditLog | 2 |
 | `AuditLogService.log` → UserAuditLog (auth/admin) | 10 |
-| **Total audit write sites** | **61** |
 
-Read/aggregation call-sites: `AuditTrailService.get_entity_audit_trail`, `VatReportService.get_audit_trail_enriched`, `BinderAuditService.get_binder_audit`, `AnnualReportService.get_report_audit`, `AuditLogService.list_logs`, timeline aggregator (`timeline_audit_aggregator.build_entity_audit_events` + `TimelineRepository` lifecycle/status/signature readers), dashboard `RecentActivityService.build`. = **8 distinct read paths.**
+Read/aggregation paths: `AuditTrailService`, `VatReportService.get_audit_trail_enriched`, `BinderAuditService`, `AnnualReportService.get_report_audit`, `AuditLogService.list_logs`, timeline aggregator + `TimelineRepository` (status/lifecycle/signature), dashboard `RecentActivityService.build`, **signature advisor-detail `audit_trail`** (§4a). API: §3. Seed: `app/seed/builders/demo/vat.py`, `app/seed/builders/demo/binders.py`, `app/seed/orchestrator.py`. Tests: §13.
 
-API call-sites: **8** (see §3). Seed call-sites: **3** — `app/seed/builders/demo/vat.py`, `app/seed/builders/demo/binders.py` (lifecycle + intake-edit), `app/seed/orchestrator.py`. Test files in audit/timeline/dashboard/lifecycle area: **43** (exact, from `find tests`). The count that *directly assert audit/history behavior and require changes* is **to be finalized in Phase 0** (file-by-file triage); §13 lists the currently-identified set without claiming completeness.
+## 3. Audit/history/timeline routes
 
-## 3. Audit/history/timeline routes (8)
+| # | Route | File | Source today | After |
+|---|---|---|---|---|
+| 1 | `GET /audit/{entity_type}/{entity_id}` | `app/audit/api/audit_routes.py:18` | EntityAuditLog | **STAYS + EXPANDS** behind `AuditEntityRegistry` authorization (§3a) |
+| 2 | `GET /users/audit-logs` | `app/users/api/user_routes_audit.py:24` | UserAuditLog | **STAYS** |
+| 3 | `GET /vat/work-items/{id}/audit` | `app/vat/api/vat_routes_queries.py:184` | VatAuditLog | **DELETE** → `/audit/vat_work_item/{id}` |
+| 4 | `GET /binders/{id}/audit` | `app/binders/api/binder_routes_audit.py:26` | BinderLifecycleLog | **DELETE** → `/audit/binder/{id}` |
+| 5 | `GET /annual-reports/{id}/audit` | `app/annual_reports/api/annual_report_routes_status.py:129` | AnnualReportStatusHistory | **DELETE** → `/audit/annual_report/{id}` |
+| 6 | `GET /binders/{id}/intakes` | `app/binders/api/binder_routes_audit.py:56` | BinderIntake | **STAYS** |
+| 7 | `GET /clients/{id}/timeline` | `app/timeline/api/timeline_routes.py:19` | 9 categories | **STAYS** (sources re-pointed, §4) |
+| 8 | `GET /dashboard/overview` (`recent_activity`) | `app/dashboard/api/dashboard_routes_overview.py` | EntityAuditLog + BinderLifecycleLog | **CHANGES** — EntityAuditLog only (§5) |
+| 9 | `GET /signature-requests/{id}` (`audit_trail`) | `app/signature_requests/api/signature_request_routes_advisor.py:101` | SignatureAuditEvent (embedded) | **CHANGES** — re-source `audit_trail` from EntityAuditLog (§4a) |
 
-| # | Route | Method | File | Source today | After |
-|---|---|---|---|---|---|
-| 1 | `/audit/{entity_type}/{entity_id}` | GET | `app/audit/api/audit_routes.py:18` | EntityAuditLog | **STAYS + EXPANDS** — `ALLOWED_READ_ENTITY_TYPES` grows to all types; sole entity-audit read route |
-| 2 | `/users/audit-logs` | GET | `app/users/api/user_routes_audit.py:24` | UserAuditLog | **STAYS** unchanged |
-| 3 | `/vat/work-items/{id}/audit` | GET | `app/vat/api/vat_routes_queries.py:184` | VatAuditLog | **DELETE** → `/audit/vat_work_item/{id}` |
-| 4 | `/binders/{id}/audit` | GET | `app/binders/api/binder_routes_audit.py:26` | BinderLifecycleLog | **DELETE** → `/audit/binder/{id}` |
-| 5 | `/annual-reports/{id}/audit` | GET | `app/annual_reports/api/annual_report_routes_status.py:129` | AnnualReportStatusHistory | **DELETE** → `/audit/annual_report/{id}` |
-| 6 | `/binders/{id}/intakes` | GET | `app/binders/api/binder_routes_audit.py:56` | BinderIntake (not edit log) | **STAYS** (reads intake rows) |
-| 7 | `/clients/{id}/timeline` | GET | `app/timeline/api/timeline_routes.py:19` | 7 sources | **STAYS** as product timeline; sources re-pointed (§4) |
-| 8 | `/dashboard/overview` (`recent_activity`) | GET | `app/dashboard/api/dashboard_routes_overview.py` | EntityAuditLog + BinderLifecycleLog | **CHANGES** — EntityAuditLog only (§5) |
+`PATCH /binders/{id}/intakes/{id}` continues to write via `BinderIntakeEditService`, now into EntityAuditLog (§10b).
 
-Also: `PATCH /binders/{id}/intakes/{id}` (`binder_routes_audit.py`) currently **writes** BinderIntakeEditLog → repointed to EntityAuditLog write (no read route affected).
+### 3a. Generic audit route — AuditEntityRegistry, scope & authorization
 
-Response compatibility required: **no**. Routes 3–5 + their schemas are deleted.
+Expanding `ALLOWED_READ_ENTITY_TYPES` is **not sufficient**. The generic route must **authorize before returning any audit rows**, using the **existing authorization model only** — no new permission model is introduced by this refactor.
 
-## 4. Timeline — redesign with one source of truth per category (correction #5)
+**Authorization model (existing, do not invent):** the system has exactly two roles, `UserRole.ADVISOR` and `UserRole.SECRETARY` (`app/users/models/user.py`). Audit reads reuse the **current** role-based access and the **current** active/deleted client-filtering rules (e.g. `scope_to_active_clients_stmt` and the existing client-scoping helpers). Any new ownership/permission model (per-accountant ownership, record-level grants, etc.) is **out of scope** unless separately approved.
 
-`app/timeline/services/timeline_service.py` aggregates the event categories listed in the registry below (per client) and is a **product timeline**, not a raw audit viewer. Files: `timeline_service.py`, `timeline_audit_aggregator.py` (holds `_DEDUP_ACTIONS`), `timeline_client_builders.py` (has `entity_audit_changed_event`), `timeline/repositories/timeline_repository.py`, `timeline_labels.py`. Client context anchor = `client_record_id` input; per-source via direct column or parent FK.
+Introduce an `AuditEntityRegistry` (in `app/audit/`) keyed by `entity_type`, each entry a descriptor:
 
-Today the same logical event can arrive from **both** a live-table builder and an EntityAuditLog row, patched up by `_DEDUP_ACTIONS`. The refactor **replaces dedup-by-patch with an explicit event-source registry**: each event category has exactly **one** source. Audit rows whose category is owned by a live builder are simply not queried for timeline (they remain in the audit-trail view).
+| Field | Meaning |
+|---|---|
+| `model` / `table` | the audited entity's SQLAlchemy model + table |
+| `exists(db, entity_id)` | existence check against the live table (with `include_deleted=True`) |
+| `resolve_scope(db, entity_id, audit_rows) -> AuditScope` | resolves the access scope from the live row when present, else from immutable audit metadata (see below) |
+| `sensitive` flag + `access_rule` | marks entity types whose audit carries restricted forensic/PII (e.g. `signature_request`); §16 governs read-time redaction + who may read, within the existing role model |
 
-**Timeline event-source registry (authoritative — one source each):**
+**`resolve_scope()` replaces a single `client_record_id` resolver.** It returns an `AuditScope`:
+```
+AuditScope:
+    client_ids: set[int]          # owning client(s); empty if firm-level
+    firm_level: bool              # True for firm-wide entities (tax_calendar, deadline_rule)
+    entity_deleted: bool          # True if the live entity is soft- or hard-deleted
+    resolved_from: "live_table" | "audit_metadata"
+```
+It must support: **zero client context / firm-level** (`firm_level=True`, empty `client_ids`); **one client**; **multiple clients** (`client_ids` with >1); **soft-deleted entities** (resolve from live row with `include_deleted=True`, `entity_deleted=True`); and **hard-deleted entities** (live row gone → resolve `client_ids` from immutable `metadata_json.client_record_id` on the audit rows, `resolved_from="audit_metadata"`, `entity_deleted=True`). **Hard-deleted audit history must remain readable** — it must not become inaccessible just because the live row was removed.
 
-| Event category | Single source | Note |
+**Layering (correction #5).** Repositories do **DB access only**. **`AuditTrailService` owns** registry lookup, `resolve_scope`, authorization, redaction, and audit→response mapping. **Routes call `AuditTrailService`** and never touch the registry, repository, or scope logic directly. Other domains that need audit items (e.g. the signature response builder, §4a) also go **through `AuditTrailService`**, not through `EntityAuditLogRepository` directly.
+
+**Service flow (`AuditTrailService.get_entity_audit_trail`):** validate `entity_type ∈ registry` → fetch the entity's audit rows (via repository) → `resolve_scope` (from live table, or from audit metadata if the row is gone) → apply the **existing** role (ADVISOR/SECRETARY) + active/deleted client-filter authorization against `scope.client_ids`/`scope.firm_level` → apply §16 read-time redaction for `sensitive` types → map to response (carrying `entity_deleted` so callers can label deleted history). The route only handles auth dependency (401 if unauthenticated) and HTTP status mapping (403/404). No entity_type is added to the registry without `model`, `exists`, `resolve_scope`, and `sensitive`/`access_rule` defined. Phase 0 enumerates `resolve_scope` for every entity_type in §6.
+
+## 4. Timeline — one source of truth per category (correction #5)
+
+`app/timeline/services/timeline_service.py` aggregates the categories in the registry below and is a **product timeline**, not a raw audit viewer. Files: `timeline_service.py`, `timeline_audit_aggregator.py` (`_DEDUP_ACTIONS`), `timeline_client_builders.py` (`entity_audit_changed_event`), `timeline/repositories/timeline_repository.py`, `timeline_labels.py`. Client anchor = `client_record_id` input.
+
+Today a logical event can arrive from **both** a live builder and an EntityAuditLog row, patched by `_DEDUP_ACTIONS`. Replace that with an explicit **event-source registry** — one source per category:
+
+| Category | Single source |
+|---|---|
+| client created | live builder (`client_created_event`) |
+| business changed | EntityAuditLog `business.*` |
+| charge created/issued/paid + invoice attached | live builders (`charge_*`, `invoice_attached`) |
+| annual_report status changed / submitted | EntityAuditLog `annual_report.status_changed`/`submitted` |
+| binder received / handed_over | live builders |
+| binder lifecycle (marked_full/reopened/ready/reverted) | EntityAuditLog `binder.*` (excludes received/handed_over) |
+| signature lifecycle (sent/viewed/signed/declined/canceled/expired) | EntityAuditLog `signature_request.*` |
+| document uploaded | live `PermanentDocument` |
+| notifications sent/failed | live `Notification` |
+
+**Recommendation:** keep aggregator + builders; re-point the 3 broken streams (annual-report status, binder lifecycle, signature) to EntityAuditLog. **Remove `_DEDUP_ACTIONS` only after** the registry covers every category and timeline tests prove zero duplicate events (Phase 7) — not in the same step as the re-point. VatAuditLog + BinderIntakeEditLog were never read by timeline.
+
+Child-entity client context resolves via `metadata_json.client_record_id` (§8) backed by the §8b expression index. Files changed: the five timeline files. Risk: Hebrew label parity; registry must guarantee single-source per category.
+
+### 4a. Signature audit drawer — not timeline-only (correction #4)
+
+The advisor signature detail route (`signature_request_routes_advisor.py:101`, `SignatureRequestWithAuditResponse`) embeds `audit_trail` (built in `signature_request_response_builder.py:build_with_audit` from `list_audit_events`) — consumed by the frontend **`SignatureRequestAuditDrawer`**. Deleting `SignatureAuditEvent` breaks this.
+
+**Decision (single approach for this refactor) — keep the embedded `audit_trail` contract; re-source it from EntityAuditLog via the service layer.** The advisor detail endpoint `GET /signature-requests/{id}` and its `SignatureRequestWithAuditResponse` wrapper are **kept** (not deleted). **Layering (correction #5):** the signature service/route fetches audit items **through `AuditTrailService`** (e.g. a `get_entity_audit_items("signature_request", id)` that applies scope/redaction), and passes the **already-fetched items** to `build_with_audit(request, audit_items)`. The response builder must **not** query `EntityAuditLogRepository` (or any repository) directly — it only maps the items it is given. The frontend `SignatureRequestAuditDrawer` keeps consuming the embedded `audit_trail` and is **not** required to call the generic endpoint in this refactor.
+- The generic `GET /audit/signature_request/{id}` **may** also serve signature audit (registry-gated), but it is **not** the drawer contract.
+- `SignatureRequestWithAuditResponse` is **retained**. Only the per-item shape changes: the old `SignatureAuditEventResponse` (typed forensic columns) is replaced by an EntityAuditLog-derived item; **a replacement embedded item schema is defined** as part of Phase 6 (fields: `action`, `actor_type`, `actor_display_name`, `performed_at`, `note`, and the §8a forensic fields surfaced from `metadata_json`).
+- **Preserve display of** `created/sent/viewed/signed/declined/canceled/expired`.
+- Map `event_type → action` (`signature_request.<event>`), `actor_type` (`advisor→user`, `signer→external_signer`, `system→system`), and move `actor_name`, `ip_address`, `user_agent`, `content_hash`, `signed_document_key` into `metadata_json` **per action** (§8a).
+- Frontend type regenerates in Phase 10 (§14); the drawer's backend contract shape is finalized in Phase 6 (backend-only acceptance).
+
+## 5. Actor display snapshot (correction #5)
+
+Renaming a user must **not** rewrite historical audit display. Joining `performed_by → users.full_name` at read time does exactly that.
+
+- **EntityAuditLog gains `actor_display_name`** (nullable) — an **immutable snapshot** captured by `EntityAuditWriter` at write time from `current_user.full_name` (or signer name for external signers, or a system label). Read paths prefer the snapshot; the `performed_by` FK remains for filtering/joins but is not the display source.
+- **UserAuditLog** already snapshots `email`; add `actor_display_name` + `target_display_name` for parity so admin-action history survives renames. (Low cost; recommended.)
+- For `external_signer`/`system` rows `performed_by` is `NULL`; `actor_display_name` carries the signer name / system label so display never depends on a user join.
+
+### 5a. Actor validation matrix (writer-enforced, fail-closed)
+
+`EntityAuditWriter` validates the actor fields on every write; an invalid combination **fails and rolls back** the domain mutation (per §17).
+
+| `actor_type` | `performed_by` | `actor_display_name` |
 |---|---|---|
-| client created | live builder (`client_created_event`) | richer than `client.created` audit |
-| business changed | EntityAuditLog `business.*` | no live builder |
-| charge created/issued/paid + invoice attached | live builders (`charge_*`, `invoice_attached`) | `charge.*` audit NOT queried for timeline |
-| annual_report status changed / submitted | EntityAuditLog `annual_report.status_changed`/`submitted` | replaces AnnualReportStatusHistory |
-| binder received / handed_over | live builders | from `Binder`/`BinderHandover` |
-| binder lifecycle (marked_full/reopened/ready/reverted) | EntityAuditLog `binder.*` | replaces BinderLifecycleLog; **excludes** received/handed_over (owned above) |
-| signature lifecycle (sent/viewed/signed/declined/canceled/expired) | EntityAuditLog `signature_request.*` | replaces SignatureAuditEvent |
-| document uploaded | live `PermanentDocument` | |
-| notifications sent/failed | live `Notification` | |
+| `user` | **required** (FK users.id) | **required** |
+| `system` | **must be NULL** | **required** (system label) |
+| `external_signer` | **must be NULL** | **required** (signer name) |
+| anything else | — | **fail validation** |
 
-**Recommendation — keep aggregator + builders; re-point 3 broken streams (annual-report status, binder lifecycle, signature) to EntityAuditLog; then retire `_DEDUP_ACTIONS`.** `_DEDUP_ACTIONS` is removed **only after** the event-source registry above covers every category and timeline tests prove zero duplicate events (see Phase 7) — not in the same step as the re-point. VatAuditLog + BinderIntakeEditLog were never read by timeline → no timeline impact.
-
-- **Child-entity client context:** resolved via **`metadata_json.client_record_id`** written at audit time (§8) — timeline needs no per-entity joins. New repo query `list_for_client_context(client_record_id, entity_types, business_ids)` reading `metadata_json->>'client_record_id'`.
-- Files changed: `timeline_service.py`, `timeline_audit_aggregator.py`, `timeline_client_builders.py`, `timeline_repository.py`, `timeline_labels.py`. Files deleted: none in timeline (deletions are old models/repos).
-- Risk: Hebrew label parity for the re-pointed semantic actions; the registry must be enforced so a live builder and an audit row never both fire for one category.
-
-## 5. Dashboard recent activity — redesign
-
-`app/dashboard/services/dashboard_recent_activity_service.py` today fetches 20 recent EntityAuditLog + 20 recent BinderLifecycleLog (imports at lines 24/25/27/28), merges, top 5; special `_serialize_binder` branch (negated ids, `field_name=="location_status"` detection, separate client lookup, `performed_at or changed_at` glue).
-
-**Target:** EntityAuditLog only via `list_recent(limit)`. Remove `_serialize_binder`, the BinderLifecycleLog import/repo, negated-id hack, dual timestamp glue. Binder activity now arrives as `entity_type="binder"` + semantic `action` → label via `_ACTION_LABELS`, href + `client_name` via `metadata_json` (`binder_id`, `client_record_id`). Single serialization path. Files: `dashboard_recent_activity_service.py`. Risk: `_ACTION_LABELS`/href maps must gain binder semantic actions; all recent-activity-eligible writes must carry `metadata_json.client_record_id`.
+Rules: `actor_type` must be one of the three known values (unknown → reject). `user` without `performed_by`, or `system`/`external_signer` with a non-null `performed_by`, or any row missing `actor_display_name`, fails validation. No partial/invalid actor row is ever committed.
 
 ## 6. ENTITY_* constants — final
 
-Canonical: `app/audit/audit_constants.py`. Rule: own `entity_type` only with an independent screen/route; child rows → parent entity_type + `metadata_json.<child>_id`.
+Canonical: `app/audit/audit_constants.py`. Rule: own `entity_type` only with an independent screen/route; child rows → parent entity_type + `metadata_json.<child>_id`. Every entity_type below must have an `AuditEntityRegistry` descriptor (§3a).
 
-| Table/domain | entity_type | Granularity | Reason |
+| Table/domain | entity_type | Granularity | Client resolver |
 |---|---|---|---|
-| client_records | `client` (exists) | row | own screen |
-| businesses | `business` (exists) | row | own screen |
-| legal_entities | `legal_entity` | row | identity/tax-profile data |
-| persons | `person` | row | identity data |
-| person_legal_entity_links | `person_legal_entity_link` | row | ownership/role changes |
-| authority_contacts | `authority_contact` | row | own CRUD |
-| entity_notes | `note` | row | own CRUD |
-| advance_payments | `advance_payment` | row | own detail page |
-| charges | `charge` (exists) | row | own screen |
-| **invoices** | **`invoice`** | row | **resolved (correction #3): `app/invoices/api/invoice_routes.py` exposes independent POST+GET API → own entity_type. Minimal lifecycle (`invoice.created`); if that API is ever removed, fold to `charge` + `metadata_json.invoice_id`.** |
-| vat_work_items | `vat_work_item` | row | own screen |
-| vat_invoices | `vat_invoice` | row | own edit modal |
-| annual_reports | `annual_report` (exists) | row | own screen |
-| annual_report_details/income/expense/credit_points/schedules | `annual_report` | **aggregate** | child; `metadata_json.section` + line/schedule id |
-| annual_report_annex_data | `annual_report` | aggregate | bulk save → one `annual_report.updated`, `section="annex_data"` |
-| binders | `binder` | row | own screen |
-| binder_intakes | `binder_intake` | row | own intake flow |
-| binder_intake_materials | `binder_intake` | aggregate | child of intake |
-| binder_handovers | `binder_handover` | row | handover event |
-| binder_handover_binders | — | — | junction; audit at handover |
-| permanent_documents | `document` | row | upload/approve/reject lifecycle |
-| signature_requests | `signature_request` | row | lifecycle + forensic |
-| tasks | `task` | row | own screen |
-| correspondence_entries | `correspondence` | row | own CRUD |
-| notifications | `notification` | row (partial) | user-initiated / business-significant only |
-| reminders | `reminder` | row (partial) | created/canceled/fired-failed only |
-| tax_calendar_entries | `tax_calendar` | aggregate | one `tax_calendar.generated`/batch; manual edit = row |
-| deadline_rules | `deadline_rule` (conditional) | row | only if UI-editable |
-| users | — (no `ENTITY_USER`) | — | auth/admin → UserAuditLog only |
-| idempotency_keys / password_reset_tokens | — | none | infra |
+| client_records | `client` | row | self |
+| businesses | `business` | row | `legal_entity → client_record` |
+| legal_entities | `legal_entity` | row | via owning client/business |
+| persons | `person` | row | via link → client (or firm-level) |
+| person_legal_entity_links | `person_legal_entity_link` | row | via legal_entity → client |
+| authority_contacts | `authority_contact` | row | `client_record_id` column |
+| entity_notes | `note` | row | `entity_type/entity_id` → client |
+| advance_payments | `advance_payment` | row | `client_record_id` column |
+| charges | `charge` | row | `client_record_id` column |
+| **invoices** | **`invoice`** | row | via `charge → client_record_id` (independent POST+GET API at `app/invoices/api/invoice_routes.py`; minimal `invoice.created`) |
+| vat_work_items | `vat_work_item` | row | `client_record_id` column |
+| vat_invoices | `vat_invoice` | row | via `work_item → client_record_id` |
+| annual_reports | `annual_report` | row | `client_record_id` column |
+| annual_report child tables | `annual_report` | **aggregate** | via parent report (rich child actions, §7a) |
+| binders | `binder` | row | `client_record_id` column |
+| binder_intakes | `binder_intake` | row | via `binder → client_record_id` |
+| binder_intake_materials | `binder_intake` | aggregate | via intake → binder |
+| binder_handovers | `binder_handover` | row | `client_record_id` column |
+| permanent_documents | `document` | row | `client_record_id` column |
+| signature_requests | `signature_request` | row (**sensitive**) | `client_record_id` column |
+| tasks | `task` | row | `client_record_id` column |
+| correspondence_entries | `correspondence` | row | `client_record_id` column |
+| notifications | `notification` | row (partial) | `client_record_id` column |
+| reminders | `reminder` | row (partial) | via source domain |
+| tax_calendar_entries | `tax_calendar` | aggregate | firm-level |
+| deadline_rules | `deadline_rule` (conditional) | row | firm-level |
+| users | — (**no `ENTITY_USER`**) | — | auth/admin → UserAuditLog only |
+| idempotency_keys / password_reset_tokens / junctions | — | none | infra |
 
-Final `ENTITY_*` set = spec §9 list + `invoice` + `deadline_rule` (conditional). **No `ENTITY_USER`** (user events stay UserAuditLog-only). `ALLOWED_READ_ENTITY_TYPES` expands to the full set (gates the generic read route).
+Final `ENTITY_*` set = spec §9 list + `invoice` + `deadline_rule` (conditional); **no `ENTITY_USER`**. `ALLOWED_READ_ENTITY_TYPES` is derived from the registry, not hand-maintained separately.
 
 ## 7. ACTION_* constants — final (rich semantic)
 
-Convention `domain.action`, constants only, **no raw strings in services**. Plain field edits → `domain.updated` (diffs in old/new); lifecycle/evidence → specific verbs.
+Convention `domain.action`, constants only, **no raw strings in services**. Plain edits → `domain.updated` (diffs in old/new); lifecycle/evidence → specific verbs.
 
-| Action(s) | Replaces |
-|---|---|
-| `client.created/updated/deleted/restored` | existing CREATED/UPDATED/DELETED/RESTORED (client) |
-| `business.created/updated/deleted/restored` | existing |
-| `legal_entity.updated`, `person.updated`, `person_legal_entity_link.created/deleted` | new |
-| `advance_payment.created/updated/amount_changed/marked_paid/deleted` | new |
-| `charge.issued/paid/canceled` | existing ISSUED/PAID/CANCELED |
-| `invoice.created` | new |
-| `vat_work_item.created/status_changed/assigned/filed/amount_overridden` | VatAuditLog actions |
-| `vat_invoice.created/updated/amount_changed/deleted` | VatAuditLog actions |
-| `annual_report.created/updated/status_changed/submitted/deleted` | STATUS_CHANGED + AnnualReportStatusHistory |
-| `annual_report.updated` + `metadata_json.section` | DETAIL_UPDATED, INCOME_*, EXPENSE_*, ANNEX_LINE_* |
-| `document.uploaded/replaced/approved/rejected/deleted` | new |
-| `signature_request.created/sent/viewed/signed/declined/canceled/expired` | SignatureAuditEvent `event_type` (evidence events) |
-| `binder.created/marked_full/reopened/marked_ready_for_handover/reverted_ready/handed_over/deleted/restored` | BinderLifecycleLog field rows |
-| `binder_intake.received/updated` | BinderIntakeEditLog |
-| `task.created/assigned/completed/canceled/deleted` | new |
-| `correspondence.created/updated/deleted` | new |
-| `notification.sent`, `reminder.created/canceled/failed`, `tax_calendar.generated` | new (partial) |
+Core set (illustrative, **incomplete**): `client.*`, `business.*`, `legal_entity.updated`, `person.updated`, `person_legal_entity_link.created/deleted`, `advance_payment.created/updated/amount_changed/marked_paid/deleted`, `charge.issued/paid/canceled`, `invoice.created`, `vat_work_item.created/status_changed/assigned/filed/amount_overridden`, `vat_invoice.created/updated/amount_changed/deleted`, `annual_report.created/updated/status_changed/submitted/deleted`, `document.uploaded/replaced/approved/rejected/deleted`, `signature_request.created/sent/viewed/signed/declined/canceled/expired`, `binder.created/marked_full/reopened/marked_ready_for_handover/reverted_ready/handed_over/deleted/restored`, `binder_intake.received/updated`, `task.created/assigned/completed/canceled/deleted`, `correspondence.created/updated/deleted`, `notification.sent`, `reminder.created/canceled/failed`, `tax_calendar.generated`.
 
-Annual-report financial-line + annex constants (`ACTION_INCOME_*`, `ACTION_EXPENSE_*`, `ACTION_ANNEX_LINE_*`) collapse into `annual_report.updated` + `metadata_json.section`/line id. Keep transition verbs (`status_changed`, `submitted`) distinct.
+> **Binding action matrix is a Phase 0 deliverable — do not start implementation from this partial list.** Phase 0 produces a binding **mutation → entity_type → action → old/new payload → metadata_json → actor** matrix covering **every audited domain's create/update/delete flow**, explicitly including: authority_contacts, entity_notes, binder_handovers, **reminders fired events** (`reminder.fired`/`reminder.failed`), documents, notifications, and all annual-report child actions (§7a). The constant set above is finalized against that matrix before any writer is changed.
+
+### 7a. Annual-report child actions — keep rich semantics (correction #8)
+
+Do **not** collapse all child operations into `annual_report.updated`. Preserve:
+- `annual_report.income_line_added/updated/deleted`
+- `annual_report.expense_line_added/updated/deleted`
+- `annual_report.annex_line_updated/deleted`
+- `annual_report.schedule_completed`
+
+`entity_type` stays `annual_report`; child identity goes in `metadata_json` (`section`, `line_id`/`schedule_id`, `line_number`). These replace the existing `ACTION_INCOME_*`, `ACTION_EXPENSE_*`, `ACTION_ANNEX_LINE_*` constants one-to-one (re-namespaced under `annual_report.*`). Plain detail edits with no dedicated verb use `annual_report.updated` + `metadata_json.section`.
 
 ## 8. metadata_json contract
 
-`client_record_id` is **mandatory whenever a client context exists** (timeline/dashboard depend on it). The changed field itself goes in `old_value`/`new_value`, never metadata.
+`client_record_id` is **mandatory whenever a client context exists** (timeline/dashboard depend on it, indexed per §8b). The changed field itself goes in `old_value`/`new_value`, never metadata. Subject to the §16 sensitive-data policy.
 
-| entity_type | required | optional | used by | risk if missing |
-|---|---|---|---|---|
-| vat_invoice | client_record_id, vat_work_item_id, invoice_number, period, tax_year | business_id, source | timeline, audit view | can't place under client |
-| vat_work_item | client_record_id, period, tax_year | source | timeline, dashboard | same |
-| advance_payment | client_record_id, period, tax_year | annual_report_id, source | timeline | same |
-| annual_report (+children) | client_record_id, tax_year | section, line_number, schedule | timeline, audit view | child orphaned |
-| document | client_record_id | business_id, annual_report_id, binder_id, document_type, version | timeline | href/label gaps |
-| signature_request | client_record_id, signer_name, signer_email (always) | per-action forensic (see below) | timeline, **forensic/legal** | evidence loss |
-| binder / binder_intake | client_record_id, binder_id | binder_number, period_start/end, field_name | timeline, dashboard | dashboard href breaks |
-| task | client_record_id | source_domain, source_id, assigned_to_user_id, assigned_role | timeline | context loss |
-| charge / invoice | client_record_id | business_id, annual_report_id, invoice_id | dashboard, timeline | href breaks |
-
-**Signature forensic metadata is per-action (not blanket):**
-
-| signature_request action | required metadata | notes |
+| entity_type | required | optional |
 |---|---|---|
-| created, sent | client_record_id, signer_name, signer_email, business_id?, annual_report_id?, document_id? | no ip/user_agent (advisor-initiated) |
+| vat_invoice | client_record_id, vat_work_item_id, invoice_number, period, tax_year | business_id, source |
+| vat_work_item | client_record_id, period, tax_year | source |
+| advance_payment | client_record_id, period, tax_year | annual_report_id, source |
+| annual_report (+children) | client_record_id, tax_year | section, line_id, schedule_id, line_number |
+| document | client_record_id | business_id, annual_report_id, binder_id, document_type, version |
+| signature_request | client_record_id, signer_name | per-action forensic (§8a) |
+| binder / binder_intake | client_record_id, binder_id | binder_number, period_start/end, field_name |
+| task | client_record_id | source_domain, source_id, assigned_to_user_id, assigned_role |
+| charge / invoice | client_record_id | business_id, annual_report_id, invoice_id |
+
+### 8a. Signature forensic metadata — per action (corrections #4, #9)
+
+`signer_email` and `content_hash` are **currently nullable** in the domain. Do **not** make them hard audit requirements unless domain validation is explicitly planned. Capture-when-available, flag-when-missing:
+
+| signature_request action | metadata captured | rule |
+|---|---|---|
+| created, sent | client_record_id, signer_name, signer_email (if present), business_id?, annual_report_id?, document_id? | advisor-initiated; no ip/user_agent |
 | viewed, signed, declined | + ip_address, user_agent **when available** | signer-initiated; capture client forensics if the request carried them |
-| signed | + content_hash (**strongly required**), signed_document_key | content_hash proves what was signed; treat a missing hash on `signed` as a defect |
+| signed | + content_hash **when available**, signed_document_key | if content_hash is missing, write `metadata_json.content_hash_missing = true` rather than failing the signature. **This refactor introduces no new queue/task workflow**; any remediation of missing hashes is a separately approved follow-up item, not part of this work |
 | canceled, expired | client_record_id (+ reason for canceled) | no ip/user_agent required |
+
+### 8b. Timeline performance — expression index (correction #7)
+
+`metadata_json->>'client_record_id'` lookups must **not** be a JSONB scan. The Phase 1 migration adds a PostgreSQL **expression index**:
+```
+CREATE INDEX idx_entity_audit_client_ctx
+  ON entity_audit_logs ((metadata_json->>'client_record_id'), performed_at);
+```
+`EntityAuditLogRepository.list_for_client_context` and the dashboard recent-activity query are written to use it (cast/compare as text consistently). SQLite dev path may table-scan; PostgreSQL is the performance target.
 
 ## 9. actor / user_id availability
 
-Approach = **explicit service-level writes** (no contextvars/after_flush/auto-audit). Audit needs `performed_by` (nullable) + `actor_type` (`user`/`system`/`external_signer`); actor flows from route `current_user.id`.
+Explicit service-level writes (no contextvars/after_flush/auto-audit). Actor flows from route `current_user`; writer snapshots `actor_display_name` (§5).
 
-| Domain | File | Actor today | Action |
-|---|---|---|---|
-| legal_entities / persons / links | mutated via client/business services | partial | thread `actor_id` from owning route |
-| advance_payments | `advance_payments/services/advance_payment_service.py` | delete has `actor_id`; create/update **no** | **add `actor_id`** to create/update |
-| permanent_documents | `documents/permanent_documents/services/permanent_document_service.py` | `uploaded_by/approved_by/rejected_by` on model, not passed to a writer | pass actor into audit write |
-| vat_work_items / vat_invoices | `vat/services/*` | `created_by`/`performed_by` present | reuse as `performed_by` |
-| annual_reports (+children) | `annual_reports/services/*` | `created_by`/`actor_id`/`changed_by` present | reuse |
-| binders / binder_intakes | `binders/services/binder_lifecycle_service.py`, `binder_intake_service.py` | `actor_id`/`changed_by_user_id`/`received_by` present | reuse |
-| charges / invoices | `charges/services/charge_billing_service.py`, `invoices/services/invoice_service.py` | `created_by/issued_by/paid_by/canceled_by` | reuse |
-| authority_contacts | `authority_contacts/services/authority_contact_service.py` | delete has `actor_id`; add/update **no** | **add `actor_id`** |
-| correspondence | `communications/services/correspondence_service.py` | `created_by` present | reuse |
-| notes | `notes/services/note_entity_note_service.py` | `created_by`/`actor_id` present | reuse |
-| tasks | `tasks/services/task_service.py` | `created_by_user_id` present | reuse |
-| notifications | `notifications/services/notification_service.py` | `triggered_by` present | reuse; auto → `actor_type="system"`, `performed_by=None` |
-| reminders / tax_calendar | scheduling / materialization | system | `actor_type="system"`; manual edit → route actor |
-| signature (external) | `signature_requests/*` | external signer, no user | `actor_type="external_signer"`, `performed_by=None`, identity in metadata |
+Missing-actor services to fix (add `actor_id` + display-name source from `current_user`): **advance_payment create/update, authority_contact add/update, permanent_document writer, legal_entity/person/link mutations**. Others already carry `created_by`/`performed_by`/`actor_id`. System events → `actor_type="system"`, `performed_by=None`; external signer → `actor_type="external_signer"`, `performed_by=None`, identity in metadata + `actor_display_name`.
 
-Missing-actor services to fix: **advance_payment create/update, authority_contact add/update, permanent_document writer, legal_entity/person/link mutations** → add `actor_id: int` param fed by `current_user.id`.
-
-## 10. Tables needing EntityAuditLog (from `3e2669e69e32_initial.py`, 53 tables)
+## 10. Tables needing EntityAuditLog (from `3e2669e69e32_initial.py`, **42 tables**)
 
 **Critical:** legal_entities, persons, person_legal_entity_links, advance_payments, vat_work_items, vat_invoices, permanent_documents, annual_reports + child tables (aggregate at parent), charges, invoices, signature_requests.
 **High:** client_records, businesses, authority_contacts, entity_notes.
 **Medium:** binders, binder_intakes, binder_intake_materials (aggregate), binder_handovers, tasks, correspondence_entries.
-**Low/conditional:** notifications (user-initiated only), reminders (significant events only), tax_calendar_entries (batch = one event), deadline_rules (only if UI-editable).
-**No audit:** idempotency_keys, password_reset_tokens, binder_handover_binders (junction), users (→ UserAuditLog), tax_calendar materialized rows per-batch.
+**Low/conditional:** notifications (user-initiated), reminders (significant events), tax_calendar_entries (batch = one event), deadline_rules (if UI-editable).
+**No audit:** idempotency_keys, password_reset_tokens, junction tables, users (→ UserAuditLog).
 
-Aggregate reminders: annex bulk save → one `annual_report.updated`; tax_calendar generation → one `tax_calendar.generated`; notification internal retry → none.
+Aggregate reminders: annual-report child ops use rich child actions (§7a) but stay at `entity_type=annual_report`; tax_calendar generation → one `tax_calendar.generated`; notification internal retry → none.
+
+### 10b. BinderIntakeEditService preserved (correction #10)
+
+**Do not delete `BinderIntakeEditService`.** It owns intake-edit business logic. Replace **only** its `BinderIntakeEditLogRepository` dependency with `EntityAuditWriter` (`binder_intake.updated`, field in `metadata_json`). Delete the log model + repository; keep the service and its `PATCH` route.
 
 ## 11. Old-model deletion checks
 
-| Old model | Typed columns read by API/timeline | EntityAuditLog preserves? | Actions | Metadata | Remove | Risk |
-|---|---|---|---|---|---|---|
-| VatAuditLog | work_item_id, action, old/new, note, invoice_id, performed_by/at | **Yes** | `vat_work_item.*`, `vat_invoice.*` | client_record_id, vat_work_item_id, invoice_number, period, tax_year | route, `vat_audit.py` schema, `VatAuditLogRepository`, seed `create_vat_audit_logs`; rewrite test | low |
-| AnnualReportStatusHistory | from_status, to_status, changed_by, note, occurred_at | **Yes** | `annual_report.status_changed` (old/new=status) | client_record_id, tax_year, form_type | route, schema, `AnnualReportStatusAuditRepository`; rewrite test | low |
-| BinderLifecycleLog | field_name, old/new, changed_by, changed_at, notes | **Yes** (semantic actions + `metadata.field_name`) | `binder.marked_full/...` | client_record_id, binder_id, field_name | `/binders/{id}/audit`, `BinderAuditResponse`/`BinderAuditEntry`, repo, `BinderAuditService`, dashboard branch; rewrite test | medium (label/registry parity) |
-| BinderIntakeEditLog | field_name, old/new, changed_by | **Yes** | `binder_intake.updated` | client_record_id, binder_id, field_name | model, repo, `BinderIntakeEditService` write path | low (no read route) |
-| **SignatureAuditEvent** | event_type, actor_type, actor_id, actor_name, ip_address, user_agent, notes, occurred_at | **Yes — verify first** | `signature_request.*` (evidence) | per-action (§8): always client_record_id/signer_name/signer_email; ip/user_agent for viewed/signed/declined when available; content_hash strongly required for signed; signed_document_key on signed | model, mixin, `SignatureAuditEventResponse`/`SignatureRequestWithAuditResponse`; update `TimelineRepository.list_signature_lifecycle_events`; rewrite test | **high — legal/forensic**: `actor_type` maps `advisor→user`, `signer→external_signer`, `system→system`; ip/user_agent/actor_name MUST move to metadata_json (per-action); **confirm no frontend signature-audit-trail view depends on typed columns before deleting** |
+| Old model | EntityAuditLog preserves? | Actions | Remove | Risk |
+|---|---|---|---|---|
+| VatAuditLog | Yes | `vat_work_item.*`, `vat_invoice.*` | route, schema, repo, seed; rewrite test | low |
+| AnnualReportStatusHistory | Yes | `annual_report.status_changed` (old/new=status) | route, schema, repo; rewrite test | low |
+| BinderLifecycleLog | Yes (semantic + `metadata.field_name`) | `binder.*` | `/binders/{id}/audit`, schemas, repo, `BinderAuditService`, dashboard branch; rewrite test | medium (label/registry parity) |
+| BinderIntakeEditLog | Yes | `binder_intake.updated` | model + repo (keep service §10b) | low |
+| **SignatureAuditEvent** | Yes — verify | `signature_request.*` (evidence) | model, mixin, `SignatureAuditEventResponse` item shape; **keep `SignatureRequestWithAuditResponse`**, re-source its `audit_trail` from EntityAuditLog with a new embedded item schema (§4a); update timeline reader; rewrite test | **high — legal/forensic + embedded drawer**; per-action metadata §8a; backend response-shape parity (frontend in Phase 10) |
 
 ## 12. New repositories/services shape
 
-`EntityAuditLogRepository` (`app/audit/repositories/audit_entity_audit_log_repository.py`): keep `append`, `get_audit_trail`, `count_audit_trail`, `list_all_by_entities`, `list_recent`. **Add** `list_by_entity`, `list_by_entities`, `list_for_client_context(client_record_id, entity_types=None, business_ids=None)` (reads `metadata_json->>'client_record_id'`), `list_recent_activity(limit)`. `append` gains `actor_type`, `metadata_json`; old/new accept dict (JSONB).
+`EntityAuditLogRepository`: keep `append`, `get_audit_trail`, `count_audit_trail`, `list_all_by_entities`, `list_recent`; **add** `list_by_entity`, `list_by_entities`, `list_for_client_context(client_record_id, entity_types=None, business_ids=None)` (uses §8b index), `list_recent_activity(limit)`. `append` gains `actor_type`, `actor_display_name`, `metadata_json`; old/new accept dict.
 
-`EntityAuditWriter` (`app/audit/services/audit_entity_audit_writer_service.py`): keep `record_create/update/delete/restore/status_change`; **add** `record_action(entity_type, entity_id, *, action, actor_id, actor_type="user", old_value, new_value, metadata_json, note)` and `record_external_action(...)` (actor_type="external_signer", performed_by=None). All helpers gain `metadata_json` + `actor_type` (default `user`).
+`EntityAuditWriter`: keep `record_create/update/delete/restore/status_change`; **add** `record_action(...)` and `record_external_action(...)` (actor_type external_signer, performed_by None). All capture `actor_display_name`. Append-only repository design per §17 (the audit repos must not expose mutation methods).
 
-Delete: `VatAuditLogRepository`, `AnnualReportStatusAuditRepository`, `BinderLifecycleLogRepository`, `BinderIntakeEditLogRepository`, `BinderAuditService`, `SignatureRequestAuditMixin`, `BinderIntakeEditService` write path + their schemas.
+**Layering (correction #5):** `EntityAuditLogRepository`/`UserAuditLogRepository` do **DB access only** (append + read queries). `AuditTrailService` owns registry lookup, `resolve_scope`, authorization, redaction, and audit→response mapping; **all read consumers — routes, the signature response builder, timeline, dashboard — obtain audit items via `AuditTrailService`, never by calling the repository directly** for authorized/redacted reads. (Timeline/dashboard aggregation may use repository client-context queries internally, but a method that returns user-facing audit items applies the service's scope/redaction.)
 
-Canonical names kept (do **not** rename despite spec's example paths): `app/audit/models/audit_entity_audit_log.py`, `.../repositories/audit_entity_audit_log_repository.py`, `.../services/audit_entity_audit_writer_service.py`, `.../audit_constants.py`, `.../services/audit_trail_service.py`.
+Delete: `VatAuditLogRepository`, `AnnualReportStatusAuditRepository`, `BinderLifecycleLogRepository`, `BinderIntakeEditLogRepository`, `BinderAuditService`, `SignatureRequestAuditMixin`, and the deleted schemas. Keep canonical file names (do not rename to spec's example paths). **Model-registry / package-export cleanup** (`app/model_registry.py`, package `__init__` exports) removes references to the five deleted models.
 
-## 13. Tests
+## 13. Tests (provisional list — Phase 0 finalizes the change set)
 
-Audit-coupled files needing updates (subset of the 43 in audit/timeline/dashboard/lifecycle areas):
+43 test files live in the audit/timeline/dashboard/lifecycle area; the subset that directly asserts audit/history behavior is finalized in Phase 0. Currently identified:
 
-| File | Breaks? | Update |
-|---|---|---|
-| `tests/audit/test_entity_audit_writer.py` | yes | JSONB metadata, actor_type, external_signer, nullable performed_by |
-| `tests/audit/test_audit_endpoint.py`, `test_audit_endpoint_filters.py` | yes | expanded entity types, new fields |
-| `tests/core/test_openapi_audit_paths.py` | yes | deleted routes drop from spec, generic route expands |
-| `tests/vat/api/test_vat_reports_audit.py` | yes (route deleted) | rewrite → `/audit/vat_work_item/{id}` |
-| `tests/annual_reports/api/test_annual_report_audit.py` | yes (deleted) | rewrite → generic |
-| `tests/annual_reports/service/test_annual_report_generic_audit.py`, `test_financial_audit_snapshots.py` | yes | `annual_report.updated` + section |
-| `tests/binders/api/test_binder_audit.py` | yes (deleted) | rewrite → generic |
-| `tests/binders/service/test_binder_lifecycle_service.py`, `test_binder_lifecycle_notification.py` | yes | semantic `binder.*` actions |
-| `tests/timeline/service/test_timeline_signature_lifecycle.py` | yes | re-source from EntityAuditLog |
-| `tests/timeline/*` (repository, event_builders, get_client_timeline) | yes | event-source registry, drop dedup |
-| `tests/dashboard/service/test_recent_activity_service.py`, `tests/dashboard/api/test_dashboard_extended.py` | yes | EntityAuditLog-only path |
-| `tests/charges/service/test_billing_audit.py`, `tests/charges/api/test_charges_api_lifecycle.py` | minor | action namespacing |
-| `tests/users/api/test_user_audit_logs.py`, `tests/users/services/test_audit_log_service.py` | minor | metadata_json JSONB |
+`tests/audit/test_entity_audit_writer.py`, `test_audit_endpoint.py`, `test_audit_endpoint_filters.py`; `tests/core/test_openapi_audit_paths.py`; `tests/vat/api/test_vat_reports_audit.py`; `tests/annual_reports/api/test_annual_report_audit.py`, `tests/annual_reports/service/test_annual_report_generic_audit.py`, `test_financial_audit_snapshots.py`; `tests/binders/api/test_binder_audit.py`, `tests/binders/service/test_binder_lifecycle_service.py`, `test_binder_lifecycle_notification.py`; `tests/timeline/service/test_timeline_signature_lifecycle.py` + other `tests/timeline/*`; `tests/dashboard/service/test_recent_activity_service.py`, `tests/dashboard/api/test_dashboard_extended.py`; `tests/charges/service/test_billing_audit.py`; `tests/users/api/test_user_audit_logs.py`, `tests/users/services/test_audit_log_service.py`.
 
-**New tests:** EntityAuditLog JSONB metadata round-trip; nullable `performed_by` + actor_type system/external_signer; VAT write → EntityAuditLog; annual-report status → EntityAuditLog; signature signed → EntityAuditLog w/ forensic metadata; binder lifecycle → EntityAuditLog; dashboard recent-activity reads EntityAuditLog only; timeline reads each category from its single registry source; UserAuditLog stays auth/admin-only.
+**New tests:** **JSON-object round-trip** — writer stores a dict/list and reader returns the same object (no `json.dumps`/`json.loads`), for `old_value`/`new_value`/`metadata_json` on EntityAuditLog **and** UserAuditLog.metadata_json; runtime response schema exposes objects, not strings; nullable `performed_by` + actor_type system/external_signer + `actor_display_name` snapshot survives user rename; per-domain writes → EntityAuditLog (VAT, annual-report status, annual-report child rich actions §7a, signature forensic §8a, binder lifecycle, binder_intake via preserved service §10b); generic route authorization (§3a, current model only): **401 unauthenticated; 403 disallowed role** (per the Phase-0 authorization matrix); **existing active/deleted client filtering preserved**; 404 on missing; soft-deleted readable-but-flagged; **hard-deleted authorized from audit metadata** per policy; sensitive forensic fields **redacted/visible per the matrix** (§16). **No "owner/accountant" permission tests** — that model does not exist. Signature advisor `audit_trail` parity (§4a); dashboard reads EntityAuditLog only; timeline single-source-per-category (no duplicates); UserAuditLog stays auth/admin-only; **append-only + atomicity tests (§17)**.
 
 ## 14. OpenAPI / frontend impact (plan only — do not regen)
 
-| Route | Old → New | Frontend type | Regen? |
-|---|---|---|---|
-| `/audit/{type}/{id}` | + actor_type, metadata_json, JSONB old/new | audit hook types | **yes** |
-| `/vat/work-items/{id}/audit` | **deleted** | VAT audit hook → generic | **yes** |
-| `/binders/{id}/audit` | **deleted** | binder audit hook → generic | **yes** |
-| `/annual-reports/{id}/audit` | **deleted** | report audit hook → generic | **yes** |
-| `/dashboard/overview` (`recent_activity`) | source change; item shape intended unchanged | dashboard hook | **verify** (correction #6): confirm `activity_type` enum/label set unchanged after binder semantic actions added; regen if the recent_activity item schema shifts |
-| `/clients/{id}/timeline` | sources change; `event_type` set may gain/lose values | timeline hook | **verify**: confirm `event_type` union unchanged; regen if it shifts |
-
-Frontend (separate later work): VAT/binder/annual-report audit hooks + components switch to the generic `/audit/{type}/{id}`; regenerate `generated.ts` (known gotcha: `gen:types` overwrites in place — back up first).
+| Route | Change | Regen? |
+|---|---|---|
+| `/audit/{type}/{id}` | + actor_type, actor_display_name, metadata_json, JSONB old/new; registry authz | **yes** |
+| `/vat/work-items/{id}/audit`, `/binders/{id}/audit`, `/annual-reports/{id}/audit` | **deleted** → generic | **yes** — frontend hooks switch endpoint **in-phase** (Phases 3/5/4), regen for that surface then; final sync Phase 10 |
+| `/signature-requests/{id}` (`audit_trail`) | wrapper `SignatureRequestWithAuditResponse` **kept**; embedded item shape changes, re-sourced via `AuditTrailService` (§4a) | **yes** — drawer contract updated **in Phase 6**; final sync Phase 10 |
+| `/dashboard/overview` (`recent_activity`) | source change | **verify** — confirm `activity_type`/label set unchanged after binder semantic actions; regen if item schema shifts |
+| `/clients/{id}/timeline` | source change | **verify** — confirm `event_type` union unchanged; regen if it shifts |
 
 ## 15. Staged execution plan
 
-**Phase 0 — Baseline & safety.** Run full pytest (`.venv` + `APP_ENV=test JWT_SECRET=x`), snapshot `openapi.json`. Acceptance: suite green; counts in this doc reconfirmed.
+**Each replacement phase (3–7) is end-to-end and self-contained: a legacy repo/schema/service is deleted only after *all* of its consumers — writer, reader, route/schema, AND every timeline/dashboard/drawer consumer — plus its tests are repointed in the same phase.** Legacy *tables* are never dropped in these phases; the single cleanup migration (Phase 9) drops them after all consumers are gone. This prevents a window where a reader/timeline/dashboard points at a deleted repo.
 
-**Phase 1 — Schema/model upgrade + new migration.** Files: `audit_entity_audit_log.py`; **new** alembic migration (do not touch initial) that (a) alters `entity_audit_logs`: old/new/metadata_json → JSONB, add `actor_type`, `metadata_json`, make `performed_by` nullable, add 4 indexes, and (b) `DROP TABLE` `vat_audit_logs`, `annual_report_status_history`, `binder_lifecycle_logs`, `binder_intake_edit_logs`, `signature_audit_events`. Explicit `DROP TYPE` **only for Postgres enum types owned exclusively by these dropped tables** — do **not** drop enums shared with surviving tables (e.g. `AnnualReportStatus` is shared with `annual_reports` and must stay; the `from_status`/`to_status` columns reference it but don't own it). Phase 0 audits which enums each dropped table owns vs shares before the migration is written; `audit_constants.py` full ENTITY_*/ACTION_* + expanded `ALLOWED_READ_ENTITY_TYPES`. Tests: writer + endpoint. Acceptance: migration up/down clean on Postgres + SQLite; model + constants land.
+**Phase 0 — Baseline, exact inventory, enum audit, binding matrices.** Run baseline checks (verification list below). **Regenerate the exact inventory** (writer/reader/route/test counts, the 42-table list, per-table enum ownership-vs-sharing). **Produce the binding action matrix (§7/§9): mutation → entity_type → action → old/new payload → metadata_json → actor, covering every audited domain's create/update/delete plus authority_contacts, notes, binder_handovers, reminders fired events, documents, notifications, annual-report child actions.** **Enumerate `resolve_scope` (§3a) for every entity_type in §6.** **Produce the binding authorization matrix** (correction #4): `entity_type → allowed_roles → scope_policy → deleted_entity_policy → forensic/sensitive field visibility`, derived **only** from the existing role model (ADVISOR/SECRETARY) and existing active/deleted client filtering — no invented owner/accountant permissions. Snapshot `openapi.json`. Output → `docs/audit-refactor-phase-0-report.md`. Acceptance: all checks green; inventory + enum table + action matrix + scope-resolver list + authorization matrix produced. **No implementation starts until these matrices exist.**
 
-**Phase 2 — Writer/repository upgrade.** `EntityAuditWriter` (+record_action/record_external_action, actor_type, metadata_json); `EntityAuditLogRepository` (+client-context queries). Update existing client/business/charge/annual-report writers to pass `metadata_json.client_record_id` + namespaced actions. Acceptance: existing writes carry metadata + actor_type; audit tests green.
+**Phase 1 — Schema add/alter only (no drops).** Apply §1b Phase-1 migration to `entity_audit_logs` + `user_audit_logs` (JSON-via-variant model columns §Target, JSONB-via-USING in migration, actor_type w/ temp default, actor_display_name, metadata_json, nullable performed_by, indexes incl §8b expression index). Define the **documented Phase-1 downgrade** (§1b: JSONB→Text casts; performed_by stays nullable on downgrade). Constants/registry scaffolding (§3a, §6, §7). Acceptance: PostgreSQL up+down round-trip clean; SQLite `create_all` works (portable JSON type); legacy tables untouched; suite green.
 
-**Phase 3 — Replace VAT audit.** Repoint 12 `append_audit` sites to EntityAuditWriter (`vat_work_item.*`/`vat_invoice.*`); delete model/repo/schema/route/seed. Rewrite VAT audit test → generic route. Acceptance: `/audit/vat_work_item/{id}` returns history; VAT suite green.
+**Phase 2 — Writer/repository + registry/authz + actor validation.** Append-only audit repositories (§17 Option A); `EntityAuditWriter` (record_action/record_external_action, actor_display_name, **actor validation matrix §5a**, **fail-closed write validation §16**); `EntityAuditLogRepository` client-context queries; `AuditEntityRegistry` + `resolve_scope` + route authorization using the **existing ADVISOR/SECRETARY + active/deleted client model** (§3a); read-time redaction hook (§16). Update existing client/business/charge/annual-report writers to pass metadata + snapshot. Acceptance: generic route authorizes (403/404/redaction + soft/hard-deleted scope tests); actor validation + append-only + atomicity tests pass; existing writes carry metadata + actor_display_name.
 
-**Phase 4 — Replace AnnualReportStatusHistory.** 4 `append_status_audit_entry` sites → `annual_report.status_changed`. Delete model/repo/route/schema. Acceptance: status history via generic route + timeline.
+**Each replacement phase that deletes or reshapes a route/schema also migrates that area's frontend consumer + regenerates the OpenAPI/`generated.ts` for that area + runs the frontend checks (correction #3).** The project decision is **no legacy wrappers / no backcompat / no temporary legacy routes** — so a deleted per-domain route cannot outlive its phase, and its frontend consumer moves in the **same** phase. Phase 10 is the **final full** verification + contract sync, **not** the first time any frontend consumer is migrated.
 
-**Phase 5 — Replace binder lifecycle + intake logs.** 9 `_append_log` → semantic `binder.*`; 2 `edit_intake` → `binder_intake.updated`. Delete both models/repos, `BinderAuditService`, `/binders/{id}/audit` + schema, binder seed lifecycle/intake writes. Update dashboard (drop `_serialize_binder`). Acceptance: dashboard + binder audit off EntityAuditLog.
+**Phase 3 — Replace VAT audit (end-to-end, incl. frontend).** Backend: repoint all `append_audit` writer sites → EntityAuditWriter; route audit reads through `AuditTrailService` (generic); rewrite VAT audit tests; delete `VatAuditLogRepository` + schema + per-domain route + seed builder. (Timeline/dashboard don't read VAT audit.) Frontend: switch the VAT audit hook/component to the generic `/audit/vat_work_item/{id}` endpoint; regenerate OpenAPI + `generated.ts` for this surface; run frontend checks for the VAT area. Table drop deferred to Phase 9. Acceptance: `/audit/vat_work_item/{id}` works; VAT backend suite + VAT frontend typecheck/tests green; no reference to `VatAuditLogRepository` or the old route remains.
 
-**Phase 6 — Replace SignatureAuditEvent.** 10 `append_audit_event` → `signature_request.*` (signer events via `record_external_action`, forensic metadata). Delete model + mixin + schemas; update `TimelineRepository.list_signature_lifecycle_events`. **Verify no frontend signature-audit view depends on typed columns first.** Acceptance: signature timeline intact; forensic fields preserved.
+**Phase 4 — Replace AnnualReportStatusHistory + child actions (end-to-end, incl. timeline + frontend).** Backend: status → `annual_report.status_changed`, child ops → rich actions (§7a); **repoint the timeline status-events reader (`TimelineRepository.list_annual_report_status_events`) in this same phase**; route reads through `AuditTrailService`; rewrite tests; delete `AnnualReportStatusAuditRepository` + schema + per-domain route. Frontend: switch the annual-report audit consumer to the generic endpoint; regen OpenAPI + types; run AR-area frontend checks. Table drop deferred. Acceptance: status + child history via generic route **and** timeline; AR backend + timeline + AR frontend checks green; no reference to the deleted repo/route remains.
 
-**Phase 7 — Rebuild timeline & dashboard.** Apply the event-source registry (§4): re-point the 3 streams and finalize the dashboard EntityAuditLog-only path **first**; add timeline tests asserting each category resolves to exactly one source; **remove `_DEDUP_ACTIONS` only once those tests prove zero duplicates** across every category. Acceptance: registry covers all categories, no duplicate events, `_DEDUP_ACTIONS` gone, timeline/dashboard suites green.
+**Phase 5 — Replace binder lifecycle + intake logs (end-to-end, incl. timeline + dashboard + frontend).** Backend: `_append_log` → `binder.*`; `BinderIntakeEditService` repointed to EntityAuditWriter (service preserved §10b); **repoint the timeline binder-lifecycle reader AND the dashboard `RecentActivityService` binder branch (drop `_serialize_binder`) in this same phase**; route reads through `AuditTrailService`; rewrite tests; delete `BinderAuditService`, `BinderLifecycleLogRepository`, `BinderIntakeEditLogRepository`, schemas, per-domain route. Frontend: switch the binder audit consumer to the generic endpoint; regen OpenAPI + types; run binder-area frontend checks. Tables dropped in Phase 9. Acceptance: timeline + dashboard + binder audit off EntityAuditLog; binder/timeline/dashboard backend + binder frontend checks green; no reference to deleted repos/route remains.
 
-**Phase 8 — Add missing audit writes by priority.** Critical (legal_entities, persons, advance_payment create/update, vat_invoices, documents, annual-report child lines, signature), then high/medium (authority_contacts, correspondence, notes, tasks, binders/handovers, invoices), then low/conditional (notifications, reminders, tax_calendar, deadline_rules). Add `actor_id` params where missing (§9). Acceptance: each tier writes EntityAuditLog with required metadata.
+**Phase 6 — Replace SignatureAuditEvent (end-to-end, incl. timeline + embedded drawer + frontend).** Backend: `append_audit_event` → `signature_request.*` (external signer via record_external_action; per-action metadata §8a; content_hash-missing flag only §8a); **in the same phase repoint BOTH the timeline signature reader (`TimelineRepository.list_signature_lifecycle_events`) AND the embedded advisor `audit_trail` (signature service fetches items via `AuditTrailService`, passes to `build_with_audit`, §4a)**, keeping `SignatureRequestWithAuditResponse` with its **new embedded item schema**; rewrite backend response tests; delete `SignatureRequestAuditMixin` + `SignatureAuditEventResponse` item. Frontend: because the embedded `audit_trail` **item shape changes**, **update the `SignatureRequestAuditDrawer` contract in this same phase** — regen OpenAPI + `generated.ts` for the signature surface, adjust the drawer to the new item fields, run signature-area frontend checks. Acceptance: embedded `audit_trail` re-sourced via `AuditTrailService` with preserved `created/sent/viewed/signed/declined/canceled/expired` display; timeline signature events intact; signature backend + frontend drawer typecheck/tests green; OpenAPI documented + synced for this surface.
 
-**Phase 9 — Seeds & tests.** Update 3 seed sites + orchestrator to emit EntityAuditLog (drop old-table builders). Full suite green.
+**Phase 7 — Rebuild timeline & dashboard, retire dedup.** With Phases 4–6 having already repointed each stream, apply the full event-source registry, finalize dashboard EntityAuditLog-only, add single-source tests; **remove `_DEDUP_ACTIONS` only once tests prove zero duplicates**. Acceptance: no duplicate events; timeline/dashboard suites green.
 
-**Phase 10 — OpenAPI/frontend regen.** Regenerate `openapi.json` + `generated.ts` (back up generated.ts first); update frontend audit hooks to generic endpoint; verify dashboard/timeline schemas (§14). Acceptance: contract sync clean; frontend types compile.
+**Phase 8 — Add missing audit writes + actors.** Critical→high→medium→low (§10), driven by the Phase-0 binding matrix; add `actor_id`/display-name where missing (§9). Acceptance: each tier writes EntityAuditLog with required metadata; append-only/atomicity (§17) + actor-validation (§5a) tests pass per domain.
 
-### Final acceptance (spec §13)
-Only `EntityAuditLog` + `UserAuditLog` remain; old audit tables/models/repos/schemas/seed removed via new migration; JSONB for old/new/metadata; every spec-§8 business mutation + selected evidence events write EntityAuditLog; auth/security/admin-access only in UserAuditLog; timeline/dashboard work with one source per category and no `_DEDUP_ACTIONS`; no raw action strings in services; audit/vat/binders/annual_reports/signature/users/timeline/dashboard tests pass.
+**Phase 9 — Cleanup migration + seeds.** Single migration drops the five now-consumerless legacy tables (downgrade recreates them with columns/indexes/FKs/constraints; drop only exclusively-owned enums, §1b). Update seed builders/orchestrator; **seed reset** runs clean. Model-registry/export cleanup. Acceptance: PostgreSQL up+down round-trip; seed reset green; suite green.
+
+**Phase 10 — Final full verification & contract sync.** Frontend consumers were already migrated per-phase (3–6); this phase does the **final** full `openapi.json` + `generated.ts` regeneration (back up generated.ts first), confirms no drift remains anywhere, and runs the complete completion-criteria suite below across backend + frontend. Acceptance: contract sync clean repo-wide; all checks green.
+
+### Completion criteria & verification commands
+Backend (non-mutating): `pytest`, `vulture`, `pyright`, **`ruff format --check`** (not the mutating `ruff format`), `ruff check`, repo scripts (migration/role/pagination/unused/enums/schema), health checks, **PostgreSQL migration up+down round-trip**, **seed reset**, OpenAPI in sync.
+Frontend (verification only): `lint`, `typecheck`, `test`, `format:check`, `arch:check`, `arch:check:strict`, `unused`. (Do **not** run `fix` as a verification step — it mutates.)
+**Docs:** primary audit-behavior documentation lives in **`docs/domains/audit.md`** (canonical write/read flows, entity_type/action matrix, scope/authorization, sensitive-data policy); update affected domain/flow docs where behavior changes (VAT, annual-reports, binders, signature-requests, timeline, dashboard). Update **`docs/backend/architecture.md` only if an architecture rule actually changes** (e.g. the append-only audit-repository convention). **Model-registry / package-export cleanup** for the deleted models.
+
+## 16. Sensitive-data policy — fail-closed writes, redacted reads
+
+Audit payloads must never become an exfiltration surface. **Write-time filtering is fail-closed; redaction is a read-time concern.**
+
+- **Forbidden in `old_value`/`new_value`/`metadata_json` (never logged):** `password_hash`, `token_hash`, `signing_token`, password-reset tokens, any secret/key, and **raw document content / file bytes**. Document audits store metadata only (storage_key, filename, mime, size, version) — not contents.
+- **Write-time validation is fail-closed (not silent).** The writer validates each audit payload against a **per-action field allowlist**. An **unknown / non-allowlisted field fails validation and rolls back the domain mutation** (it is *not* silently dropped) — surfacing the mismatch immediately rather than leaking or losing data. Forbidden fields above are a hard reject.
+- **PII handling:** `id_number` (ת.ז/ח.פ), `email`, `phone`, `ip_address`, `user_agent`, and document metadata are written **only where they are the legitimate audited field or required forensic context** (e.g. signature §8a), and only if on the allowlist. Where a full value isn't needed, the allowlist entry specifies the stored form (e.g. last-4 / hash of `id_number` when the change isn't to the id itself; truncated `user_agent`).
+- **Payload size limits (fail-closed):** each JSONB column is capped (old/new ≤ N KB, metadata ≤ N KB; Phase 0 picks N). An **oversized payload fails validation and rolls back** — *unless* the action has an **explicit, approved summary-payload contract** (e.g. bulk annex save stores field-name/count summaries by design). No silent truncation.
+- **Read-time redaction:** `sensitive` entity types (e.g. `signature_request`) gate forensic fields behind the §3a `access_rule` — readers without the required (existing-model) access get the event list without ip/user_agent/content_hash. Redaction happens server-side in the route, **after** the registry scope/authorization check. Redaction never alters stored rows.
+
+## 17. Append-only & transactional integrity (correction #11)
+
+- **Same transaction:** every audit write happens in the **same DB transaction** as the domain mutation it records (writer uses the request-scoped session, no separate commit). The route/service commits once.
+- **Fail-closed:** if the audit insert fails, the **domain mutation rolls back** — a mutation must never succeed without its audit row. (Conversely, a rolled-back mutation leaves no orphan audit row.)
+- **Append-only repository (BaseRepository reality).** `app/common/repositories/base_repository.py` `BaseRepository` **does expose** `update`, `delete`, `soft_delete`, and `hard_delete`. So "the methods don't exist" is false today and must be fixed deliberately. **Decision — Option A (preferred): audit repositories do not inherit `BaseRepository`.** `EntityAuditLogRepository` and `UserAuditLogRepository` are built on a small append-only base (or no base) exposing **append + read only** (`append`, `get_*`, `list_*`, `count_*`) and **no** `update`/`delete`/`hard_delete`. (Fallback Option B, only if non-inheritance proves impractical: inherit `BaseRepository` but **override `update`/`delete`/`soft_delete`/`hard_delete` to raise an explicit `AppError`/`NotImplementedError`.** Document whichever is chosen in Phase 2.) No audit mutation/delete **API** route exists either. Corrections are new rows.
+- **Tests:** (a) **rollback test** — force the audit insert to raise, assert the domain row is absent after the request; (b) **append-only test** — assert the audit repositories expose no working mutation method (Option A: attribute absent; Option B: call raises); (c) **atomicity test** — domain failure leaves no audit row.
+
+### Final acceptance (spec §13 + corrections)
+Only `EntityAuditLog` + `UserAuditLog` remain; legacy tables dropped via the post-3–7 cleanup migration with reversible downgrade; JSONB (PostgreSQL) for old/new/metadata; actor display snapshots immutable to renames; generic route authorizes via `AuditEntityRegistry` and redacts sensitive types; signature drawer + timeline + dashboard work with no duplication; annual-report child operations keep rich semantic actions; audit writes are transactional + append-only; no raw action strings in services; all completion-criteria checks green.
