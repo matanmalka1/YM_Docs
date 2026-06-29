@@ -186,7 +186,7 @@ Missing-action items explicitly recovered: `client.entity_type_changed`, `charge
 
 ## 10. AuditEntityRegistry preparation matrix — un-grouped, per entity_type
 
-**Authorization model clarification (important):** the system has two roles, `UserRole.ADVISOR` and `UserRole.SECRETARY`. **`scope_to_active_clients_stmt` is a soft-deleted-client *filter*, NOT per-user authorization** — it excludes deleted clients from active listings; it does not grant/deny by user. There is **no per-user ownership model**. So registry "scope" = (a) entity exists, (b) firm-level vs client-scoped, (c) deleted-history readability. Per-role visibility below encodes only what exists today (route auth + the deleted-client filter); it invents nothing.
+**Authorization model clarification (important):** the system has two roles, `UserRole.ADVISOR` and `UserRole.SECRETARY`, and both may read the generic audit route. **`scope_to_active_clients_stmt` is a soft-deleted-client filter, NOT per-user authorization** — it excludes deleted clients from active listings; it does not grant/deny by user and audit-history reads bypass it. There is no per-user ownership model or disallowed authenticated role. Registry "scope" therefore records entity context and deleted-history resolution, not ownership authorization.
 
 **Deleted-history readability (explicit):** audit history must remain readable after the entity is soft- or hard-deleted (audit is the record of what happened). Therefore the registry's `resolve_scope` must **bypass the active-client filter for audit reads** and resolve scope with `include_deleted=True` (soft) or from `metadata_json.client_record_id` (hard). The deleted-client filter applies to *live listing*, not to *audit history*.
 
@@ -211,6 +211,7 @@ Missing-action items explicitly recovered: `client.entity_type_changed`, `charge
 | document | PermanentDocument | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard | no | n/a |
 | signature_request | SignatureRequest | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard (hard via audit metadata) | YES (data class) | **DECIDED (§14): preserve current behavior — ip/user_agent/content_hash visible to BOTH ADVISOR and SECRETARY.** No per-role redaction in this refactor; any stricter rule is a separate permission change. |
 | task | Task | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard | no | n/a |
+| correspondence | CorrespondenceEntry | client_record_id | ADVISOR, SECRETARY | client-scoped | soft/hard | no | n/a |
 | notification | Notification | client_record_id | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | reminder | Reminder | source→client | ADVISOR, SECRETARY | client-scoped | hard via audit metadata | no | n/a |
 | tax_calendar | TaxCalendarEntry | firm-level | ADVISOR, SECRETARY | firm-level (no client filter) | n/a | no | n/a |

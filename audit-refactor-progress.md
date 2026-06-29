@@ -226,11 +226,11 @@ Decisions made:
 - Migration files use the numeric-prefix convention (`0002_…`, `0003_…`); the hash-named initial migration is left untouched per the locked rule.
 
 Risks/blockers:
-- DEFERRED (Phase 2/6): the signature auto-submit annual-report transition (`signature_request_service.py`) still uses the `_SYSTEM_USER_ID = 0` sentinel (recorded as `actor_type="user"`, `performed_by=0`). The correct representation is `actor_type="system"` + `performed_by=NULL`, which needs the system/external-signer writer API (§5a, Phase 2; signatures Phase 6). Phase 1 only made `performed_by` nullable to enable that fix; this path's behavior is unchanged (not regressed) and is marked with a code comment.
+- DEFERRED wiring (Phase 6): the signature auto-submit annual-report transition (`signature_request_service.py`) still uses the `_SYSTEM_USER_ID = 0` sentinel. Phase 2 builds/tests the system/external-signer writer API, but does not wire this path while legacy `AnnualReportStatusHistory.changed_by` still requires a user FK. The signature path is wired after its legacy dependency is removed/repointed in the staged replacement phases.
 - Legacy per-domain audit (VAT/binders/AR-status/signature) still emit/read their own shapes; their frontend consumers are untouched and migrate in Phases 3–6.
 
 Next safe step:
-- Phase 2 — append-only audit repositories, full `EntityAuditWriter` helpers + §5a actor validation matrix + §16 fail-closed write validation, `AuditEntityRegistry` + `resolve_scope` + route authorization (ADVISOR/SECRETARY + active/deleted scoping), read-time redaction, and required `metadata_json` enrichment (incl. `client_record_id`). Resolve the system-actor sentinel as part of the §5a writer API.
+- Phase 2 — append-only audit repositories, full `EntityAuditWriter` helpers + §5a actor validation matrix + §16 fail-closed write validation, repository-backed `AuditEntityRegistry` + deleted-history scope resolution, current-role authorization (both ADVISOR/SECRETARY), sensitive-data hook, namespaced actions, envelope-level `entity_deleted`, and required `metadata_json` enrichment. Build/test the system-actor API; signature sentinel wiring remains Phase 6.
 
 ## Phase Update Template
 
@@ -374,3 +374,15 @@ Next safe step:
 - Progress log: phase table corrected — Phase 0 legacy count now 20 legacy-model-class files (+13 consumer files), not 29; Phase 1 row expanded; Phase 10 relabelled "final full verification + contract sync" (frontend consumers already migrated per-phase), not a frontend-update step.
 - Added docs/domains/audit.md update to Phase 1 (documentation-ownership rule: primary audit docs there; architecture.md only if a rule changes).
 - Phase 1 spans project root (backend + frontend + docs), not backend-only.
+
+### Phase 2 prompt synchronization (2026-06-29)
+
+- Phase 2 execution prompt and source docs synchronized before implementation:
+  - Fixed authorization to the real model: both ADVISOR and SECRETARY are allowed; no 403-by-role, owner/accountant, or per-role-redaction cases are invented. Audit reads bypass the active-client listing filter.
+  - Defined hard-delete flow and `entity_deleted` as one envelope-level `EntityAuditTrailResponse` field; 404 only when neither live entity nor usable historical metadata exists.
+  - Registry DB access is repository-owned; `AuditTrailService` orchestrates but does not execute SQL. Added the missing `correspondence` registry row.
+  - Locked normalized compact-JSON limits: old/new 32 KiB each, metadata 16 KiB; no Phase-2 summary exception.
+  - Phase 2 builds/tests system-actor support but defers signature auto-submit wiring to Phase 6 because legacy annual-report status history still requires a user FK.
+  - Namespaced actions explicitly include the required audit frontend and narrow timeline label/test updates; no timeline source repointing or dedup redesign.
+  - OpenAPI + canonical `npm run gen:types` are mandatory; manual generated-type edits are forbidden. The append-only audit-repository rule requires a Phase-2 update to `docs/backend/architecture.md`.
+- Phase 2 remains not started. Revised execution prompt approved after final review.
