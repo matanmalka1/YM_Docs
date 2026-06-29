@@ -2,13 +2,16 @@
 
 ## Current Status
 
-Status: Planning approved. Phase 0 not started yet.
+Status: Phase 0 completed. Baseline green. No blockers. Phase 1 not started.
 
 Current phase:
-- Pre-Phase 0 setup
+- Phase 0 — Baseline, exact inventory, enum audit (Completed)
 
 Next phase:
-- Phase 0 — Baseline, exact inventory, enum audit
+- Phase 1 — Schema add/alter only (migrations 1a→1b); not started
+
+Phase 0 report:
+- docs/audit-refactor-phase-0-report.md
 
 Main plan file:
 - docs/audit-refactor-implementation-plan.md
@@ -81,7 +84,7 @@ Progress log:
 | Phase | Name | Status | Summary | Report |
 |---|---|---|---|---|
 | Pre-Phase 0 | Setup progress log | In progress | Create this context/progress file | docs/audit-refactor-progress.md |
-| Phase 0 | Baseline, exact inventory, enum audit | Not started | Run baseline checks and produce exact inventory | docs/audit-refactor-phase-0-report.md |
+| Phase 0 | Baseline, exact inventory, enum audit | Completed | Baseline green; exact inventory + matrices produced; no blockers | docs/audit-refactor-phase-0-report.md |
 | Phase 1 | Schema add/alter only | Not started | Alter EntityAuditLog/UserAuditLog only; no legacy drops | TBD |
 | Phase 2 | Writer/repository + registry/authz | Not started | Add writer/repo APIs and AuditEntityRegistry | TBD |
 | Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
@@ -97,10 +100,11 @@ Progress log:
 
 - docs/audit-refactor-implementation-plan.md
 - docs/audit-refactor-progress.md
+- docs/audit-refactor-phase-0-report.md
 
 ## Current Files Not Yet Created
 
-- docs/audit-refactor-phase-0-report.md
+- (none pending for Phase 0)
 
 ## Known Risks
 
@@ -112,6 +116,54 @@ Progress log:
 6. Actor display snapshot correctness.
 7. Append-only and same-transaction enforcement.
 8. Frontend generated types and deleted per-domain routes.
+
+## Phase 0 — Baseline, exact inventory, enum audit
+
+Status:
+- Completed
+
+Date:
+- 2026-06-29
+
+Goal:
+- Run baseline checks and produce the exact pre-implementation inventory + binding matrices. No implementation.
+
+Files changed:
+- docs/audit-refactor-phase-0-report.md (created)
+- docs/audit-refactor-progress.md (updated)
+
+Production code changed:
+- no
+
+Migrations changed:
+- no
+
+Schemas/OpenAPI changed:
+- no
+
+Frontend changed:
+- no
+
+Tests/checks run:
+- pytest 1517 passed (user-confirmed). vulture pass. pyright 0/0/0. ruff format --check pass (915 files). ruff check pass. Scripts: migration 0, role 0 (217 routes), pagination 0 (31 endpoints), unused 4 (known external/manual), enums 0, schema 43 (informational). Health checks pass. OpenAPI in sync. Frontend lint/typecheck/tests/format/arch/arch:strict/knip pass.
+
+Result:
+- Baseline green. Exact inventory produced: 7 audit models, 57 audit write sites (47 → EntityAuditLog, 10 UserAuditLog), 9 read routes, 42 migration tables, 5 legacy tables to drop, 5 frontend consumer areas, 5 seed builders. Plus binding action matrix, AuditEntityRegistry/scope matrix, signature replacement inventory, timeline/dashboard inventory, actor availability inventory.
+
+Important findings:
+- Legacy audit tables own NO exclusive Postgres enum (action/event_type/actor_type/field_name are plain String). Only enum involved, annualreportstatus, is shared with annual_reports and must stay → cleanup migration drops ZERO enum types.
+- json.dumps in EntityAuditWriter (audit_entity_audit_writer_service.py:143) + UserAuditLogRepository.create (:34); json.loads in AuditLogService._to_dict (:83) — must change with the JSONB switch (Phase 1).
+- build_with_audit already receives items (no repo dependency) — supports the AuditTrailService-fed layering for the signature drawer.
+- 5 missing-actor surfaces confirmed: advance_payment create + update, authority_contact add + update, permanent_document delete (all have route current_user available).
+
+Decisions made:
+- None new; confirmed plan assumptions. Open item for Phase 2: confirm SECRETARY has no audit-read restriction beyond existing route auth + client filtering (current finding: none).
+
+Risks/blockers:
+- No blockers. Risks carried: signature forensic parity, timeline duplicate events, JSON serializer/reader switch, Phase-1 NOT NULL sequencing, fail-safe downgrade, shared annualreportstatus enum, layering, frontend per-phase migration.
+
+Next safe step:
+- Phase 1 (schema add/alter only; migrations 1a→1b; serializer/reader changes; writer actor support). No legacy table drops in Phase 1.
 
 ## Phase Update Template
 
@@ -202,3 +254,11 @@ Next safe step:
   - Layering — repositories do DB access only; AuditTrailService owns registry lookup, resolve_scope, authorization, redaction, response mapping; routes call AuditTrailService; the signature response builder receives already-fetched audit items via AuditTrailService and does not query EntityAuditLogRepository directly (§3a/§4a/§12 updated).
   - Downgrade behavior — Option A clean/fail-safe: Phase-1 downgrade asserts no performed_by IS NULL rows before restoring NOT NULL and fails with a clear message otherwise (no silent asymmetric schema change, no row destruction); JSONB→Text casts defined.
 - Next safe step remains Phase 0 only — and only after this correction.
+
+### Phase 0 — Completed (2026-06-29)
+
+- Baseline checks run; all green (pytest 1517, vulture, pyright 0/0/0, ruff format --check, ruff check, audit scripts [migration/role/pagination/enums 0; unused 4 + schema 43 = pre-existing informational], health, OpenAPI sync, frontend suite).
+- Exact inventory + binding action matrix + AuditEntityRegistry/scope matrix + signature replacement inventory + timeline/dashboard inventory + actor availability inventory written to docs/audit-refactor-phase-0-report.md.
+- Counts: 7 audit models; 57 audit write sites (47 → EntityAuditLog: record_* 14, vat 12, signature 9, binder 7, AR-status 3, intake-edit 2; UserAuditLog 10); 9 read routes; 42 migration tables; 5 legacy tables to drop; 5 frontend consumer areas; 5 seed builders.
+- Key findings: legacy audit tables own ZERO exclusive Postgres enum (cleanup drops no enum; annualreportstatus shared with annual_reports → keep); json.dumps sites (audit_entity_audit_writer_service.py:143, user_audit_log_repository.py:34) + json.loads (user_audit_log_service.py:83) to change in Phase 1; build_with_audit already receives items (supports AuditTrailService-fed layering); 5 missing-actor surfaces confirmed (advance_payment create/update, authority_contact add/update, permanent_document delete).
+- No blockers. Recommendation: Phase 1 safe to start. Phase 1 NOT started.
