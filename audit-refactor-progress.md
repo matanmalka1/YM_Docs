@@ -288,3 +288,12 @@ Next safe step:
   - Action matrix corrected: charge.created and charge.deleted are genuine actions (not issue/paid aliases); annual_reports does NOT use ACTION_METADATA_UPDATED (that is VAT-only); deadline → annual_report.deadline_updated; business.*/signature_request.* labelled shorthand, not binding persisted lists.
 - Four open items DECIDED: signature forensic visible to both roles; actor_display_name threaded from current_user.full_name with actor_id; charge action names (created/issued/paid/canceled/deleted); AR legacy history removed in Phase 4 with create/status_changed/deadline_updated/child semantic actions preserved.
 - Status: Phase 0 COMPLETED. Phase 1 APPROVED. Phase 1 not yet started.
+
+### Plan sync before Phase 1 (2026-06-29)
+
+- Implementation plan synchronized so Phase 1 is internally consistent (docs/audit-refactor-implementation-plan.md):
+  - Phase 1 now explicitly includes the generic-audit contract sync: because EntityAuditLogResponse.old_value/new_value change string→JSON object, openapi.json + generated.ts + src/features/audit/ contracts/formatters are regenerated/updated and frontend audit checks run IN Phase 1 (not Phase 2/10). §14 row updated accordingly.
+  - Actor threading clarified to happen in Phase 1 (not Phase 2): minimal writer actor support + thread current_user.full_name + actor_type into all 30 existing EntityAuditLog write sites BEFORE migration 1b enforces actor_type NOT NULL. Phase 2 keeps the full EntityAuditWriter helpers / validation matrix / registry / authz / metadata enrichment.
+  - Fixed stale statements: §15 Phase 1 no longer says "performed_by stays nullable on downgrade" — it now uses the fail-safe Option A downgrade (assert no performed_by IS NULL, else fail). §4a line no longer says signature frontend regenerates in Phase 10 — drawer + generated types migrate in Phase 6, with Phase 10 only the final full sync.
+  - Phase 0 report count scoping fixed: legacy-model class-reference files = 20 (word-boundary grep), legacy repo/schema/consumer files = 13, test files = 38; the earlier single "29" label that didn't match its list is replaced by two exactly-counted sets.
+- Phase 1 APPROVED post-sync. Still not started.
