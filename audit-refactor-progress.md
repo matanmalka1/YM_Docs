@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 0 COMPLETED (two review rounds; all corrections applied, 4 open items decided). Phase 1 APPROVED, not yet started.
+Status: Phase 1 COMPLETED (schema + JSON-object switch + actor threading + generic-audit contract sync). Phase 2 not started.
 
 Current phase:
-- Phase 0 — Baseline, exact inventory, enum audit (Completed)
+- Phase 1 — Schema + JSON switch + actor threading + generic-audit contract sync (Completed)
 
 Next phase:
-- Phase 1 — Schema add/alter only (migrations 1a→1b); approved, not started
+- Phase 2 — Writer helpers / repository / registry / authz / validation (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -85,7 +85,7 @@ Progress log:
 |---|---|---|---|---|
 | Pre-Phase 0 | Setup progress log | In progress | Create this context/progress file | docs/audit-refactor-progress.md |
 | Phase 0 | Baseline, exact inventory, enum audit | Completed | Three review rounds; counts 30/63/73, 20 legacy-model-class/13 consumer/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
-| Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Approved, not started | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b, serializer/reader JSON-object switch, thread actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regen generic-audit OpenAPI/types/frontend, docs/domains/audit.md | TBD |
+| Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Completed | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b (PG round-trip + fail-safe proven), serializer/reader JSON-object switch, threaded actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regenerated generic-audit OpenAPI/types/frontend, docs/domains/audit.md | this file (Phase 1 section) |
 | Phase 2 | Writer/repository + registry/authz | Not started | Add writer/repo APIs and AuditEntityRegistry | TBD |
 | Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
 | Phase 4 | Replace AnnualReportStatusHistory | Not started | Move status + child actions to EntityAuditLog | TBD |
@@ -173,6 +173,64 @@ Risks/blockers:
 
 Next safe step:
 - Phase 1 — schema add/alter (migrations 1a→1b) + serializer/reader changes + writer actor support (actor_display_name threaded). No legacy table drops.
+
+## Phase 1 — Schema + JSON switch + actor threading + generic-audit contract sync
+
+Status:
+- Completed
+
+Date:
+- 2026-06-29
+
+Goal:
+- Convert the two surviving audit tables to the target shape (JSONB payloads + actor snapshots), switch serializer/readers off JSON-string encoding, thread actor identity into every existing EntityAuditLog write and the UserAuditLog auth/admin writers, and ship the forced generic-audit response-shape change end-to-end (OpenAPI + frontend). No legacy audit tables touched.
+
+Files changed:
+- Backend models: `app/audit/models/audit_entity_audit_log.py` (JSONB old/new/metadata via `JSON().with_variant(JSONB,"postgresql")`, `actor_type` NOT NULL default `"user"`, `actor_display_name`, nullable `performed_by`, perf indexes + dialect note on the §8b expression index), `app/users/models/user_audit_log.py` (metadata_json→JSONB, `actor_display_name`, `target_display_name`; no actor_type/old/new).
+- Backend repos/writer: `app/audit/repositories/audit_entity_audit_log_repository.py` (append: actor_type/actor_display_name/metadata_json, performed_by nullable), `app/audit/services/audit_entity_audit_writer_service.py` (drop `json.dumps`; `_serialize_value` returns normalized object; actor params on append + record_*), `app/charges/charge_billing_audit.py`, `app/users/repositories/user_audit_log_repository.py` (dict metadata + display snapshots), `app/users/services/user_audit_log_service.py` (drop `json.loads`; display snapshots in `_to_dict`/`log`).
+- Backend schemas: `app/audit/schemas/audit_entity_audit_log.py` (old/new/metadata_json as JSON objects + actor_type/actor_display_name, performed_by nullable), `app/users/schemas/user_management.py` (actor_display_name/target_display_name on `UserAuditLogResponse`).
+- Backend reader: `app/audit/services/audit_trail_service.py` (null-safe performed_by collection; response carries snapshot; reads prefer snapshot).
+- Actor threading — 30 EntityAuditLog write sites + their service/route call chains: clients (create/update/lifecycle + excel import), businesses (create/update/lifecycle + client-business facade), charges (create/issue/pay/cancel/delete + bulk), annual_reports (create/status/deadline/detail/annex/financial-lines/vat-import/delete). UserAuditLog snapshot capture: `user_auth_service.py`, `user_management_service.py` (+ their routes).
+- Migrations: `alembic/versions/0002_audit_jsonb_actor.py` (1a) + `0003_audit_actor_type_notnull.py` (1b), numeric-prefixed per `docs/backend/migrations.md`.
+- Seed: `app/seed/builders/users.py` (dict metadata + actor/target snapshots on UserAuditLog; actor_type + actor_display_name on seeded EntityAuditLog rows).
+- Frontend: `src/types/generated.ts` (surgical audit-schema edits — full regen is unrelated version churn), `openapi.json` (regenerated; diff is 100% audit), `src/features/audit/api/contracts.ts` (JSON-object zod + nullable performed_by + actor fields), `src/features/audit/utils/auditFormatters.ts` (no JSON.parse; `AuditDiffInput` decouples the formatter from the full entry type), `AuditTrailTable.tsx` (optional `actor_display_name` + `actor_display_name → performed_by_name → #id → —`), `useEntityAuditTrailSection.ts` (skip null-actor rows), `src/features/timeline/normalize.ts` + `timeline/api/contracts.ts` (consume the decoupled formatter; change_old/change_new typed as JSON), audit feature barrels.
+- New tests: `tests/audit/test_phase1_json_roundtrip.py` (dict round-trip both tables + response objects + snapshots), `tests/audit/test_phase1_migration_roundtrip.py` (Postgres-gated: clean upgrade→downgrade→re-upgrade + fail-safe refusal), `tests/audit/test_audit_endpoint.py::test_actor_display_name_snapshot_survives_user_rename`. Updated string-contract tests across audit/charges/clients/annual_reports to the JSON-object contract; updated bulk-billing + auto-populate fakes for the new `actor_name` kwarg.
+
+Production code changed:
+- yes
+
+Migrations changed:
+- yes (two new revisions; initial migration untouched)
+
+Schemas/OpenAPI changed:
+- yes (EntityAuditLogResponse old/new→objects + actor fields + nullable performed_by; UserAuditLogResponse + actor/target display)
+
+Frontend changed:
+- yes (generic-audit contracts/formatter/table/hook + timeline formatter adapter + generated.ts/openapi.json)
+
+Tests/checks run:
+- Backend: full `pytest` (re-run after review fixes), `ruff check` (pass), `ruff format --check` (pass), `pyright` (0/0/0), `vulture` (only pre-existing database.py event-hook findings), audit scripts — migration chain (linear, 3 files), role 217, pagination 31, enum sync clean. SQLite `create_all` builds both models. PostgreSQL up→down round-trip on a throwaway DB: upgrade initial→1a→1b clean; clean downgrade→re-upgrade restores JSONB; fail-safe downgrade with a NULL-performed_by row **refused atomically** with a clear message (no row deletion, schema unchanged).
+- Frontend (verification only): typecheck, lint, test (59), format:check, arch:check, arch:check:strict, unused — all green.
+
+Result:
+- COMPLETED. Two-model target shape in place for `entity_audit_logs`/`user_audit_logs`; serializer/readers off JSON strings; actor snapshots threaded; generic-audit contract synced backend↔frontend; migrations round-trip cleanly with a fail-safe downgrade. No legacy audit table/model/repo/route, timeline behavior, dashboard, or signature drawer changed.
+
+Important findings:
+- Committed `openapi.json` was actually in sync for non-audit paths; the fresh export diff was 100% audit (78 lines). `generated.ts` full regen is ~42k lines of unrelated openapi-typescript version/formatting churn, so the audit type changes were applied surgically (per the OpenAPI/generated-drift memo).
+- The generic audit formatter was coupled to the full `EntityAuditLogEntry`; introduced `AuditDiffInput` (old/new: unknown) so the timeline (a hidden consumer) compiles without a behavior change. Timeline `change_old/change_new` are now JSON values because the backend timeline builder passes EntityAuditLog payloads straight through.
+- `performed_by_name` (live users join) is retained as a fallback but reads now prefer the immutable `actor_display_name`; a rename regression test proves the snapshot is stable while the live-join name follows renames.
+
+Decisions made:
+- Kept the model-level `actor_type` default `"user"` (Python + temporary server-default in 1a) even though every writer passes it via the writer's own default — it keeps direct-ORM/seed construction safe and SQLite `create_all` valid. 1b enforces NOT NULL and drops only the server_default. (Reviewer noted "explicit actor_type"; the writer always supplies it — the model default is a deliberate belt-and-suspenders, not a substitute.)
+- The §8b PostgreSQL expression index lives only in migration 0002 (documented dialect-specific exception in the model) because a portable JSON `->>'…'` expression index isn't expressible for SQLite `create_all`.
+- Migration files use the numeric-prefix convention (`0002_…`, `0003_…`); the hash-named initial migration is left untouched per the locked rule.
+
+Risks/blockers:
+- DEFERRED (Phase 2/6): the signature auto-submit annual-report transition (`signature_request_service.py`) still uses the `_SYSTEM_USER_ID = 0` sentinel (recorded as `actor_type="user"`, `performed_by=0`). The correct representation is `actor_type="system"` + `performed_by=NULL`, which needs the system/external-signer writer API (§5a, Phase 2; signatures Phase 6). Phase 1 only made `performed_by` nullable to enable that fix; this path's behavior is unchanged (not regressed) and is marked with a code comment.
+- Legacy per-domain audit (VAT/binders/AR-status/signature) still emit/read their own shapes; their frontend consumers are untouched and migrate in Phases 3–6.
+
+Next safe step:
+- Phase 2 — append-only audit repositories, full `EntityAuditWriter` helpers + §5a actor validation matrix + §16 fail-closed write validation, `AuditEntityRegistry` + `resolve_scope` + route authorization (ADVISOR/SECRETARY + active/deleted scoping), read-time redaction, and required `metadata_json` enrichment (incl. `client_record_id`). Resolve the system-actor sentinel as part of the §5a writer API.
 
 ## Phase Update Template
 
@@ -297,6 +355,17 @@ Next safe step:
   - Fixed stale statements: §15 Phase 1 no longer says "performed_by stays nullable on downgrade" — it now uses the fail-safe Option A downgrade (assert no performed_by IS NULL, else fail). §4a line no longer says signature frontend regenerates in Phase 10 — drawer + generated types migrate in Phase 6, with Phase 10 only the final full sync.
   - Phase 0 report count scoping fixed: legacy-model class-reference files = 20 (word-boundary grep), legacy repo/schema/consumer files = 13, test files = 38; the earlier single "29" label that didn't match its list is replaced by two exactly-counted sets.
 - Phase 1 APPROVED post-sync. Still not started.
+
+### Phase 1 — COMPLETED (2026-06-29)
+
+- Implemented the two-model target shape for `entity_audit_logs` + `user_audit_logs` only (no legacy drops): JSONB old/new/metadata via `JSON().with_variant(JSONB,"postgresql")`, `actor_type` (NOT NULL, default "user") + `actor_display_name` + nullable `performed_by` on EntityAuditLog; JSONB `metadata_json` + `actor_display_name` + `target_display_name` on UserAuditLog (no actor_type/old/new).
+- Serializer/reader switch: dropped `json.dumps` in `EntityAuditWriter._serialize_value` + `UserAuditLogRepository.create` and `json.loads` in `AuditLogService._to_dict`; `EntityAuditLogResponse`/`UserAuditLogResponse` expose JSON objects + the snapshot fields.
+- Threaded `current_user.full_name` (+ `actor_type` via writer default) into all 30 existing EntityAuditLog write sites and their service/route call chains; UserAuditLog auth/admin writers capture actor/target display snapshots.
+- Migrations `0002_audit_jsonb_actor` (1a) + `0003_audit_actor_type_notnull` (1b); PostgreSQL round-trip proven on a throwaway DB incl. clean upgrade→downgrade→re-upgrade and an **atomic fail-safe downgrade refusal** when NULL-performed_by rows exist; SQLite `create_all` validated.
+- Generic-audit contract sync: regenerated `openapi.json` (audit-only diff) + surgically updated `src/types/generated.ts`; migrated `src/features/audit/` contracts/formatter/table/hook and the timeline formatter adapter (decoupled via `AuditDiffInput`); full frontend verification green.
+- Seed builders updated to dict metadata + actor/target snapshots. Docs: `docs/domains/audit.md` updated (two-model shapes, actor-snapshot + JSON-object conventions, index/read-preference notes).
+- Review round applied: numeric-prefix migration filenames; seed JSON-scalar→object fix; model docstring path + expression-index dialect note; clean-round-trip + rename-snapshot regression tests added; system-actor sentinel (signature auto-submit) documented as deferred to Phase 2/6.
+- Backend full `pytest` green; `ruff check`/`ruff format --check`/`pyright`/audit scripts green. Phase 2 not started.
 
 ### Plan sync round 3 (2026-06-29)
 

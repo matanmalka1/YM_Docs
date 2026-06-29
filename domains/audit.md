@@ -11,7 +11,18 @@ Source of truth: mandatory
 # Audit
 
 The audit domain stores append-only change records for selected business entities and exposes one read-only HTTP endpoint for staff to inspect those records. In the current implementation, writes happen indirectly through `EntityAuditWriter` from other domains; the `audit` module itself owns the generic table, response schema, repository query path, and entity-type validation for read access.
-Last verified against code + backend/openapi.json: 2026-06-11.
+Last verified against code + backend/openapi.json: 2026-06-29.
+
+## Two audit models (target shape)
+
+The audit refactor (see `docs/audit-refactor-implementation-plan.md`) converges on exactly two audit models with **distinct shapes** — do not conflate them:
+
+- **`EntityAuditLog`** (table `entity_audit_logs`, this domain) — business mutations + evidence events. Carries `actor_type`, `actor_display_name`, and JSON-object `old_value`/`new_value`/`metadata_json`. `performed_by` is nullable (system / external-signer rows have no `users.id`).
+- **`UserAuditLog`** (table `user_audit_logs`, owned by the `users` domain) — auth/security/admin-access events. Has **no** `old_value`/`new_value` and **no** `actor_type`; it stores a JSON-object `metadata_json` plus `actor_display_name` + `target_display_name` snapshots and the closed `AuditAction`/`AuditStatus` enums.
+
+**Actor snapshot convention (§5 of the plan).** Display names are immutable snapshots captured at **write time** from the route's `current_user.full_name` and threaded alongside the actor id — never joined from `users` at read time (a rename must not rewrite historical audit display). `EntityAuditLog.actor_type` is one of `user | system | external_signer`; for `system`/`external_signer` rows `performed_by` is `NULL` and `actor_display_name` carries the system label / signer name. As of Phase 1 every existing `EntityAuditLog` write passes `actor_type` (default `"user"`) + `actor_display_name`, and the `UserAuditLog` auth/admin writers capture `actor_display_name` (+ `target_display_name` where a target user exists).
+
+**JSON-object storage convention.** `old_value`/`new_value`/`metadata_json` are stored as JSON objects (PostgreSQL `JSONB`, SQLite `JSON`) using the portable `JSON().with_variant(JSONB, "postgresql")` column type. The writer persists dict/list values directly — it does **not** `json.dumps` them into strings — and readers/response schemas expose them as JSON objects (`dict | list | null`), not strings.
 
 ## Endpoints
 
@@ -32,18 +43,21 @@ The audit domain owns one persisted SQLAlchemy model:
 | `id` | `int` PK | no | autoincrement primary key |
 | `entity_type` | `String` | no | free string, indexed |
 | `entity_id` | `int` | no | target entity id, indexed |
-| `performed_by` | `int` FK -> `users.id` | no | actor who performed the change |
+| `performed_by` | `int` FK -> `users.id` | **yes** | actor id; `NULL` for system / external-signer rows |
+| `actor_type` | `String` | no | `user` \| `system` \| `external_signer` (model default `"user"`) |
+| `actor_display_name` | `String` | yes | immutable actor-name snapshot captured at write time |
 | `action` | `String` | no | free string action name |
-| `old_value` | `Text` | yes | JSON string snapshot before mutation |
-| `new_value` | `Text` | yes | JSON string snapshot after mutation |
+| `old_value` | `JSONB` (SQLite `JSON`) | yes | JSON-object snapshot before mutation |
+| `new_value` | `JSONB` (SQLite `JSON`) | yes | JSON-object snapshot after mutation |
+| `metadata_json` | `JSONB` (SQLite `JSON`) | yes | structured context (e.g. `client_record_id`) |
 | `note` | `Text` | yes | optional audit note |
 | `performed_at` | `datetime` | no | defaults to `utcnow` |
 
-There is also a composite index `idx_entity_audit_type_id` on (`entity_type`, `entity_id`). Source: `backend/app/audit/models/entity_audit_log.py:24-44`.
+Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the PostgreSQL expression index `idx_entity_audit_client_ctx` on `((metadata_json->>'client_record_id'), performed_at)` (created in migration; SQLite dev may table-scan). Source: `backend/app/audit/models/audit_entity_audit_log.py`; migrations `backend/alembic/versions/0002_audit_jsonb_actor.py` + `0003_audit_actor_type_notnull.py`.
 
 ### Response schema
 
-`EntityAuditLogResponse` exposes the stored fields plus `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `page`, and `page_size`. Source: `backend/app/audit/schemas/entity_audit_log.py:8-27`; OpenAPI components: `backend/openapi.json`.
+`EntityAuditLogResponse` exposes the stored fields (`old_value`/`new_value`/`metadata_json` as JSON objects, `actor_type`, `actor_display_name`, nullable `performed_by`) plus the read-time-enriched `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `page`, and `page_size`. Source: `backend/app/audit/schemas/audit_entity_audit_log.py`; OpenAPI components: `backend/openapi.json`.
 
 ## Enums / statuses
 
@@ -60,10 +74,11 @@ This domain does not use Python enums for audit entity types or actions. Current
 - The read API rejects any `entity_type` not present in `ALLOWED_READ_ENTITY_TYPES` with `AUDIT.INVALID_ENTITY_TYPE`. Source: `backend/app/audit/services/audit_trail_service.py:35-37`.
 - Read access first verifies that the target entity exists in its owning repository (`ClientRecord`, `Business`, `Charge`, or `AnnualReport`) and raises `AUDIT.ENTITY_NOT_FOUND` with HTTP 404 when absent. Source: `backend/app/audit/services/audit_trail_service.py:39-53`.
 - The read API accepts `page` and `page_size` query parameters; the service translates them to repository `limit`/`offset` internally. It also accepts optional filters `action` (str), `user_id` (int, matched against `performed_by`), and `created_after`/`created_before` (datetime, matched against `performed_at`). Audit trail queries are always scoped to the exact `(entity_type, entity_id)` pair, narrowed by any supplied filters, and ordered newest-first by `performed_at DESC, id DESC`. Source: `backend/app/audit/api/routes.py:18-27`, `backend/app/audit/services/audit_trail_service.py:55-75`, `backend/app/audit/repositories/entity_audit_log_repository.py:37-61`.
-- `performed_by_name` is not stored on the audit row; it is enriched at read time by bulk-loading distinct user ids from `users` and mapping them onto the response items. Source: `backend/app/audit/services/audit_trail_service.py:63-74`.
+- Display reads **prefer the immutable `actor_display_name` snapshot** over the live-join `performed_by_name`. `performed_by_name` is not stored on the audit row; it is enriched at read time by bulk-loading distinct user ids from `users` (so it tracks renames), and is exposed only as a fallback for legacy rows without a snapshot. A user rename therefore changes `performed_by_name` but never `actor_display_name`. Source: `backend/app/audit/services/audit_trail_service.py`; frontend `AuditTrailTable` prefers `actor_display_name → performed_by_name → #id → —`.
 - Audit rows are append-only by design: the model has no soft-delete columns and no update path in this module. Corrections are represented by new rows, not edits to existing ones. Source: `backend/app/audit/models/entity_audit_log.py:4-12,24-44`.
-- `EntityAuditWriter.append()` is a no-op when `actor_id` is `None`; callers only get an audit row when a concrete actor id is available. Source: `backend/app/audit/services/entity_audit_writer.py:26-47`.
-- `EntityAuditWriter` serializes payload snapshots to JSON strings, normalizing enums to `.value`, datetimes/dates to ISO strings, decimals to strings, and wrapping raw string payloads as `{"value": ...}` before persistence. Source: `backend/app/audit/services/entity_audit_writer.py:138-159`.
+- `EntityAuditWriter.append()` is a no-op when `actor_id` is `None`; callers only get an audit row when a concrete actor id is available (system / external-signer actor handling via `actor_type` is a later phase). Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
+- `EntityAuditWriter` normalizes payload snapshots (enums to `.value`, datetimes/dates to ISO strings, decimals to strings, raw string payloads wrapped as `{"value": ...}`) and stores the resulting **dict/list object directly** in the JSONB column — it no longer `json.dumps` snapshots into strings. Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
+- Every `EntityAuditWriter` write passes `actor_type` (default `"user"`) and threads `actor_display_name` from the route's `current_user.full_name`. Source: the 30 existing write sites across clients/businesses/charges/annual_reports.
 
 ## Error codes
 
