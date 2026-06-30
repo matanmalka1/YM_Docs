@@ -211,7 +211,9 @@ Renaming a user must **not** rewrite historical audit display. Joining `performe
 | `external_signer` | **must be NULL** | **required** (signer name) |
 | anything else | — | **fail validation** |
 
-Rules: `actor_type` must be one of the three known values (unknown → reject). `user` without `performed_by`, or `system`/`external_signer` with a non-null `performed_by`, or any row missing `actor_display_name`, fails validation. No partial/invalid actor row is ever committed.
+Rules: `actor_type` must be one of the three known values (unknown → reject). `user` without `performed_by`, or `system`/`external_signer` with a non-null `performed_by`, fails validation. No partial/invalid actor row is ever committed.
+
+**Phase-2 decision (approved) — `actor_display_name` requirement is narrowed for `user`.** The structural invariants above are fully fail-closed. `actor_display_name` stays **required + fail-closed for `system`/`external_signer`** (no `performed_by` FK exists, so the snapshot is the only display source). For **`user`** it is **strongly encouraged but NOT fail-closed**: the `performed_by` FK gives a read-time name fallback, so a missing snapshot degrades gracefully (not rename-stable) instead of rolling back the mutation. Enforcing it strictly broke ~108 existing user/internal flows that never thread a display name (obligation orchestrator, freeze/close cascade, seed, excel import). **§5a follow-up (deferred, ~Phase 8):** restore strict `user → display required` once a display name is threaded through every internal orchestration/cascade/seed/excel path that writes audit. Tracked in `docs/audit-refactor-progress.md` and `docs/domains/audit.md`.
 
 ## 6. ENTITY_* constants — final
 

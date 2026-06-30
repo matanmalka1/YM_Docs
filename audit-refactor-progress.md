@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 1 COMPLETED (schema + JSON-object switch + actor threading + generic-audit contract sync). Phase 2 not started.
+Status: Phase 2 COMPLETED (writer helpers + append-only repositories + registry/scope/authz + fail-closed write validation + metadata enrichment + action namespacing + frontend sync). Phase 3 not started.
 
 Current phase:
-- Phase 1 — Schema + JSON switch + actor threading + generic-audit contract sync (Completed)
+- Phase 2 — Writer helpers / repository / registry / authz / validation (Completed)
 
 Next phase:
-- Phase 2 — Writer helpers / repository / registry / authz / validation (not started)
+- Phase 3 — Replace VAT audit (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -86,7 +86,7 @@ Progress log:
 | Pre-Phase 0 | Setup progress log | In progress | Create this context/progress file | docs/audit-refactor-progress.md |
 | Phase 0 | Baseline, exact inventory, enum audit | Completed | Three review rounds; counts 30/63/73, 20 legacy-model-class/13 consumer/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
 | Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Completed | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b (PG round-trip + fail-safe proven), serializer/reader JSON-object switch, threaded actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regenerated generic-audit OpenAPI/types/frontend, docs/domains/audit.md | this file (Phase 1 section) |
-| Phase 2 | Writer/repository + registry/authz | Not started | Add writer/repo APIs and AuditEntityRegistry | TBD |
+| Phase 2 | Writer/repository + registry/authz | Completed | Append-only repos; writer record_action/record_external_action + §5a actor matrix + §16 validation (no-op removed); repo client-context queries; AuditEntityRegistry + resolve_scope (23 types) + role authz; envelope entity_deleted; metadata enrichment + namespaced actions; frontend synced | this file (Phase 2 section) |
 | Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
 | Phase 4 | Replace AnnualReportStatusHistory | Not started | Move status + child actions to EntityAuditLog | TBD |
 | Phase 5 | Replace binder lifecycle/intake logs | Not started | Move binder audit to EntityAuditLog | TBD |
@@ -231,6 +231,63 @@ Risks/blockers:
 
 Next safe step:
 - Phase 2 — append-only audit repositories, full `EntityAuditWriter` helpers + §5a actor validation matrix + §16 fail-closed write validation, repository-backed `AuditEntityRegistry` + deleted-history scope resolution, current-role authorization (both ADVISOR/SECRETARY), sensitive-data hook, namespaced actions, envelope-level `entity_deleted`, and required `metadata_json` enrichment. Build/test the system-actor API; signature sentinel wiring remains Phase 6.
+
+## Phase 2 — Writer helpers / repository / registry / authz / validation
+
+Status:
+- Completed
+
+Date:
+- 2026-06-29
+
+Goal:
+- Add the full `EntityAuditWriter` helper + fail-closed validation surface, append-only audit repositories, repository-backed `AuditEntityRegistry` + scope resolution + current-role authorization, the read-flow rework (envelope `entity_deleted`, deleted-history readability), `metadata_json` enrichment + namespaced actions on the existing audited writes, and the forced frontend/OpenAPI sync. No legacy audit table/model/route touched; no new domains audited; no migration.
+
+Files changed:
+- Backend (new): `app/common/repositories/append_only_repository.py` (append-only base), `app/audit/audit_write_policy.py` (§5a actor matrix + §16 forbidden-key/metadata-allowlist/size-cap validation), `app/audit/audit_entity_registry.py` (23-type registry + `ScopeStrategy` + `allowed_read_entity_types`), `app/audit/audit_scope.py` (`AuditScope`/`EntityScopeResolution`), `app/audit/repositories/audit_scope_repository.py` (existence/scope DB resolution).
+- Backend (changed): `app/audit/repositories/audit_entity_audit_log_repository.py` (now `AppendOnlyRepository`; added `list_by_entity`/`list_by_entities`/`list_for_client_context` (§8b)/`list_recent_activity`), `app/users/repositories/user_audit_log_repository.py` (`AppendOnlyRepository`; dropped dead `include_deleted`), `app/audit/services/audit_entity_audit_writer_service.py` (`record_action`/`record_external_action`, namespace via `entity_action`, validation, no-op removed), `app/audit/services/audit_trail_service.py` (registry orchestration, `resolve_scope`, role authz, sensitive hook, envelope mapping), `app/audit/audit_constants.py` (full `ENTITY_*` set, `entity_action`, pre-namespaced charge/AR actions, `NOTE_ENTITY_TYPE_CHANGED`), `app/audit/schemas/audit_entity_audit_log.py` (envelope `entity_deleted`), `app/audit/api/audit_routes.py` (passes `current_user`), `app/core/error_codes.py` (+`AUDIT.INVALID_ACTOR`/`FORBIDDEN_FIELD`/`PAYLOAD_TOO_LARGE`).
+- Backend metadata enrichment + namespacing on existing writes: clients (create/update/entity-type-change/delete/restore), businesses (create/update/lifecycle delete+restore — client resolved via `get_by_legal_entity_id`), charges (`charge_billing_audit.py` + `charge_billing_service.py` create/issue/pay/cancel/delete), annual_reports (create/status/deadline/detail/annex/financial-line/vat-import/delete). Timeline/dashboard forced label updates: `app/timeline/timeline_audit_aggregator.py` (`_DEDUP_ACTIONS` namespaced), `app/dashboard/services/dashboard_recent_activity_service.py` (flat namespaced label/activity maps).
+- Frontend: `src/features/audit/api/contracts.ts` (+`entity_deleted`), `src/features/audit/constants.ts` (namespaced `AUDIT_ACTION_LABELS` built programmatically + `AUDIT_ACTIONS_BY_ENTITY_TYPE` full namespaced values, incl. `client.entity_type_changed`), `src/features/audit/utils/auditFormatters.ts` (verb-suffix fallback). `backend/openapi.json` regenerated (audit-only). `src/types/generated.ts` regenerated **deterministically** via the pinned generator (see review-fix below) — `entity_deleted: boolean` + the pre-existing `date_from/date_to` drift; `package.json` `gen:types` now runs the pinned local `openapi-typescript@7.13.0` devDependency + `prettier --write` (no `npx --yes` unpinned).
+- Tests (new): `tests/audit/test_phase2_registry_authz.py` (401; both roles; 404 only with no live+no history; soft/hard-deleted readable+flagged; both roles same forensic; actor matrix valid + every invalid combo rolls back; §16 forbidden/non-allowlisted/oversized; append-only mutators absent; atomicity savepoint rollback). Updated: `tests/audit/test_entity_audit_writer.py`, `test_audit_endpoint.py`, `test_audit_endpoint_filters.py`, `test_phase1_json_roundtrip.py`, `tests/charges/service/test_billing_audit.py`, `tests/clients/service/test_entity_type_change_guard.py`, plus 23 fallout fixes across annual_reports/businesses/charges/invoices/clients-repo/timeline tests (thread `actor_id`/namespaced actions where they relied on the removed no-op or bare actions).
+
+Production code changed:
+- yes
+
+Migrations changed:
+- no (Phase-1 schema is the target; all Phase-2 changes are response/validation/query/registry level on existing columns; `entity_deleted` is response-only)
+
+Schemas/OpenAPI changed:
+- yes (`EntityAuditTrailResponse.entity_deleted`; audit-only OpenAPI diff)
+
+Frontend changed:
+- yes (contracts/constants/formatter + surgical generated.ts)
+
+Tests/checks run:
+- Backend static: `ruff check` pass, `ruff format --check` pass (formatted the 7 authored files), `pyright` 0/0/0, `vulture` clean, audit scripts — migration chain linear, role 217 protected, pagination 31, enum sync clean, unused-routes 4 (pre-existing baseline), dump_schema informational. SQLite `create_all` builds. No migration added → no PostgreSQL round-trip needed this phase.
+- Backend `pytest`: user ran the full suite; the only failures were 5 tests whose fixes landed after that run started — re-running those 5 individually passes. Net: full suite green (1537 + those 5).
+- Frontend: typecheck, lint, `test` (59), `format:check`, `arch:check`, `arch:check:strict`, `unused` (knip) — all green. `gen:types` confirmed the known ~21k-line version/format churn (pre-existing drift memo); restored canonical `generated.ts` and applied the audit-only `entity_deleted` delta surgically.
+
+Result:
+- COMPLETED. Generic audit reads are registry-authorized with deleted-history readability and an envelope `entity_deleted`; audit repositories are append-only; writes are fail-closed (actor matrix + §16) and transactional; existing audited writes carry namespaced actions + `metadata_json.client_record_id`; frontend/OpenAPI synced. No legacy audit table/model/repo/route, signature service/drawer, dashboard architecture, or timeline source architecture changed.
+
+Important findings:
+- Strict §5a (`user → actor_display_name` required, fail-closed) broke ~108 existing user+test flows because display names are not threaded through internal orchestration/cascade/seed/excel paths (the obligation orchestrator passes `actor_name or ""`). Surfaced as a decision; user chose the narrow option.
+- The committed `openapi.json` was in sync for non-audit paths; the audit export diff was exactly +5 lines (`entity_deleted`). `gen:types` still churns ~21k unrelated lines (openapi-typescript version/format), so the surgical-edit workflow from Phase 1 was reused.
+- `deadline_rule` has no per-row UI edit route (only list + firm-wide bootstrap) → excluded from the registry (plan §6 "conditional"; documented).
+
+Decisions made:
+- **Actor matrix (narrow, recommended option chosen by user):** structural invariants stay fail-closed for all actor types (`actor_type` valid; `user ⇒ performed_by`; `system`/`external_signer ⇒ performed_by NULL + display required). For `user` rows `actor_display_name` is strongly encouraged but NOT fail-closed — the `performed_by` FK gives a read-time name fallback, so a missing snapshot degrades gracefully (not rename-stable) rather than rolling back the mutation. **Follow-up:** strict `user → display required` + threading a display name through every internal orchestration/cascade/seed/excel path that writes audit (tracked for a later phase, e.g. Phase 8 when those domains' writes are built out).
+- **§16 policy (revised after review):** a full per-`(entity_type, action)` policy in `audit_write_policy.py` — positive top-level value-field allowlist for `old_value`/`new_value` (bounded by request/snapshot shapes, so `document_content`/unexpected fields reject), required + allowed `metadata_json` keys (`metadata_json` must be an object — a list/scalar rejects, never silently skipped), action↔entity_type namespace match, plus the recursive forbidden-key/raw-bytes denylist and size caps. (The earlier metadata-only interpretation was rejected in review and replaced with this.)
+- **Action namespacing:** generic verbs are composed `<entity_type>.<verb>` by the writer's `record_*` helpers; charge/AR-child actions are pre-namespaced constants. `client.entity_type_changed` is a first-class semantic action (revised after review — was previously a `note` on a `client.updated` row); the back-compat alias was removed.
+- **Append-only:** Option A (no `BaseRepository` inheritance) via `AppendOnlyRepository`. Now an architecture rule in `docs/backend/architecture.md`.
+- **Scope is not authorization:** both roles read all; `client_ids` is contextual, so resolver precision is best-effort for polymorphic types (note/reminder) — existence + `entity_deleted` + 404 logic are the load-bearing outputs.
+
+Risks/blockers:
+- Internal-path `user` audit rows (orchestrator/cascade/seed) carry no `actor_display_name` snapshot, so they are not rename-stable (display falls back to the live `performed_by` join). Closed by the §5a follow-up above.
+- Signature auto-submit `_SYSTEM_USER_ID=0` wiring remains deferred to Phase 6 (legacy `AnnualReportStatusHistory.changed_by` still requires a user FK). The system/external-signer writer API is built + tested but not wired to that path.
+
+Next safe step:
+- Phase 3 — Replace VAT audit end-to-end (writer repoint → `EntityAuditWriter`, reads via `AuditTrailService`, delete `VatAuditLogRepository` + schema + per-domain route + seed, migrate the VAT frontend audit surface). Legacy table drop stays in Phase 9.
 
 ## Phase Update Template
 
@@ -386,3 +443,25 @@ Next safe step:
   - Namespaced actions explicitly include the required audit frontend and narrow timeline label/test updates; no timeline source repointing or dedup redesign.
   - OpenAPI + canonical `npm run gen:types` are mandatory; manual generated-type edits are forbidden. The append-only audit-repository rule requires a Phase-2 update to `docs/backend/architecture.md`.
 - Phase 2 remains not started. Revised execution prompt approved after final review.
+
+### Phase 2 — COMPLETED (2026-06-29)
+
+- Implemented the full Phase-2 surface (see the "Phase 2" section above for files/checks): append-only audit repositories (`AppendOnlyRepository`, no `BaseRepository` mutation surface — now an architecture rule); `EntityAuditWriter` `record_action`/`record_external_action` + §5a actor matrix + §16 fail-closed payload validation with the `actor_id is None` no-op removed; repository client-context queries (`list_by_entity`/`list_by_entities`/`list_for_client_context` §8b/`list_recent_activity`); repository-backed `AuditEntityRegistry` (23 entity types, `deadline_rule` excluded) + `resolve_scope` (firm/one/multi-client, soft + hard-delete-from-metadata) + current-role authorization; envelope-level `entity_deleted`; `metadata_json.client_record_id` enrichment + namespaced `<entity_type>.<verb>` actions across the existing client/business/charge/annual-report writes; forced timeline/dashboard label updates; frontend contracts/constants/formatter + surgical `generated.ts` + regenerated `openapi.json` (audit-only).
+- **Decision recorded (actor matrix):** narrow option chosen by the user — structural invariants fail-closed for all actor types and `actor_display_name` required for system/external_signer; for `user` it is encouraged but not fail-closed (FK fallback). Follow-up logged: strict `user → display required` + threading display names through internal orchestration/cascade/seed/excel paths (deferred, likely Phase 8).
+- **Decision recorded (§16 allowlist):** per-action field allowlist governs `metadata_json` (defined §8 contract); `old_value`/`new_value` carry the audited domain change, guarded by the recursive forbidden-key denylist + size caps.
+- Verification: backend `ruff`/`pyright` (0/0/0)/`vulture`/audit-scripts green, SQLite `create_all` builds, full `pytest` green (the user's full-suite run showed 5 stale failures whose fixes landed mid-run; re-running those 5 passes). Frontend typecheck/lint/test(59)/format/arch/arch:strict/knip green. No migration added.
+- Phase 3 (Replace VAT audit) not started.
+
+### Phase 2 — review-round fixes (2026-06-29)
+
+A code review found two P1 and several P2 issues; all addressed:
+
+- **P1 — bulk audit atomicity:** `BulkBillingService.bulk_action` caught `AppError` and continued while the per-charge status flush had already happened → a failed audit could leave a mutation to commit without its row (§17). Each item now runs in its own `db.begin_nested()` savepoint, so an audit failure rolls back that charge's mutation; other items are unaffected. (3 unit tests updated to use a real session.)
+- **P1 — fail-closed policy bypasses:** replaced the metadata-only allowlist with a full per-`(entity_type, action)` policy (`audit_write_policy.py`): positive `old_value`/`new_value` field allowlist (so `document_content`/raw content reject — in no allowlist), required + allowed `metadata_json` keys, `metadata_json`-must-be-an-object (a list no longer silently skips), action↔entity_type namespace match, recursive forbidden-key/raw-bytes denylist, size caps.
+- **P2 — `client.entity_type_changed`** is now a real semantic action via `record_action` (was `client.updated` + note); the back-compat alias in `audit_constants.py` was removed; frontend labels/filters updated.
+- **P2 — historical scope:** scope is now resolved from ALL of the entity's audit rows (unfiltered `list_by_entity`), never the current filtered/paged view; hard-deleted history returns 404 unless it is firm-level, self-scoped, or carries a usable `client_record_id`. Real `note`/`reminder` resolvers added (resolve via the target's registry descriptor) instead of always-empty.
+- **P2 — seed:** `seed/builders/users.py` now writes EntityAuditLog through `EntityAuditWriter` (namespaced actions + `metadata_json` + validation), backdating `performed_at` after.
+- **P2 — child identity metadata:** AR income/expense writes carry `section` + `line_id`; annex writes carry `line_id` + `line_number` (§7a).
+- **P2 — deterministic `generated.ts`:** the "21k churn" was a missing `prettier` step; with `gen + prettier` the diff is the 2 audit-relevant lines. Pinned `openapi-typescript@7.13.0` as a devDependency, `gen:types` now runs the local binary + `prettier --write`, and `generated.ts` was regenerated deterministically (`entity_deleted: boolean` required, matching the generator; the surgical optional `?` was wrong).
+- **Policy gaps caught by production-path tests (now fixed):** added `annual_report.deleted` policy; allowlisted `advance_rate_updated_at` (server-stamped, audited on `client.updated`) and `source_vat_categories` (vat-import expense provenance).
+- Verification after fixes: `tests/charges tests/clients tests/businesses tests/annual_reports tests/audit` → 324 passed, 1 skipped; `ruff`/`pyright` green. Audit test files updated by a second pass (Codex) for the required-metadata policy: 48 passed.

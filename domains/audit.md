@@ -30,7 +30,7 @@ The audit refactor (see `docs/audit-refactor-implementation-plan.md`) converges 
 |--------|------|---------|
 | `GET` | `/api/v1/audit/{entity_type}/{entity_id}` | Return paginated audit entries for one supported entity instance. |
 
-The router is defined with `prefix="/audit"` at `backend/app/audit/api/routes.py:10-27`, and the effective path exists in `backend/openapi.json:11607-11680`.
+The router is defined with `prefix="/audit"` in `backend/app/audit/api/audit_routes.py`, and the effective path is exported in `backend/openapi.json`.
 
 ## Model & fields
 
@@ -57,41 +57,56 @@ Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(p
 
 ### Response schema
 
-`EntityAuditLogResponse` exposes the stored fields (`old_value`/`new_value`/`metadata_json` as JSON objects, `actor_type`, `actor_display_name`, nullable `performed_by`) plus the read-time-enriched `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `page`, and `page_size`. Source: `backend/app/audit/schemas/audit_entity_audit_log.py`; OpenAPI components: `backend/openapi.json`.
+`EntityAuditLogResponse` exposes the stored fields (`old_value`/`new_value`/`metadata_json` as JSON objects, `actor_type`, `actor_display_name`, nullable `performed_by`) plus the read-time-enriched `performed_by_name`; `EntityAuditTrailResponse` wraps `items`, `total`, `page`, `page_size`, and an envelope-level `entity_deleted: bool` (true when the audited entity is soft- or hard-deleted; history stays readable). Source: `backend/app/audit/schemas/audit_entity_audit_log.py`; OpenAPI components: `backend/openapi.json`.
 
 ## Enums / statuses
 
-This domain does not use Python enums for audit entity types or actions. Current exact string constants are:
+This domain does not use Python enums for audit entity types or actions. As of Phase 2, persisted `action` values are **namespaced** `<entity_type>.<verb>` (never bare). Constants live in `backend/app/audit/audit_constants.py`:
 
-- Readable `entity_type` values: `annual_report`, `business`, `charge`, `client`. Source: `backend/app/audit/constants.py:8-18`.
-- Shared action constants: `created`, `updated`, `deleted`, `restored`, `entity_type_changed`. Source: `backend/app/audit/constants.py:23-28`.
-- Charge action constants: `issued`, `paid`, `canceled`. Source: `backend/app/audit/constants.py:30-33`.
-- Annual-report action constants: `status_changed`, `annual_report_detail_updated`, `annual_report_deadline_updated`, `annex_line_added`, `annex_line_updated`, `annex_line_deleted`, `income_added`, `income_updated`, `income_deleted`, `expense_added`, `expense_updated`, `expense_deleted`. Source: `backend/app/audit/constants.py:35-49`.
+- Entity-type constants `ENTITY_*` cover the full §6 set (23 types) and are the canonical keys for the registry.
+- Generic verbs (`created`/`updated`/`deleted`/`restored`/`status_changed`) are *bare* building blocks; the writer composes the namespace via `entity_action(entity_type, verb)` → e.g. `client.created`, `annual_report.status_changed`. `client.entity_type_changed` is a first-class semantic action (`ACTION_ENTITY_TYPE_CHANGED`).
+- Charge-specific actions are pre-namespaced: `charge.issued`, `charge.paid`, `charge.canceled` (`ACTION_CHARGE_*`).
+- Annual-report actions are pre-namespaced: `annual_report.updated` (detail edits), `annual_report.deadline_updated`, `annual_report.{income,expense}_line_{added,updated,deleted}`, `annual_report.annex_line_{added,updated,deleted}`.
+
+`ALLOWED_READ_ENTITY_TYPES` is **derived from the registry** (`allowed_read_entity_types()`), never hand-maintained.
 
 ## Domain rules & invariants
 
-- The only HTTP route is read-only and role-gated to `ADVISOR` and `SECRETARY`. Source: `backend/app/audit/api/routes.py:13-27`.
-- The read API rejects any `entity_type` not present in `ALLOWED_READ_ENTITY_TYPES` with `AUDIT.INVALID_ENTITY_TYPE`. Source: `backend/app/audit/services/audit_trail_service.py:35-37`.
-- Read access first verifies that the target entity exists in its owning repository (`ClientRecord`, `Business`, `Charge`, or `AnnualReport`) and raises `AUDIT.ENTITY_NOT_FOUND` with HTTP 404 when absent. Source: `backend/app/audit/services/audit_trail_service.py:39-53`.
-- The read API accepts `page` and `page_size` query parameters; the service translates them to repository `limit`/`offset` internally. It also accepts optional filters `action` (str), `user_id` (int, matched against `performed_by`), and `created_after`/`created_before` (datetime, matched against `performed_at`). Audit trail queries are always scoped to the exact `(entity_type, entity_id)` pair, narrowed by any supplied filters, and ordered newest-first by `performed_at DESC, id DESC`. Source: `backend/app/audit/api/routes.py:18-27`, `backend/app/audit/services/audit_trail_service.py:55-75`, `backend/app/audit/repositories/entity_audit_log_repository.py:37-61`.
-- Display reads **prefer the immutable `actor_display_name` snapshot** over the live-join `performed_by_name`. `performed_by_name` is not stored on the audit row; it is enriched at read time by bulk-loading distinct user ids from `users` (so it tracks renames), and is exposed only as a fallback for legacy rows without a snapshot. A user rename therefore changes `performed_by_name` but never `actor_display_name`. Source: `backend/app/audit/services/audit_trail_service.py`; frontend `AuditTrailTable` prefers `actor_display_name → performed_by_name → #id → —`.
-- Audit rows are append-only by design: the model has no soft-delete columns and no update path in this module. Corrections are represented by new rows, not edits to existing ones. Source: `backend/app/audit/models/entity_audit_log.py:4-12,24-44`.
-- `EntityAuditWriter.append()` is a no-op when `actor_id` is `None`; callers only get an audit row when a concrete actor id is available (system / external-signer actor handling via `actor_type` is a later phase). Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
-- `EntityAuditWriter` normalizes payload snapshots (enums to `.value`, datetimes/dates to ISO strings, decimals to strings, raw string payloads wrapped as `{"value": ...}`) and stores the resulting **dict/list object directly** in the JSONB column — it no longer `json.dumps` snapshots into strings. Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
-- Every `EntityAuditWriter` write passes `actor_type` (default `"user"`) and threads `actor_display_name` from the route's `current_user.full_name`. Source: the 30 existing write sites across clients/businesses/charges/annual_reports.
+- The only HTTP route is read-only and role-gated to `ADVISOR` and `SECRETARY`. Both roles may read every audit trail; `scope_to_active_clients_stmt` is a live-listing deleted-client filter, NOT authorization, and audit reads bypass it so deleted history stays readable. Source: `backend/app/audit/api/audit_routes.py`.
+- The read API rejects any `entity_type` not present in the registry with `AUDIT.INVALID_ENTITY_TYPE`. Source: `backend/app/audit/services/audit_trail_service.py`.
+- **Read flow (registry-backed):** validate `entity_type ∈ registry` → fetch audit rows → resolve the live entity via the registry/scope repository with `include_deleted` → if the live row is absent, resolve client context from immutable `metadata_json.client_record_id` → return `AUDIT.ENTITY_NOT_FOUND` (404) **only when neither a live entity nor usable historical audit metadata exists** → authorize the current ADVISOR/SECRETARY role → apply the sensitive-data hook → map to response. `entity_deleted` is set once on the envelope. Source: `backend/app/audit/services/audit_trail_service.py`.
+- The read API accepts `page`/`page_size` plus optional `action`, `user_id` (→ `performed_by`), `created_after`/`created_before` (→ `performed_at`). Trail queries are scoped to the exact `(entity_type, entity_id)` pair, newest-first by `performed_at DESC, id DESC`. Source: `backend/app/audit/repositories/audit_entity_audit_log_repository.py`.
+- Display reads **prefer the immutable `actor_display_name` snapshot** over the live-join `performed_by_name` (the latter tracks renames and is a fallback only). Source: `backend/app/audit/services/audit_trail_service.py`; frontend `AuditTrailTable` prefers `actor_display_name → performed_by_name → #id → —`.
+- **Append-only repositories (Phase 2):** `EntityAuditLogRepository` + `UserAuditLogRepository` extend `AppendOnlyRepository`, not `BaseRepository` — they expose only `append`/`create` + read queries and have NO `update`/`delete`/`soft_delete`/`hard_delete`. Corrections are new rows. Source: `backend/app/common/repositories/append_only_repository.py`.
+- **Same-transaction, fail-closed writes (Phase 2):** `EntityAuditWriter` validates every write (actor matrix + payload safety) and appends in the caller's transaction. An invalid payload or failed insert raises and rolls the domain mutation back; a rolled-back mutation leaves no orphan audit row. The old `actor_id is None` no-op is removed. Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
+- `EntityAuditWriter` normalizes payload snapshots (enums→`.value`, dates→ISO, decimals→str, bare strings→`{"value": ...}`) and stores the dict/list object directly in the JSONB column. Source: `backend/app/audit/services/audit_entity_audit_writer_service.py`.
+
+## Registry, scope, actor matrix & sensitive-data policy (Phase 2)
+
+- **`AuditEntityRegistry`** (`backend/app/audit/audit_entity_registry.py`) holds a pure descriptor per `entity_type` (model, resolution `strategy`, `sensitive` flag). It executes no SQL. `ALLOWED_READ_ENTITY_TYPES` is derived from it. `deadline_rule` is intentionally excluded (no per-row UI edit route; conditional per plan §6).
+- **Scope resolution** runs in `AuditScopeRepository` (DB access only) and is interpreted by `AuditTrailService` into an `AuditScope` (`client_ids`, `firm_level`, `entity_deleted`, `resolved_from = live_table | audit_metadata`). It supports firm-level / one / many clients, soft-deleted (live row + `include_deleted`), and hard-deleted (live row gone → client_ids from `metadata_json.client_record_id`). Scope is context, NOT per-user authorization.
+- **Actor validation matrix (§5a)** — fail-closed on every write: `actor_type ∈ {user, system, external_signer}`; `user` requires `performed_by`; `system`/`external_signer` require `performed_by = None` AND `actor_display_name`. For `user` rows `actor_display_name` is strongly encouraged but NOT fail-closed (the `performed_by` FK gives a read-time fallback); strict enforcement + universal name-threading is a tracked follow-up (see progress log). Source: `backend/app/audit/audit_write_policy.py`.
+- **Fail-closed payload safety (§16)** — a per-`(entity_type, action)` policy (`ACTION_POLICIES`): a positive top-level field allowlist for `old_value`/`new_value` (bounded by the request/snapshot shapes, so document content / unexpected fields reject — they are in no allowlist), required + allowed `metadata_json` keys, and `metadata_json`-must-be-an-object (a list/scalar rejects, never silently skips). The action's `<entity_type>.` prefix must match the row's entity_type. Defense-in-depth: a recursive forbidden-key denylist (`password*`/`token*`/`secret*`/`signing*`/`*content*`/keys + raw bytes) and compact-UTF-8-JSON size caps (`old_value`/`new_value` 32 KiB each, `metadata_json` 16 KiB). An action with no registered policy is rejected. Source: `backend/app/audit/audit_write_policy.py`.
+- **Sensitive-data hook** — sensitive entity types (`signature_request`) pass through a service-owned hook. Under the current two-role model both ADVISOR and SECRETARY preserve the same forensic fields; forbidden data is rejected at write time. There is no lower-privilege authenticated role, so no per-role redaction exists. Source: `backend/app/audit/services/audit_trail_service.py`.
+- **`metadata_json.client_record_id`** is enriched on every existing client/business/charge/annual-report write (plus `business_id`/`tax_year` where relevant) so client-context reads and the §8b expression index work.
 
 ## Error codes
 
 The audit module raises these `AUDIT.*` codes:
 
-- `AUDIT.INVALID_ENTITY_TYPE` for unsupported read targets. Source: `backend/app/audit/services/audit_trail_service.py:35-37`.
-- `AUDIT.ENTITY_NOT_FOUND` when the requested entity id does not exist for the validated type. Source: `backend/app/audit/services/audit_trail_service.py:50-53`.
+- `AUDIT.INVALID_ENTITY_TYPE` for unsupported read targets.
+- `AUDIT.ENTITY_NOT_FOUND` (404) when neither a live entity nor usable historical audit metadata exists.
+- `AUDIT.INVALID_ACTOR` (500) when a write violates the §5a actor matrix.
+- `AUDIT.FORBIDDEN_FIELD` (500) for a forbidden/non-allowlisted payload field (§16).
+- `AUDIT.PAYLOAD_TOO_LARGE` (500) when a normalized payload exceeds its size cap (§16).
+
+Source: `backend/app/audit/services/audit_trail_service.py`, `backend/app/audit/audit_write_policy.py`.
 
 Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 
-No open known issues.
+- **§5a follow-up (deferred):** `actor_display_name` is fail-closed only for `system`/`external_signer`; for `user` rows it is encouraged but not enforced (the `performed_by` FK gives a read-time fallback). Audit rows written by internal machine paths (obligation orchestrator, freeze/close cascade, seed, excel import) therefore may carry no name snapshot and are not rename-stable. Strict `user → display required` + threading a display name through every such path is tracked for a later phase. See `docs/audit-refactor-progress.md` and `docs/audit-refactor-implementation-plan.md` §5a.
 
 ## Decisions (preserved)
 
@@ -99,7 +114,7 @@ Still-true decisions preserved from the shared historical reference `backend/doc
 
 1. `AuditTrail` is the accountability log for audited entity changes, separate from the operational `Timeline`. Source: `backend/docs/history-vs-timeline.md:18-22`.
 2. The system should not dump the full audit stream into timeline views; timeline may use only selected high-value audit-derived events, while audit remains the complete record. Source: `backend/docs/history-vs-timeline.md:20-22`.
-3. Generic audit inspection is intentionally scoped around the entity families `client`, `business`, `charge`, and `annual_report`, which matches the current `ALLOWED_READ_ENTITY_TYPES`. Source: `backend/docs/history-vs-timeline.md:24-29`; `backend/app/audit/constants.py:8-18`.
+3. Generic audit inspection is registry-driven (Phase 2). `client`, `business`, `charge`, and `annual_report` are the families that currently *write* audit; the registry additionally declares the full §6 entity set so reads/scope are defined for every audited type as later phases add their writes. `ALLOWED_READ_ENTITY_TYPES` is derived from the registry. Source: `backend/app/audit/audit_entity_registry.py`.
 
 ## Future / planned
 

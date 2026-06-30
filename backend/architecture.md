@@ -57,6 +57,7 @@ app/<domain>/
 - Repositories must not raise FastAPI `HTTPException`.
 - Repositories flush after writes but must not commit transactions.
 - `BaseRepository` subclasses must set a class-level `model`.
+- Append-only audit repositories must NOT inherit `BaseRepository`. `EntityAuditLogRepository` and `UserAuditLogRepository` extend `AppendOnlyRepository` (`app/common/repositories/append_only_repository.py`), which exposes only the session handle + the shared pagination helper and deliberately provides no `update`/`delete`/`soft_delete`/`hard_delete`. Audit rows are immutable: a correction is a new row, never an edit or delete, and no audit mutation/delete HTTP route exists. Audit writes are append-only and run in the caller's transaction (the writer raises and rolls the domain mutation back on any invalid/oversized payload).
 - Repositories must not re-implement a `BaseRepository` method (e.g. `get_by_id`, `soft_delete`) when the inherited behavior is identical; override only to add real, differing behavior such as a non-`deleted_at` soft-delete column.
 - `BaseRepository.get(..., include_deleted=True)` is the explicit way to preserve identity-map-style
   lookup semantics for soft-deleted rows. Do not replace `Session.get()` with `get_by_id()` when the
