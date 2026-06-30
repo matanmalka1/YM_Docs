@@ -43,7 +43,7 @@ Main logic: `backend/app/binders/services/binder_intake_service.py`
      - If `open_new_binder=True` and active binder exists: set `active_binder.period_end` (from last material's structured period), then `mark_full()`.
      - Require `office_client_number` set on client.
      - Create new `Binder` with `binder_number = f"{office_client_number}/{seq}"`.
-     - Create `BinderLifecycleLog` initial state.
+     - Record creation as one `binder.created` `EntityAuditLog` row (Phase 5; was `BinderLifecycleLog` initial state).
      - `is_new_binder = True`.
 
 4. **Lifecycle transition** (existing binders only):
@@ -71,7 +71,7 @@ Main logic: `backend/app/binders/services/binder_intake_service.py`
 
 | Domain | Role |
 |--------|------|
-| `binders` | Creates BinderIntake, BinderIntakeMaterials; conditionally creates Binder, BinderLifecycleLog |
+| `binders` | Creates BinderIntake, BinderIntakeMaterials; conditionally creates Binder; writes `binder.*` EntityAuditLog rows |
 | `vat` | Conditionally updates VatWorkItem (PENDING_MATERIALS → MATERIAL_RECEIVED) |
 | `clients` | Reads ClientRecord (guard) |
 | `businesses` | Reads Business list (guard: all-locked check) |
@@ -83,7 +83,7 @@ Main logic: `backend/app/binders/services/binder_intake_service.py`
 | `BinderIntake` | Always created |
 | `BinderIntakeMaterial` | Created for each material in the request |
 | `Binder` | Created if new binder needed |
-| `BinderLifecycleLog` | Created on new binder; updated on lifecycle transitions |
+| `EntityAuditLog` (`binder.*`) | `binder.created` on new binder; `binder.material_received` / lifecycle actions on transitions (Phase 5; was `BinderLifecycleLog`) |
 | `Binder.period_start` | Backfilled from first material if was None |
 | `Binder.period_end` | Set on old active binder when `open_new_binder=True` |
 | `VatWorkItem.status` | Changed PENDING_MATERIALS → MATERIAL_RECEIVED for linked VAT items |
@@ -151,7 +151,7 @@ Patchable fields (all optional):
 - `client_record_id`, `binder_id` — transfer to another binder/client
 - `business_ids`, `annual_report_ids`, `vat_report_ids` — FK replacement with cross-client ownership validation
 
-The `binder_id` path param scopes the lookup; a mismatched intake returns 404. All changes write one `BinderIntakeEditLog` row per mutated field.
+The `binder_id` path param scopes the lookup; a mismatched intake returns 404. All changes write one `binder_intake.updated` `EntityAuditLog` row per mutated field (Phase 5; was `BinderIntakeEditLog`).
 
 ## 14. Documentation Target
 

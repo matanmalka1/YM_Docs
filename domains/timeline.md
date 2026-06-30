@@ -68,9 +68,9 @@ The domain has no enum models of its own. Event types are string constants assem
 
 | `event_type` | Trigger |
 |---|---|
-| `binder_received` | Binder has `received_at` or `period_start` |
-| `binder_handed_over` | Binder `handed_over_at` is set |
-| `binder_lifecycle_change` | `BinderLifecycleLog` entry with a meaningful transition |
+| `binder_received` | Binder has `received_at` or `period_start` (live builder) |
+| `binder_handed_over` | Binder `handed_over_at` is set (live builder) |
+| `binder_lifecycle_change` | `EntityAuditLog` `binder.*` row for a capacity/location transition (`marked_full`, `reopened`, `marked_ready_for_handover`, `reverted_ready`); since Phase 5 sourced from `EntityAuditLog`, not the legacy `BinderLifecycleLog`. `binder.created`/`material_received`/`handed_over` are excluded — reception and handover are covered by the live builders above. |
 
 ### Charge / invoice events (`backend/app/timeline/services/timeline_charge_event_builders.py`)
 
@@ -85,7 +85,7 @@ The domain has no enum models of its own. Event types are string constants assem
 
 | `event_type` | Trigger |
 |---|---|
-| `annual_report_status_changed` | One row per `AnnualReportStatusHistory` entry |
+| `annual_report_status_changed` | One row per `EntityAuditLog` entry with action `annual_report.status_changed` |
 
 ### Client / document events (`backend/app/timeline/services/timeline_client_builders.py`)
 
@@ -128,13 +128,11 @@ All rules sourced from `backend/app/timeline/services/timeline_service.py` unles
 
 3. **Full aggregation, then sort, then paginate.** All events from all sources are collected in memory, sorted descending by `timestamp`, then sliced by `(page-1)*page_size : page*page_size`. `total` reflects the pre-slice count. (`timeline_service.py:106-109`)
 
-4. **Per-client bulk safety cap: `_TIMELINE_BULK_LIMIT = 500`.** Applied to high-volume sources: charges, permanent documents, signature lifecycle events, annual report status history, and notifications. Events beyond this cap per source are silently truncated — oldest events disappear without notice. (`timeline_service.py:39`, `timeline_repository.py:11`)
+4. **Per-client bulk safety cap: `_TIMELINE_BULK_LIMIT = 500`.** Applied to high-volume sources: charges, permanent documents, signature lifecycle events, annual report status audit events, and notifications. Events beyond this cap per source are silently truncated — oldest events disappear without notice. (`timeline_service.py:39`, `timeline_repository.py:11`)
 
-5. **Binder lifecycle deduplication.** Two classes of binder lifecycle log rows are dropped to reduce noise (`timeline_service.py:123-126`):
-   - Rows where `old_value == new_value` and `notes != BINDER_RECEIVED`.
-   - Rows where `old_value in (None, "null")` and `new_value == "in_office"` — suppressed because a `binder_received` event already covers this transition.
+5. **Binder lifecycle source (Phase 5).** Binder lifecycle events are read from `EntityAuditLog` `binder.*` rows via an explicit action allowlist (`marked_full`, `reopened`, `marked_ready_for_handover`, `reverted_ready`) — `binder.created`, `binder.material_received`, and `binder.handed_over` are excluded so reception/handover stay single-sourced from the live `binder_received`/`binder_handed_over` builders. This replaced the legacy `BinderLifecycleLog` reader and its old-value/new-value dedup heuristics. (`timeline_service.py`)
 
-6. **Annual report events from history, not report row.** Events are emitted per `AnnualReportStatusHistory` row (one event per status transition), not from the current report state. (`timeline_service.py:144-159`)
+6. **Annual report events from audit, not report row.** Events are emitted per `EntityAuditLog` row where `entity_type = annual_report` and `action = annual_report.status_changed` (one event per audited status transition), not from the current report state. (`timeline_repository.py:63-110`, `timeline_service.py:206-207`)
 
 7. **Signature events from audit log, not request row.** Events are emitted per `SignatureAuditEvent` row for the lifecycle types `sent`, `signed`, `declined`, `canceled`, `expired`. (`timeline_repository.py:41-59`)
 

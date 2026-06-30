@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 3 COMPLETED (VAT audit moved end-to-end from legacy `VatAuditLog` read/write path to generic `EntityAuditLog`, including frontend VAT History migration). Phase 4 not started.
+Status: Phase 5 COMPLETED (binder lifecycle + intake-edit audit moved to generic `EntityAuditLog` after Phase 4 moved annual-report status audit). Phase 6 not started.
 
 Current phase:
-- Phase 3 — Replace VAT audit (Completed)
+- Phase 5 — Replace binder lifecycle/intake logs (Completed)
 
 Next phase:
-- Phase 4 — Replace AnnualReportStatusHistory + child actions (not started)
+- Phase 6 — Replace SignatureAuditEvent (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -88,8 +88,8 @@ Progress log:
 | Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Completed | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b (PG round-trip + fail-safe proven), serializer/reader JSON-object switch, threaded actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regenerated generic-audit OpenAPI/types/frontend, docs/domains/audit.md | this file (Phase 1 section) |
 | Phase 2 | Writer/repository + registry/authz | Completed | Append-only repos; writer record_action/record_external_action + §5a actor matrix + §16 validation (no-op removed); repo client-context queries; AuditEntityRegistry + resolve_scope (23 types) + role authz; envelope entity_deleted; metadata enrichment + namespaced actions; frontend synced | this file (Phase 2 section) |
 | Phase 3 | Replace VAT audit | Completed | VAT writes/read UI moved to EntityAuditLog generic audit; legacy VAT audit route/repo/schema/seed removed; table kept for Phase 9 | this file (Phase 3 section) |
-| Phase 4 | Replace AnnualReportStatusHistory | Not started | Move status + child actions to EntityAuditLog | TBD |
-| Phase 5 | Replace binder lifecycle/intake logs | Not started | Move binder audit to EntityAuditLog | TBD |
+| Phase 4 | Replace AnnualReportStatusHistory | Completed | Annual-report status writes/read UI/timeline moved to EntityAuditLog generic audit; legacy AR audit route/repo/schema removed; table kept for Phase 9 | this file (Phase 4 section) |
+| Phase 5 | Replace binder lifecycle/intake logs | Completed | Binder lifecycle + intake-edit audit moved to EntityAuditLog; timeline + dashboard binder sources repointed; legacy route/service/repos/schemas removed; frontend on generic route | this file (Phase 5 section) |
 | Phase 6 | Replace SignatureAuditEvent | Not started | Move signature audit and drawer trail to EntityAuditLog | TBD |
 | Phase 7 | Rebuild timeline/dashboard | Not started | Single-source registry, no duplicates | TBD |
 | Phase 8 | Add missing audit writes | Not started | Add remaining domain audit coverage | TBD |
@@ -450,7 +450,7 @@ Next safe step:
 - **Decision recorded (actor matrix):** narrow option chosen by the user — structural invariants fail-closed for all actor types and `actor_display_name` required for system/external_signer; for `user` it is encouraged but not fail-closed (FK fallback). Follow-up logged: strict `user → display required` + threading display names through internal orchestration/cascade/seed/excel paths (deferred, likely Phase 8).
 - **Decision recorded (§16 allowlist):** per-action field allowlist governs `metadata_json` (defined §8 contract); `old_value`/`new_value` carry the audited domain change, guarded by the recursive forbidden-key denylist + size caps.
 - Verification: backend `ruff`/`pyright` (0/0/0)/`vulture`/audit-scripts green, SQLite `create_all` builds, full `pytest` green (the user's full-suite run showed 5 stale failures whose fixes landed mid-run; re-running those 5 passes). Frontend typecheck/lint/test(59)/format/arch/arch:strict/knip green. No migration added.
-- Phase 3 (Replace VAT audit) completed; Phase 4 not started.
+- Phase 3 (Replace VAT audit) completed; later sections record Phase 4 and Phase 5 completion.
 
 ### Phase 2 — review-round fixes (2026-06-29)
 
@@ -493,5 +493,82 @@ Verification reported for Phase 3:
 Behavior note:
 - Invoice add/update/delete/amount-change events now live on the `vat_invoice` audit trail. A VAT work-item History tab that reads only `/audit/vat_work_item/{id}` shows only work-item lifecycle events, not invoice events. This is the intended entity split. Product review of whether a combined VAT-period history view is needed is tracked in `docs/vat-history-product-followup.md`.
 
+### Phase 4 — COMPLETED (2026-06-30)
+
+Goal:
+- Replace AnnualReportStatusHistory end-to-end for production status audit behavior: move annual-report status writes/reads off the legacy repository/schema/route and onto generic `EntityAuditLog`, including the annual-report frontend audit consumer and timeline status-event source. Keep the legacy table/model for the Phase 9 cleanup migration.
+
+Files changed:
+- Backend: annual-report status/create/query services and status route, annual-report repository composition, annual-report response schemas, timeline repository, targeted annual-report/timeline/OpenAPI tests, and `openapi.json`.
+- Deleted backend code: `app/annual_reports/repositories/annual_report_status_audit_repository.py` and the annual-report-local `GET /annual-reports/{id}/audit` route/list schema. `AnnualReportStatusHistory` model/table remain until Phase 9.
+- Frontend: annual-report timeline panel moved from the deleted annual-report audit API/query/component to the generic audit feature; annual-report audit endpoint/query/type/component dead code removed; `generated.ts` regenerated after OpenAPI export.
+- Docs: `docs/domains/annual-reports.md`, `docs/domains/audit.md`, `docs/domains/timeline.md`, and `docs/flows/02-annual-report-status-transition.md` document the Phase 4 behavior.
+
+Implementation summary:
+- Removed the three production `append_status_audit_entry` write sites. Creation keeps `annual_report.created`; status transitions write `annual_report.status_changed`; deadline updates write `annual_report.deadline_updated`.
+- Status-change audit rows preserve old/new status, note, `client_record_id`, `tax_year`, actor id, and `actor_display_name` from the route's current user.
+- Timeline annual-report status events now read `EntityAuditLog` rows for `annual_report.status_changed`, preserving the existing `annual_report_status_changed` event shape and Hebrew labels.
+- Generic reads are served by `/api/v1/audit/annual_report/{id}` through `AuditTrailService`; ADVISOR and SECRETARY can read the trail.
+
+Verification reported for Phase 4:
+- Targeted backend annual-report/timeline/OpenAPI tests cover generic annual-report audit reads, secretary access, old-route removal, timeline source migration, and status-mutation rollback on audit failure.
+- Frontend annual-report audit migration checks regenerated OpenAPI types and ran the annual-report-relevant type/lint/test surface.
+
+## Phase 5 — Replace binder lifecycle + intake logs
+
+Status:
+- Completed
+
+Date:
+- 2026-06-30
+
+Goal:
+- Move binder lifecycle and intake-edit audit off the legacy `BinderLifecycleLog` / `BinderIntakeEditLog` repositories and onto generic `EntityAuditLog`, end-to-end: writers, generic read route, the binder timeline reader, the dashboard recent-activity binder branch, and the binder frontend audit consumer. Keep `BinderIntakeEditService` (repoint its writes only). Delete the per-domain binder audit route + `BinderAuditService` + both log repositories + binder audit schemas. Legacy tables kept for the Phase-9 cleanup migration.
+
+Files changed:
+- Backend (new): `app/binders/binder_audit.py` (metadata + lifecycle/intake snapshot helpers, the Phase-3 `vat_audit.py` analog).
+- Backend (audit shared, append-only): `app/audit/audit_constants.py` (binder lifecycle `ACTION_BINDER_*` + `ACTION_BINDER_INTAKE_UPDATED`), `app/audit/audit_write_policy.py` (per-action policies for the 7 binder lifecycle actions + `binder_intake.updated`; binder/intake metadata allowlists). The registry already declared `binder`/`binder_intake`/`binder_handover` (Phase 2) — no registry change.
+- Backend (writers): `app/binders/services/binder_lifecycle_service.py` (dropped `BinderLifecycleLogRepository`; `_append_log`→`_record` via `EntityAuditWriter`; 7 `_append_log` sites → rich semantic `binder.*` actions; `log_initial_state` collapses the two `null→in_office`/`null→open` rows into one `binder.created`; threads `actor_display_name`). `app/binders/services/binder_intake_edit_service.py` (dropped `BinderIntakeEditLogRepository`; field changes → `binder_intake.updated` with `{"value": ...}` + field identity in metadata; service KEPT). Routes thread `current_user.full_name`: `binder_routes_receive_return.py` (6 lifecycle + bulk callers), `binder_routes_audit.py` (intake PATCH), `binder_handover_service.py` (grouped handover).
+- Backend (deletions): `app/binders/services/binder_audit_service.py`, `app/binders/repositories/binder_lifecycle_log_repository.py`, `app/binders/repositories/binder_intake_edit_log_repository.py`, the `GET /binders/{id}/audit` route, and the `BinderAuditEntry`/`BinderAuditResponse` schemas (`app/binders/schemas/binder.py`). `get_binder_intakes` moved from `BinderAuditService` to `BinderIntakeService`; the `/intakes` GET + PATCH routes stay. `BinderLifecycleLog` / `BinderIntakeEditLog` **models + tables** kept (Phase 9). `model_registry.py` keeps the model imports (unchanged).
+- Backend (timeline): `app/timeline/services/timeline_service.py` (binder branch only) — `_append_lifecycle_change_events` now reads `EntityAuditLog` `binder.*` via an action allowlist (`marked_full`/`reopened`/`marked_ready_for_handover`/`reverted_ready`), excluding `created`/`material_received`/`handed_over` (live builders cover reception/handover). Adapts each audit row to the existing `binder_lifecycle_change_event` builder via a `SimpleNamespace` view (builder file untouched). Dropped the unused `_status_str`.
+- Backend (dashboard): `app/dashboard/services/dashboard_recent_activity_service.py` — dropped `BinderLifecycleLogRepository`/`BinderRepository`/`binder_rows`/`_serialize_binder`/`_binder_label`/negative ids; binder activity flows through the single `EntityAuditLog` stream; binder labels from the action-label table; client resolved from `metadata_json.client_record_id`; `binder.marked_ready_for_handover`/`binder.handed_over` → `done`.
+- Frontend: `src/features/audit/api/contracts.ts` (`EntityAuditType` += `binder`,`binder_intake`), `src/features/audit/constants.ts` (binder verb labels + action lists + field labels, append-only), `src/features/binders/components/drawer/BinderAuditSection.tsx` (rewritten to render `EntityAuditTrailSection entityType="binder"` with binder field-value labels; same name/prop, drawer unchanged), removed dead `getAudit`/`BinderAuditResponse`/`BinderAuditEntry`/`binderAudit` endpoint/query-key/types and the now-unused `getBinder{Location,Capacity}StatusVariant` getters. `src/types/generated.ts` + `backend/openapi.json` regenerated (binder-audit-only diff).
+- Tests: rewrote `tests/binders/api/test_binder_audit.py` (generic `/audit/binder/{id}` returns lifecycle events; ADVISOR + SECRETARY read; pagination; old route 404), `tests/binders/service/test_binder_lifecycle_service.py` (assert `EntityAuditLog` `binder.*` actions + new atomicity rollback test), `tests/binders/service/test_binder_intake_edit_service.py` (assert `binder_intake.updated` rows + metadata), `tests/binders/api/test_binders.py` (initial-state → one `binder.created`), `tests/dashboard/service/test_recent_activity_service.py` (binder label/activity-type), new `tests/timeline/service/test_timeline_binder_lifecycle.py` (binder events from EntityAuditLog). Adjusted `tests/core/test_openapi_audit_paths.py` (binder old-route expectation removed) and `tests/regression/test_readonly_endpoints_no_side_effects.py` (binder audit read via generic route).
+- Docs: `docs/domains/binders.md` (audit section + endpoint table + intake-editing + decisions), `docs/domains/audit.md` (binder actions + Phase-5 generic-write set), `docs/domains/timeline.md` (binder source), `docs/domains/dashboard.md` (recent-activity binder source), `docs/flows/01`, `docs/flows/04`, `docs/flows/08`, and this progress log.
+
+Production code changed:
+- yes
+
+Migrations changed:
+- no (Phase 5 drops no tables; binder log tables drop in Phase 9)
+
+Schemas/OpenAPI changed:
+- yes (removed `BinderAuditResponse`/`BinderAuditEntry` + `GET /binders/{id}/audit`; binder lifecycle/intake now served by the existing generic `EntityAuditTrailResponse`)
+
+Frontend changed:
+- yes (generic audit consumer + contracts/constants + regenerated types)
+
+Tests/checks run:
+- Backend focused pytest: `tests/binders tests/timeline tests/dashboard tests/core/test_openapi_audit_paths.py tests/regression/test_readonly_endpoints_no_side_effects.py` → 127 passed. `ruff check` + `ruff format --check` clean on changed files; `pyright` 0/0/0 on changed app files (run with the project `pyrightconfig.json`); `rg` confirms no production refs to `BinderAuditService`/`BinderLifecycleLogRepository`/`BinderIntakeEditLogRepository`/old route/schemas/`_serialize_binder` remain. `export_openapi.py` + `check_contract_sync.py` → in sync (binder-audit-only diff, 191 lines removed).
+- Frontend: `gen:types` (deterministic, 112-line binder-audit-only diff), `typecheck`, `lint`, `arch:check`, `arch:check:strict`, `test` (59), `unused`/knip — all green.
+
+Result:
+- COMPLETED. Binder lifecycle + intake-edit audit, the binder timeline lifecycle source, the dashboard recent-activity binder branch, and the binder frontend audit surface are all off the legacy logs and on `EntityAuditLog`. `BinderIntakeEditService` preserved (writes repointed). Legacy route/service/repos/schemas removed; legacy tables retained for Phase 9. No annual-report/signature/VAT code touched.
+
+Important findings:
+- The per-domain binder "audit" router (`binder_routes_audit.py`) also hosts the `/intakes` GET + intake PATCH routes (which stay). Deleting `BinderAuditService` required moving its `get_binder_intakes` reader into `BinderIntakeService` rather than deleting it outright.
+- The pyright IDE diagnostics surfaced `responses=`/`isoformat` errors that the project's untracked `backend/pyrightconfig.json` suppresses; that config is not present in the Phase-5 git worktree. Copying it into the worktree (an untracked local file) reproduces the project's clean pyright result.
+- Timeline binder lifecycle reading lived in `timeline_service.py` (not `timeline_repository.py`); the binder branch was repointed in place and the existing `binder_lifecycle_change_event` builder reused via a row-shape adapter, so the builder file stayed untouched.
+
+Decisions made:
+- `log_initial_state` collapses the two legacy initial lifecycle rows into a single `binder.created` row (both statuses in `new_value`). The legacy timeline already suppressed the `null→in_office` row, so timeline output is unaffected.
+- Timeline binder lifecycle source excludes `binder.created`/`material_received`/`handed_over` (plan §4: reception + handover are live-builder territory). This also removes a prior duplicate where handover appeared as both `binder_handed_over` and a lifecycle-change event.
+- Dashboard binder rows use the action-label table rather than the audit `note` (binder notes are operational reason strings, not display labels), preserving the prior dashboard label set.
+- `actor_display_name` threaded from `current_user.full_name` on the lifecycle/intake/handover routes; internal callers (intake/onboarding `receive`, seed) pass none and rely on the `performed_by` FK fallback (§5a — `user` display is encouraged, not fail-closed).
+
+Risks/blockers:
+- Seed (`app/seed/builders/demo/binders.py`) still builds legacy `BinderLifecycleLog`/`BinderIntakeEditLog` rows directly; it is **out of Phase-5 scope** (seed is owned by Phase 9). The models/tables remain, so seed still imports and runs, but demo binder activity will not appear in the EntityAuditLog-backed dashboard/timeline until the seed is updated in Phase 9. Flagged for the Phase-9/integrator follow-up.
+- `openapi.json` + `generated.ts` are regenerated-per-branch throwaways; expect a regenerate-after-merge by the integrator (Phase 4 touches the same generated files).
+
 Next safe step:
-- Phase 4 — Replace `AnnualReportStatusHistory` + child actions end-to-end, including annual-report audit frontend and timeline status-events repointing. Do not start Phase 5+ until Phase 4 is reviewed.
+- Integrator review + merge alongside Phase 4 (shared files: `audit_constants.py`/`audit_write_policy.py` append-only, `contracts.ts` union member add, timeline files different branches, generated files regenerated). Phase 6 (signature) is the next replacement phase.

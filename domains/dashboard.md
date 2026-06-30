@@ -88,7 +88,7 @@ Composed of `monthly`, `bimonthly`, and nested `advance_payments` (itself monthl
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | int | Audit log row id (negative for binder lifecycle rows) |
+| `id` | int | `EntityAuditLog` row id (single stream; binder rows are no longer negated as of Phase 5) |
 | `date` | str | DD.MM.YYYY (Israel local time) |
 | `time` | str | HH:MM (Israel local time) |
 | `label` | str | Hebrew label from audit action/entity mapping |
@@ -104,7 +104,7 @@ Dashboard itself defines no enums. It references enums from other domains:
 - `WorkQueueUrgency` (`OVERDUE`, `APPROACHING`, `IMPORTANT`, `UPCOMING`) — work-queue domain; attention eligibility uses the first three (`_ATTENTION_URGENCIES`)
 - `WorkQueueSourceType` (`VAT_WORK_ITEM`, `ANNUAL_REPORT`, `ADVANCE_PAYMENT`, `CHARGE`, `BINDER`, `TASK`) — work-queue domain
 - `AnnualReportStatus` (`SUBMITTED`, `CLOSED`, `IN_PREPARATION`, `PENDING_CLIENT`, `COLLECTING_DOCS`) — annual-reports domain; used in tax-submission widget bucketing
-- `BinderLocationStatus` (`READY_FOR_HANDOVER`, `HANDED_OVER`, `IN_OFFICE`) — binders domain; used to label binder lifecycle activity items
+- `BinderLocationStatus` (`READY_FOR_HANDOVER`, `HANDED_OVER`, `IN_OFFICE`) — binders domain; binder recent-activity labels now come from the `binder.*` audit-action label table (Phase 5)
 
 ## Domain rules & invariants
 
@@ -140,12 +140,11 @@ Dashboard itself defines no enums. It references enums from other domains:
 - Returns `(0, None)` for secretary or when count is 0.
 - ILS formatted via `_format_ils` (strips trailing zeros, prepends `₪`).
 
-**Recent activity** (`recent_activity_service.py:74-95`):
-- Fetches up to 20 audit-log rows and 20 binder-lifecycle-log rows.
-- Merges both streams, sorts descending by timestamp, returns top 5.
-- Binder lifecycle IDs are negated (`-row.id`) to avoid collisions with audit log IDs.
+**Recent activity** (`recent_activity_service.py`):
+- Fetches up to 20 `EntityAuditLog` rows (single stream), sorts descending by timestamp, returns top 5.
+- As of Phase 5, binder activity comes from `EntityAuditLog` `binder.*` rows like every other entity — the legacy `BinderLifecycleLog` read path, the negative-id binder rows, and `_serialize_binder`/`_binder_label` are removed. Binder rows resolve their owning client from `metadata_json.client_record_id`.
+- Binder labels come from the action-label table (operational `note` reasons are not surfaced for binder rows); `activity_type` is `"done"` for `binder.marked_ready_for_handover` and `binder.handed_over`, else `"updated"`.
 - Timestamps localised to Israel timezone; tz-naive timestamps assumed UTC.
-- Activity type for binder rows: `"done"` if `new_value == READY_FOR_HANDOVER`, else `"updated"`.
 
 **Reference date** (`dashboard_overview_service.py:52-53`):
 - Defaults to `israel_today()` when not supplied. Production call never passes it; test harness may inject a date.
