@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 5 COMPLETED (binder lifecycle + intake-edit audit moved to generic `EntityAuditLog` after Phase 4 moved annual-report status audit). Phase 6 not started.
+Status: Phase 6 COMPLETED (signature-request audit, embedded drawer trail, and timeline signature source moved to generic `EntityAuditLog`). Phase 7 not started.
 
 Current phase:
-- Phase 5 — Replace binder lifecycle/intake logs (Completed)
+- Phase 6 — Replace SignatureAuditEvent (Completed)
 
 Next phase:
-- Phase 6 — Replace SignatureAuditEvent (not started)
+- Phase 7 — Rebuild timeline/dashboard (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -90,7 +90,7 @@ Progress log:
 | Phase 3 | Replace VAT audit | Completed | VAT writes/read UI moved to EntityAuditLog generic audit; legacy VAT audit route/repo/schema/seed removed; table kept for Phase 9 | this file (Phase 3 section) |
 | Phase 4 | Replace AnnualReportStatusHistory | Completed | Annual-report status writes/read UI/timeline moved to EntityAuditLog generic audit; legacy AR audit route/repo/schema removed; table kept for Phase 9 | this file (Phase 4 section) |
 | Phase 5 | Replace binder lifecycle/intake logs | Completed | Binder lifecycle + intake-edit audit moved to EntityAuditLog; timeline + dashboard binder sources repointed; legacy route/service/repos/schemas removed; frontend on generic route | this file (Phase 5 section) |
-| Phase 6 | Replace SignatureAuditEvent | Not started | Move signature audit and drawer trail to EntityAuditLog | TBD |
+| Phase 6 | Replace SignatureAuditEvent | Completed | Signature writers, embedded drawer trail, timeline signature source, seed, frontend drawer, OpenAPI/types moved to EntityAuditLog; legacy table kept for Phase 9 | this file (Phase 6 section) |
 | Phase 7 | Rebuild timeline/dashboard | Not started | Single-source registry, no duplicates | TBD |
 | Phase 8 | Add missing audit writes | Not started | Add remaining domain audit coverage | TBD |
 | Phase 9 | Cleanup migration + seeds | Not started | Drop legacy tables, update seeds | TBD |
@@ -361,7 +361,7 @@ Next safe step:
   - Phase 0 must produce a binding mutation→entity_type→action→old/new→metadata→actor matrix covering all audited domains (authority_contacts, notes, binder_handovers, reminders fired, documents, notifications, AR child actions); no implementation from the partial list.
   - Model JSON columns use JSON().with_variant(JSONB,"postgresql") for SQLite create_all safety; migrations stay PostgreSQL-specific with USING casts.
   - Phase-1 downgrade documented: JSONB→Text casts; performed_by stays nullable on downgrade (NOT NULL not safely restorable; rows not destroyed).
-  - Phase 6 acceptance is backend-only (response tests, OpenAPI impact, embedded trail re-sourced); frontend drawer verification moved to Phase 10.
+  - Phase 6 acceptance originally said backend-only, but this was superseded by the Phase-1/Phase-3 correction below: Phase 6 includes the frontend drawer because the embedded `audit_trail` item shape changes.
   - Verification commands: ruff format --check (not mutating ruff format); frontend lint/typecheck/test/format:check/arch:check/arch:check:strict/unused; "fix" removed.
   - Documentation ownership: primary audit docs in docs/domains/audit.md; docs/backend/architecture.md updated only if an architecture rule changes.
 - Next safe step remains Phase 0 only — and only after this plan correction.
@@ -514,6 +514,13 @@ Verification reported for Phase 4:
 - Targeted backend annual-report/timeline/OpenAPI tests cover generic annual-report audit reads, secretary access, old-route removal, timeline source migration, and status-mutation rollback on audit failure.
 - Frontend annual-report audit migration checks regenerated OpenAPI types and ran the annual-report-relevant type/lint/test surface.
 
+### Phase 6 — COMPLETED (2026-06-30)
+
+- Signature-request audit moved from `SignatureAuditEvent` to `EntityAuditLog` end-to-end: writers, embedded advisor drawer trail, timeline signature source, seed, backend tests, frontend drawer contracts/rendering, OpenAPI/generated types, and docs.
+- Preserved the legacy `signature_audit_events` model/table for Phase 9 cleanup only; no migration added and no initial migration rewrite.
+- Signature auto-submit annual-report transition now uses a real generic-audit system actor instead of `_SYSTEM_USER_ID=0`.
+- Verification recorded in the full Phase 6 section below.
+
 ## Phase 5 — Replace binder lifecycle + intake logs
 
 Status:
@@ -572,3 +579,58 @@ Risks/blockers:
 
 Next safe step:
 - Integrator review + merge alongside Phase 4 (shared files: `audit_constants.py`/`audit_write_policy.py` append-only, `contracts.ts` union member add, timeline files different branches, generated files regenerated). Phase 6 (signature) is the next replacement phase.
+
+## Phase 6 — Replace SignatureAuditEvent
+
+Status:
+- Completed
+
+Date:
+- 2026-06-30
+
+Goal:
+- Move signature-request audit off the legacy `SignatureAuditEvent` write/read path and onto generic `EntityAuditLog` end-to-end: lifecycle writers, embedded advisor `audit_trail`, timeline signature reader, seed, backend tests, frontend drawer contracts/rendering, OpenAPI/generated types, and docs. Keep the legacy table/model for Phase 9 cleanup only.
+
+Files changed:
+- Backend audit shared: `app/audit/audit_constants.py` (signature action constants), `app/audit/audit_write_policy.py` (per-action signature policies; `signed_document_key` nullable; `content_hash_missing=true` when needed), `app/audit/services/audit_entity_audit_writer_service.py` (system actor forwarding for status-change helper), `app/audit/services/audit_trail_service.py` (authorized unpaginated embedded item method).
+- Backend signature: new `app/signature_requests/signature_request_audit.py` helper; removed `app/signature_requests/repositories/signature_request_audit.py`; `SignatureRequestRepository` now owns CRUD only; creation/signer/admin/facade services write `signature_request.*` through `EntityAuditWriter`; embedded response schema is `SignatureRequestAuditItemResponse`; advisor route fetches embedded audit through `AuditTrailService`; response builder maps already-fetched items only.
+- Backend cross-domain/timeline/seed: `annual_report_status_service.py` accepts a narrow system-actor status-transition path for signature auto-submit (no `_SYSTEM_USER_ID=0`); `timeline_repository.py` and `timeline_client_builders.py` read signature lifecycle events from `EntityAuditLog`; demo signature seed writes generic audit rows and backdates `performed_at`.
+- Frontend/OpenAPI: `backend/openapi.json`, `frontend/src/types/generated.ts`, `frontend/src/features/signatureRequests/api/contracts.ts`, `constants.ts`, `api/index.ts`, and `SignatureRequestAuditDrawer.tsx` updated to the new embedded item fields and namespaced labels.
+- Tests: signature API/service/repository tests and `tests/timeline/service/test_timeline_signature_lifecycle.py` updated to assert generic audit rows, signer/system actors, missing-hash evidence, embedded shape, cancellation reason metadata, and unchanged five timeline event types.
+- Docs: `docs/domains/audit.md`, `docs/domains/signature-requests.md`, `docs/domains/timeline.md`, and this progress log.
+
+Production code changed:
+- yes
+
+Migrations changed:
+- no (legacy `signature_audit_events` table/model kept for Phase 9; initial migration untouched)
+
+Schemas/OpenAPI changed:
+- yes (`SignatureAuditEventResponse` replaced by `SignatureRequestAuditItemResponse`; `SignatureRequestWithAuditResponse.audit_trail` item shape changed)
+
+Frontend changed:
+- yes (drawer contract/rendering, labels, generated types)
+
+Tests/checks run:
+- Backend focused: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m pytest tests/signature_requests tests/timeline/service/test_timeline_signature_lifecycle.py` → 43 passed.
+- Backend focused lint: `APP_ENV=test JWT_SECRET=x ./.venv/bin/ruff check app/audit app/signature_requests app/timeline app/annual_reports/services/annual_report_status_service.py app/seed/builders/demo/signature_requests.py tests/signature_requests tests/timeline/service/test_timeline_signature_lifecycle.py --fix` → clean after import/order fixes.
+- OpenAPI/types: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json`; `npm run gen:types` rerun after export. Diff is signature-schema only for generated types.
+- Frontend focused: `npm run typecheck` and `npm run lint` passed.
+
+Result:
+- COMPLETED. Production signature-request audit no longer writes or reads `SignatureAuditEvent`; embedded advisor audit history is authorized through `AuditTrailService` and displays the new item shape; timeline signature events keep the same five event types; signature auto-submit no longer uses `_SYSTEM_USER_ID=0`; OpenAPI/generated types are synced for the signature surface. No migration added.
+
+Important findings:
+- The Phase-2 signature policy predeclared `signature_request.signed` with `signed_document_key` required. Phase 6 corrected this to match §8a: `signed_document_key` is captured only when available, while `content_hash` is captured when available and otherwise `content_hash_missing=true`.
+- The embedded audit service method returns items in chronological order to preserve the old drawer behavior; the generic audit endpoint remains newest-first.
+- Remaining `SignatureAuditEvent` references are the retained legacy ORM model/table and historical docs/Phase-0 inventory, not production writers/readers.
+
+Decisions made:
+- Preserved `signature_request.annual_report_signed` as a namespaced generic audit action instead of dropping it, because current code/docs expose that event in the drawer.
+- Kept decline reason as the audit `note` snapshot for timeline parity; cancellation/expiry reasons are additionally stored in metadata when available.
+
+Risks/blockers:
+- Full backend/frontend suites were not yet run at this point in the log; run them before final merge if this branch is used as the release gate.
+
+Next safe step:
+- Phase 7 — Rebuild timeline/dashboard single-source registry and duplicate handling. Do not drop legacy `signature_audit_events` until Phase 9.

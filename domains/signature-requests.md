@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 Manages the full lifecycle of digital signature requests sent to clients for legally-binding approval of documents. Built under Israeli Electronic Signature Law 5761-2001: every request anchors to a `client_record_id`, carries a one-time signing token, captures a content hash for tamper detection, and records every lifecycle transition in an append-only audit trail.
 
-Last verified against code + backend/openapi.json: 2026-06-14 for public signing token OpenAPI bounds; full-domain verification remains 2026-06-05.
+Last verified against code + backend/openapi.json: 2026-06-30.
 
 ## Endpoints
 
@@ -80,26 +80,13 @@ Source: `backend/app/signature_requests/models/signature_request.py:56`
 
 Indexes: `(client_record_id)`, `(business_id)`, `(annual_report_id)`, `(status)`, partial `(status, sent_at) WHERE deleted_at IS NULL`.
 
-### `SignatureAuditEvent` — table `signature_audit_events`
+### Signature audit — `EntityAuditLog`
 
-Source: `backend/app/signature_requests/models/signature_request.py:157`
+Source: `backend/app/signature_requests/signature_request_audit.py`, `backend/app/audit/models/audit_entity_audit_log.py`.
 
-Append-only — no soft delete, no `updated_at`.
+Phase 6 moved production signature audit writes/reads from the legacy `signature_audit_events` table to generic `EntityAuditLog` rows with `entity_type = "signature_request"`. The legacy `SignatureAuditEvent` model/table remain registered only for the Phase 9 cleanup migration; production code must not write or read them.
 
-| Column | Type | Nullable | Notes |
-|--------|------|----------|-------|
-| `id` | int PK | no | |
-| `signature_request_id` | FK → `signature_requests.id` | no | indexed |
-| `event_type` | String | no | free-form; not an enum (see below) |
-| `actor_type` | String | no | `advisor` / `signer` / `system` |
-| `actor_id` | int | yes | advisor user ID if applicable |
-| `actor_name` | String | yes | |
-| `ip_address` | String | yes | |
-| `user_agent` | String | yes | |
-| `notes` | Text | yes | Hebrew narrative note |
-| `occurred_at` | datetime | no | UTC |
-
-Index: `(occurred_at)`.
+Embedded advisor details (`GET /api/v1/signature-requests/{request_id}`) still return `SignatureRequestWithAuditResponse.audit_trail`, but each item is now `SignatureRequestAuditItemResponse`: `action`, `actor_type`, `actor_display_name`, `performed_at`, `note`, plus surfaced forensic metadata fields (`client_record_id`, `signer_name`, `signer_email`, `business_id`, `annual_report_id`, `document_id`, `ip_address`, `user_agent`, `content_hash`, `content_hash_missing`, `signed_document_key`, `reason`).
 
 ## Enums / statuses
 
@@ -129,11 +116,11 @@ Source: `backend/app/signature_requests/models/signature_request.py:48`
 | `vat_return_approval` | אישור דוח מע"מ |
 | `custom` | חתימה כללית |
 
-### `event_type` values (audit trail)
+### Audit action values
 
-`event_type` and `actor_type` are plain `String` columns — intentionally not enum, so new event types require no migration. Known values: `created`, `sent`, `viewed`, `signed`, `declined`, `canceled`, `expired`, `annual_report_signed`.
+Signature audit actions are namespaced strings owned by `backend/app/audit/audit_constants.py`: `signature_request.created`, `.sent`, `.viewed`, `.signed`, `.declined`, `.canceled`, `.expired`, and `.annual_report_signed`.
 
-Source: `backend/app/signature_requests/models/signature_request.py:24`, `services/messages.py`.
+`actor_type` is the generic audit value: `user` for advisor/internal user actions, `external_signer` for public signer actions, and `system` for automatic/system evidence rows.
 
 ## Domain rules & invariants
 
@@ -155,15 +142,15 @@ Source: `backend/app/signature_requests/services/`
 
 8. **Signer actions require `pending_signature` status.** `assert_pending` raises `SIGNATURE_REQUEST.INVALID_STATUS` if not pending. (`signature_request_validations.py:57-67`)
 
-9. **Runtime expiry detection.** If `expires_at` has passed at the time of a signer action, the service atomically transitions to `EXPIRED`, clears the token, appends an `expired` audit event, and raises `SIGNATURE_REQUEST.EXPIRED`. (`signer_actions.py:28-37`)
+9. **Runtime expiry detection.** If `expires_at` has passed at the time of a signer action, the service atomically transitions to `EXPIRED`, clears the token, appends `signature_request.expired`, and raises `SIGNATURE_REQUEST.EXPIRED`. (`signer_actions.py`)
 
 10. **Cancel is client-scoped and pending-only.** Cancellation requires both `client_record_id` and `request_id`; the repository resolves only a matching `pending_signature` row under a row lock. A mismatched client, missing request, or terminal request raises `SIGNATURE_REQUEST.NOT_FOUND`.
 
-11. **Batch expiry job.** `expire_overdue_requests()` scans all `pending_signature` rows past `expires_at`, transitions them to `EXPIRED`, and appends audit events. Intended for a periodic scheduler. (`admin_actions.py:59-79`)
+11. **Batch expiry job.** `expire_overdue_requests()` scans all `pending_signature` rows past `expires_at`, transitions them to `EXPIRED`, and appends `signature_request.expired` audit rows. Intended for a periodic scheduler. (`admin_actions.py`)
 
-12. **Annual-report auto-advance on sign.** When a signed request has `annual_report_id` set and `request_type = annual_report_approval`, `SignatureRequestService.sign_request` attempts a best-effort `pending_client → submitted` transition and sets `client_approved_at`. The call is wrapped in `try/except` — failure is logged, not surfaced to the signer. (`signature_request_service.py:84-108`)
+12. **Annual-report auto-advance on sign.** When a signed request has `annual_report_id` set and `request_type = annual_report_approval`, `SignatureRequestService.sign_request` writes `signature_request.annual_report_signed`, attempts a best-effort `pending_client → submitted` transition using a real generic audit system actor (`actor_type="system"`, `performed_by=NULL`, no fake user id), and sets `client_approved_at`. The call is wrapped in `try/except` — failure is logged, not surfaced to the signer. (`signature_request_service.py`)
 
-13. **Audit trail is append-only.** `SignatureAuditEvent` has no `updated_at` and no soft-delete. Events for `created` and `sent` are always appended together at creation. (`create_request.py:115-130`, model docstring)
+13. **Audit trail is append-only.** Signature lifecycle evidence is written through `EntityAuditWriter`; invalid audit payloads fail closed and roll back the same transaction. Events for `signature_request.created` and `.sent` are always appended together at creation.
 
 14. **`signer_ip_address` excluded from API responses.** Intentionally omitted from `SignatureRequestResponse` schema to avoid PII exposure. Available only in the audit trail. (`schemas/signature_request.py:55`)
 
@@ -204,9 +191,9 @@ From `backend/app/signature_requests/README.md` (audited 2026-03-22) and model d
 
 2. **`signing_token` is cleared after terminal state.** Once a request reaches `signed`, `declined`, `canceled`, or `expired`, the token is set to `NULL`. This prevents replay of a previously-used token.
 
-3. **`event_type` and `actor_type` are `String`, not enum.** Allows the audit trail to gain new event types without schema migrations. This is a deliberate tradeoff: type safety is sacrificed for migration-free extensibility.
+3. **Audit actions are namespaced strings.** Signature audit actions are not database enums; they are controlled by audit constants and the fail-closed write policy.
 
-4. **`SignatureAuditEvent` has no soft delete and no `updated_at`.** The audit trail is legally required to be immutable. Adding delete or update columns would undermine its evidentiary value.
+4. **Legacy `SignatureAuditEvent` table retained until cleanup.** The old table/model remain only for Phase 9 cleanup; current production audit behavior is `EntityAuditLog`.
 
 5. **Content hash is SHA-256 of caller-supplied text.** The service does not hash the stored file — it hashes `content_to_hash` provided at creation time. This allows hashing of a canonical serialization without streaming from S3/R2.
 

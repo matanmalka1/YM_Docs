@@ -93,11 +93,11 @@ The domain has no enum models of its own. Event types are string constants assem
 |---|---|
 | `client_created` | Per client `LegalEntity` resolved from the client record |
 | `document_uploaded` | Per non-deleted `PermanentDocument` across all client businesses |
-| `signature_request_sent` | `SignatureAuditEvent.event_type == "sent"` |
-| `signature_request_signed` | `SignatureAuditEvent.event_type == "signed"` |
-| `signature_request_declined` | `SignatureAuditEvent.event_type == "declined"` |
-| `signature_request_canceled` | `SignatureAuditEvent.event_type == "canceled"` |
-| `signature_request_expired` | `SignatureAuditEvent.event_type == "expired"` |
+| `signature_request_sent` | `EntityAuditLog.action == "signature_request.sent"` |
+| `signature_request_signed` | `EntityAuditLog.action == "signature_request.signed"` |
+| `signature_request_declined` | `EntityAuditLog.action == "signature_request.declined"` |
+| `signature_request_canceled` | `EntityAuditLog.action == "signature_request.canceled"` |
+| `signature_request_expired` | `EntityAuditLog.action == "signature_request.expired"` |
 
 ### Notification events (`backend/app/timeline/services/timeline_notification_event_builders.py`)
 
@@ -134,7 +134,7 @@ All rules sourced from `backend/app/timeline/services/timeline_service.py` unles
 
 6. **Annual report events from audit, not report row.** Events are emitted per `EntityAuditLog` row where `entity_type = annual_report` and `action = annual_report.status_changed` (one event per audited status transition), not from the current report state. (`timeline_repository.py:63-110`, `timeline_service.py:206-207`)
 
-7. **Signature events from audit log, not request row.** Events are emitted per `SignatureAuditEvent` row for the lifecycle types `sent`, `signed`, `declined`, `canceled`, `expired`. (`timeline_repository.py:41-59`)
+7. **Signature events from audit log, not request row.** Events are emitted per `EntityAuditLog` row where `entity_type = signature_request` and action is one of `signature_request.sent`, `.signed`, `.declined`, `.canceled`, `.expired`. Timeline still does not emit `created` or `viewed`. (`timeline_repository.py`, `timeline_client_builders.py`)
 
 8. **Notifications: SENT and FAILED only.** Notifications with other statuses (e.g. `PENDING`) are excluded. (`timeline_service.py:130-141`) Both `notification_sent` and `notification_failed` events are included in the timeline.
 
@@ -157,7 +157,7 @@ No open known issues.
 ## Resolved issues
 
 - **F-039 / F-TL-001** (2026-06-05): Legacy `backend/app/timeline/README.md` excluded `notification_sent` as noisy. Code intentionally emits both `notification_sent` and `notification_failed`. Decision: keep both — failure signals are useful. Domain doc updated to reflect current behaviour. Legacy README is a pointer only.
-- **F-040 / F-TL-002** (2026-06-05): `decline_reason` for `signature_request_declined` events was read from the live `SignatureRequest.decline_reason` column (mutable, not a snapshot). Fixed: `signer_actions.py` already stores `reason` in `SignatureAuditEvent.notes` at decline time. `timeline_client_builders.py` now reads `audit_event.notes` instead.
+- **F-040 / F-TL-002** (2026-06-05, source migrated in Phase 6): `decline_reason` for `signature_request_declined` events was read from the live `SignatureRequest.decline_reason` column (mutable, not a snapshot). Fixed by reading the audit-row `note` snapshot. Since Phase 6 the source row is `EntityAuditLog`, not `SignatureAuditEvent`.
 
 ## Decisions (preserved)
 
