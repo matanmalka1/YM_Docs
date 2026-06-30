@@ -42,7 +42,7 @@ File: `backend/app/clients/services/client_onboarding_orchestrator.py`
 
 1. **Initial binder** — `_ensure_initial_binder()`:
    - If client already has any binder: skip.
-   - Else: `create_initial_binder()` → create `Binder` + `BinderLifecycleLog`.
+   - Else: `create_initial_binder()` → create `Binder` + one `binder.created` `EntityAuditLog` row (Phase 5; was `BinderLifecycleLog`).
    - Requires `actor_id` and `office_client_number` (both raise `ValueError` if None).
 
 2. **Annual reports** — `generate_client_obligations()`:
@@ -84,7 +84,7 @@ File: `backend/app/businesses/services/business_service.py`
 |--------|------|
 | `clients` | Creates LegalEntity, Person, ClientRecord |
 | `businesses` | Creates Business |
-| `binders` | Creates Binder, BinderLifecycleLog |
+| `binders` | Creates Binder + `binder.created` EntityAuditLog row |
 | `annual_reports` | Creates AnnualReport (1–2 rows) |
 | `vat` | Creates VatWorkItem rows |
 | `advance_payments` | Creates AdvancePayment rows |
@@ -94,7 +94,7 @@ File: `backend/app/businesses/services/business_service.py`
 ## 5. Side Effects
 
 - Creates: `LegalEntity`, `Person`, `ClientRecord`, `Business`
-- Creates: `Binder` + `BinderLifecycleLog` (if no binder existed)
+- Creates: `Binder` + one `binder.created` `EntityAuditLog` row (if no binder existed)
 - Creates: 1–2 `AnnualReport` rows (current year + optionally next year)
 - Creates: N `VatWorkItem` rows (based on VAT frequency and obligation plan)
 - Creates: N `AdvancePayment` rows (based on advance payment frequency)

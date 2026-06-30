@@ -31,7 +31,6 @@ Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` o
 | POST | /api/v1/binders/{binder_id}/revert-ready-for-handover | Revert ready-for-handover back to in-office |
 | POST | /api/v1/binders/{binder_id}/handover-to-client | Hand over single binder to client |
 | POST | /api/v1/binders/handover-to-client-bulk | Hand over multiple binders in one grouped event |
-| GET | /api/v1/binders/{binder_id}/audit | Lifecycle audit log for binder |
 | GET | /api/v1/binders/{binder_id}/intakes | All material intakes for binder |
 | PATCH | /api/v1/binders/{binder_id}/intakes/{intake_id} | Edit an existing intake (fields + cross-client transfer) |
 | GET | /api/v1/clients/{client_record_id}/binders | All binders for a specific client |
@@ -109,26 +108,36 @@ Cite: `backend/app/binders/models/binder_handover.py`
 ### BinderHandoverBinder (`binder_handover_binders` table)
 Association: handover event ↔ specific binders. Unique index on `(handover_id, binder_id)`.
 
-### BinderLifecycleLog (`binder_lifecycle_logs` table)
-Cite: `backend/app/binders/models/binder_lifecycle_log.py`
+### Binder audit (EntityAuditLog)
 
-One row per changed field per lifecycle transition.
+As of the audit refactor (Phase 5), binder lifecycle and intake-edit history is recorded in the
+generic `EntityAuditLog` table (`app/audit`), **not** in per-domain log tables. The legacy
+`BinderLifecycleLog` / `BinderIntakeEditLog` repositories, the `BinderAuditService`, the
+`GET /binders/{id}/audit` route and the `BinderAuditEntry`/`BinderAuditResponse` schemas are removed.
+The `binder_lifecycle_logs` / `binder_intake_edit_logs` **tables** survive until the Phase-9 cleanup
+migration; nothing reads or writes them anymore.
 
-| Column | Type | Nullable |
-|--------|------|----------|
-| id | int PK | no |
-| binder_id | int FK→binders.id | no |
-| field_name | str | no | `location_status` or `capacity_status` |
-| old_value | str | no | |
-| new_value | str | no | |
-| changed_by_user_id | int FK→users.id | no | |
-| changed_at | datetime | no | UTC |
-| notes | text | yes | reason/context |
+- **Binder lifecycle** rows anchor on `entity_type=binder` with rich semantic actions
+  (`binder.created`, `binder.material_received`, `binder.marked_full`, `binder.reopened`,
+  `binder.marked_ready_for_handover`, `binder.reverted_ready`, `binder.handed_over`). The changed
+  status is carried in `old_value`/`new_value` (`{"location_status"|"capacity_status": value}`); the
+  reason message is the audit row `note`; `metadata_json` carries `client_record_id` (indexed client
+  context, §8), `binder_id`, and `binder_number`. `binder.created` collapses the two legacy
+  `null→in_office` / `null→open` initial rows into one row whose `new_value` holds both statuses.
+- **Intake edits** anchor on `entity_type=binder_intake` with `binder_intake.updated` — one row per
+  changed field. The before/after value is wrapped as `{"value": ...}`; `metadata_json` carries
+  `client_record_id`, `binder_id`, `intake_id`, and the `field_name` identity (e.g. `notes`,
+  `received_at`, `client_record_id`, `binder_id`, or `material:{id}.{attr}`).
+- Reads go through the generic route `GET /api/v1/audit/binder/{id}` (and
+  `/api/v1/audit/binder_intake/{id}`), served by `AuditTrailService` and gated to `ADVISOR`/`SECRETARY`.
+  Writes go through `EntityAuditWriter` in the caller's transaction (append-only + fail-closed §16/§17):
+  a failed audit write rolls back the binder mutation. Actor display name is threaded from
+  `current_user.full_name` on the lifecycle/intake routes. Helpers live in `app/binders/binder_audit.py`.
 
-### BinderIntakeEditLog (`binder_intake_edit_logs` table)
-Cite: `backend/app/binders/models/binder_intake_edit_log.py`
-
-Field-level audit trail for edits to `BinderIntake` and its `BinderIntakeMaterial` rows. One row per changed field per edit.
+Cite: `backend/app/binders/services/binder_lifecycle_service.py`,
+`backend/app/binders/services/binder_intake_edit_service.py`, `backend/app/binders/binder_audit.py`,
+`backend/app/audit/audit_constants.py`, `backend/app/audit/audit_write_policy.py`. See
+`docs/domains/audit.md`.
 
 ## Enums / statuses
 
@@ -211,10 +220,10 @@ When a new client is created, `create_initial_binder` opens a bare placeholder b
 ### Intake editing (`BinderIntakeEditService`)
 Cite: `backend/app/binders/services/binder_intake_edit_service.py`
 
-Exposed via `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}`. Supports partial edits to `BinderIntake` with field-level audit trail (`BinderIntakeEditLog`). Patchable intake fields: `received_at`, `received_by`, `notes`. Transfer patch (changing `client_record_id` or `binder_id`) validates that all FK-linked entities (`business_id`, `annual_report_id`, `vat_report_id`) belong to the target client/legal entity. The `binder_id` path parameter scopes the lookup — intakes belonging to a different binder return 404.
+Exposed via `PATCH /api/v1/binders/{binder_id}/intakes/{intake_id}`. Supports partial edits to `BinderIntake` with a field-level audit trail written to `EntityAuditLog` (`binder_intake.updated`, one row per changed field; see "Binder audit" above). Patchable intake fields: `received_at`, `received_by`, `notes`. Transfer patch (changing `client_record_id` or `binder_id`) validates that all FK-linked entities (`business_id`, `annual_report_id`, `vat_report_id`) belong to the target client/legal entity. The `binder_id` path parameter scopes the lookup — intakes belonging to a different binder return 404. `BinderIntakeEditService` is preserved; only its persistence target changed (legacy `BinderIntakeEditLog` → `EntityAuditWriter`).
 
 ### Audit logging
-Every lifecycle and capacity transition writes one `BinderLifecycleLog` row per changed field. `notes` carries the reason message. Initial state on creation logs `null → in_office` and `null → open`.
+Every lifecycle and capacity transition writes one `EntityAuditLog` row with a rich semantic `binder.*` action (see "Binder audit" above). The audit row `note` carries the reason message; the changed status is in `old_value`/`new_value`. Binder creation records a single `binder.created` row.
 
 ## Error codes
 
@@ -272,7 +281,7 @@ From the archived binder lifecycle refactor spec in `docs/archive/binders-legacy
 - **Repeated arrivals stay as separate intake events.** Additional client deliveries create new `BinderIntake` rows rather than merging prior physical arrivals; duplicate material rows for the same type/period/business are acceptable for receipt tracking.
 - **Bulk readiness is a preserved business concept.** Handover readiness can be decided across multiple binders up to a reporting-period cutoff, not only one binder at a time.
 - **Post-handover binder is never reused.** New material after handover always opens a new binder.
-- **`BinderLifecycleLog` replaces any old status log shape.** One row per changed field, not one row per transition event.
+- **Binder lifecycle history is one EntityAuditLog row per transition** (audit refactor, Phase 5), with a rich semantic `binder.*` action. This superseded the legacy `BinderLifecycleLog` (which kept one row per changed field). The old per-field/per-transition log shape and route are removed.
 
 ## Future / planned
 

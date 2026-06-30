@@ -21,7 +21,6 @@ backend/app/annual_reports/services/status_service.py
     → repo.get_by_id_for_update()      # row-level lock
     → _assert_filing_readiness()       # only on → SUBMITTED
     → repo.update()
-    → repo.append_status_history()
     → EntityAuditWriter.record_status_change()
     → _cancel_pending_signature_requests()   # conditional
     → _trigger_signature_request()           # conditional
@@ -64,8 +63,7 @@ transmitted         → submitted
    - `→ SUBMITTED`: set `submitted_at` (now if not provided), optionally `ita_reference`, `submission_method`. If deadline type is STANDARD and `submission_method` given: recalculate `filing_deadline`.
    - `→ CLOSED`: set `assessment_amount`, `refund_due`, `tax_due` if provided.
 6. `repo.update(report_id, report=report, **update_fields)` — update row.
-7. `repo.append_status_history(...)` — insert `AnnualReportStatusHistory` row (always).
-8. `EntityAuditWriter.record_status_change(ENTITY_ANNUAL_REPORT, ...)` — insert audit row (always).
+7. `EntityAuditWriter.record_status_change(ENTITY_ANNUAL_REPORT, ...)` — insert `EntityAuditLog` row with `annual_report.status_changed`, old/new status, note, `client_record_id`, `tax_year`, actor id, and actor display-name snapshot.
 9. **If leaving `PENDING_CLIENT`** (old == PENDING_CLIENT, new != PENDING_CLIENT):
    - `_cancel_pending_signature_requests()` — cancel all pending SRs linked to this report.
 10. **If entering `PENDING_CLIENT`** (new == PENDING_CLIENT):
@@ -79,16 +77,15 @@ transmitted         → submitted
 
 | Domain | Role |
 |--------|------|
-| `annual_reports` | Updates AnnualReport, creates AnnualReportStatusHistory |
+| `annual_reports` | Updates AnnualReport |
 | `signature_requests` | Creates or cancels SignatureRequest |
 | `clients` | Reads ClientRecord and resolves signer name from LegalEntity/Person |
-| `audit` | Writes AuditLog |
+| `audit` | Writes generic EntityAuditLog |
 
 ## 6. Side Effects
 
 - Updates: `AnnualReport` row (status, optionally submitted_at, ita_reference, submission_method, filing_deadline, assessment_amount, refund_due, tax_due).
-- Creates: `AnnualReportStatusHistory` row on every call.
-- Creates: `AuditLog` row on every call.
+- Creates: `EntityAuditLog` row with `annual_report.status_changed` on every successful status transition.
 - **On `PENDING_CLIENT` entry**: creates 1 `SignatureRequest`.
 - **On `PENDING_CLIENT` exit** (to any state): cancels all pending `SignatureRequest` rows linked to this report.
 - **On re-entry to `PENDING_CLIENT`**: cancels old SRs, then creates a new one.
@@ -102,7 +99,7 @@ No savepoints used in this flow.
 ## 8. Idempotency / Duplicate Protection
 
 Not idempotent.
-Each call appends a new `AnnualReportStatusHistory` row and a new `AuditLog` row, regardless of whether the status is actually changing.
+Each successful transition appends a new `EntityAuditLog` row; invalid or failed audit writes roll back the status mutation.
 
 Re-entering `PENDING_CLIENT` is safe: old pending SRs are cancelled before a new SR is created.
 

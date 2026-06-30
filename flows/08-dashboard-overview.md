@@ -29,7 +29,7 @@ Router: `backend/app/dashboard/api/dashboard_overview.py`
    b. `_open_charges_stats()` → `ChargeRepository.open_charges_stats()` — count + total amount of ISSUED charges.
    c. `_build_quick_actions(reference_date)` — returns `[]` (method body is empty, placeholder only).
    d. `AdvisorTodayService.build(reference_date)` — deadline items due today or soon.
-   e. `RecentActivityService.build()` — recent audit log activity.
+   e. `RecentActivityService.build()` — recent activity from a single `EntityAuditLog` stream (as of Phase 5, binder activity comes from `binder.*` audit rows; the legacy `BinderLifecycleLog` branch is removed).
 4. `ClientRecordRepository.count()` — checks if any clients exist (for `is_empty` flag).
 5. Return assembled dict.
 
