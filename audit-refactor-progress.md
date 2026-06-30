@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 7 COMPLETED (timeline change-log feed suppression derived from an explicit event-source registry; `_DEDUP_ACTIONS` retired; dashboard recent-activity locked as EntityAuditLog-only with its activity_type/label union test-locked). Phase 8 not started.
+Status: Phase 8 COMPLETED (remaining unaudited write paths now write `EntityAuditLog` for legal identity graph, advance payments, invoices, permanent documents live paths, authority contacts, entity notes, tasks, correspondence, notifications, reminders, and tax-calendar generation; verification reported green by integrator). Phase 9 not started.
 
 Current phase:
-- Phase 7 — Timeline/dashboard single-source registry; retire dedup (Completed)
+- Phase 8 — Audit writes for currently-unaudited domains (Completed; verification reported green)
 
 Next phase:
-- Phase 8 — Audit writes for currently-unaudited domains (not started)
+- Phase 9 — Cleanup migration + seeds (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -92,7 +92,7 @@ Progress log:
 | Phase 5 | Replace binder lifecycle/intake logs | Completed | Binder lifecycle + intake-edit audit moved to EntityAuditLog; timeline + dashboard binder sources repointed; legacy route/service/repos/schemas removed; frontend on generic route | this file (Phase 5 section) |
 | Phase 6 | Replace SignatureAuditEvent | Completed | Signature writers, embedded drawer trail, timeline signature source, seed, frontend drawer, OpenAPI/types moved to EntityAuditLog; legacy table kept for Phase 9 | this file (Phase 6 section) |
 | Phase 7 | Timeline/dashboard single-source registry; retire dedup | Completed | Explicit `timeline_event_sources` registry derives the change-log suppression set; `_DEDUP_ACTIONS` retired; single-source proven (no duplicate events); dashboard recent-activity locked EntityAuditLog-only with activity_type/label union test-locked; OpenAPI + frontend types unchanged | this file (Phase 7 section) |
-| Phase 8 | Add missing audit writes | Not started | Add remaining domain audit coverage | TBD |
+| Phase 8 | Add missing audit writes | Completed | Added missing EntityAuditLog writes/actors for the live Phase-8 surfaces; backend/OpenAPI/frontend verification reported green by integrator, with existing frontend unused-export/tag hints noted | this file (Phase 8 section) |
 | Phase 9 | Cleanup migration + seeds | Not started | Drop legacy tables, update seeds | TBD |
 | Phase 10 | Final full verification + contract sync | Not started | Final repo-wide contract sync + full verification (frontend consumers already migrated per-phase 1/3/4/5/6) | TBD |
 
@@ -704,3 +704,64 @@ Risks/blockers:
 
 Next safe step:
 - Phase 8 — add `EntityAuditLog` writes for the currently-unaudited domains (the §13 missing-actor surfaces and any domain not yet emitting generic audit), per the plan. Do NOT drop legacy tables or touch seeds (Phase 9). Phase 7 changed only timeline/dashboard reads, so Phase 8 starts from a clean single-source timeline.
+
+## Phase 8 — Add missing audit writes
+
+Status:
+- Completed; verification reported green by integrator.
+
+Date:
+- 2026-06-30
+
+Goal:
+- Add `EntityAuditLog` writes for audited-but-not-yet-writing live mutation paths and thread missing `actor_id` / `actor_display_name` from routes, without migrations, seed changes, timeline/dashboard read changes, or legacy table cleanup.
+
+Files changed:
+- Backend audit shared: `backend/app/audit/audit_constants.py` (append-only new action constants), `backend/app/audit/audit_write_policy.py` (fail-closed policies for new actions).
+- Backend writers/actors: advance payments, invoices, permanent documents, authority contacts, entity notes, tasks, correspondence, reminders, notifications, tax-calendar generation, client legal-identity graph, and legal-entity owner-link repository return shape.
+- Docs: `docs/audit-refactor-progress.md`, `docs/domains/audit.md`, and affected domain docs.
+
+Production code changed:
+- yes
+
+Migrations changed:
+- no
+
+Schemas/OpenAPI changed:
+- no intended request/response schema change. OpenAPI export and contract sync were reported green.
+
+Frontend changed:
+- no
+
+Tests/checks run:
+- Reported green by integrator from local terminal:
+  - Backend OpenAPI export: `scripts.tooling.export_openapi --output openapi.json`.
+  - Backend contract sync: `scripts.tooling.check_contract_sync --path openapi.json`.
+  - Backend pytest: reported green / all passed.
+  - Frontend generated types: `npm run gen:types`.
+  - Frontend typecheck: `npm run typecheck`.
+  - Frontend lint: `npm run lint`.
+  - Frontend tests: `npm run test` (18 files, 61 tests passed).
+  - Frontend format: `npm run format:check`.
+  - Frontend architecture checks: `npm run arch:check`, `npm run arch:check:strict`.
+  - Frontend unused analysis: `npm run unused` still reports the existing baseline unused exports/tag hint (`EMPTY_FIELD_VALUE_LABELS`, binder status labels, VAT `@auditContract` tag hint).
+
+Result:
+- Implemented live Phase-8 write coverage for: `legal_entity.created/updated`, `person.created/updated`, `person_legal_entity_link.created`, `advance_payment.created/updated/deleted`, `invoice.created`, `document.uploaded/updated/replaced/deleted`, `authority_contact.created/updated/deleted`, `note.created/updated/deleted`, `task.created/updated/assigned/completed/canceled/deleted`, `correspondence.created/updated/deleted`, `notification.sent` for successful user-initiated sends, `reminder.created/canceled/failed`, and `tax_calendar.generated`.
+- Actor display names are threaded from routes for the requested missing surfaces: advance-payment create/update/delete/generate, authority-contact add/update/delete, permanent-document delete/replace/upload/update, invoice attach, task update/bulk-assign/delete plus other task writes, correspondence update/delete/create, reminder cancel/create, and notification send.
+- Internal no-user service calls that create audited rows use `actor_type="system"`, `performed_by=None`, and explicit label `מערכת` rather than invalid user rows.
+
+Findings:
+- Permanent-document approve/reject write paths do not exist in the live service/API; upload currently auto-approves. No approve/reject audit actions were invented.
+- `deadline_rule` remains skipped: code/registry confirm no per-row UI edit route.
+- Existing binder/VAT/annual-report/signature write paths were not re-added or dual-written.
+
+Decisions:
+- §5a strict user-display fail-closed restore was kept narrowed in Phase 8 by user confirmation. Strict `user -> actor_display_name required` remains a separate follow-up because it requires broad internal/orchestrator/cascade/seed/excel threading.
+
+Risks/blockers:
+- No Phase-8 blocker remains after the reported green verification.
+- Residual frontend unused-export/tag-hint output is the existing baseline and not a Phase-8 blocker.
+
+Next safe step:
+- Phase 9 may proceed with the cleanup migration + seed rewrite. Do not start Phase 10 final verification until Phase 9 is complete.
