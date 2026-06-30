@@ -79,6 +79,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
 - `docs/frontend/design-system-followup.md` — tracking only; remaining Batch 3 design-system primitive-API follow-up items (full audit catalog archived at `docs/archive/design-system-audit-plan.md`).
 - `docs/search-filters-followup.md` — tracking only; unified Search page filter backlog (why advanced filters UNION instead of intersect), from the 2026-06-28 read-through.
+- `docs/vat-history-product-followup.md` — tracking only; product review item for VAT work-item vs invoice audit history discoverability after the audit refactor.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
 
 ## Agent
