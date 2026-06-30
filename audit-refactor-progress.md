@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 8 COMPLETED (remaining unaudited write paths now write `EntityAuditLog` for legal identity graph, advance payments, invoices, permanent documents live paths, authority contacts, entity notes, tasks, correspondence, notifications, reminders, and tax-calendar generation; verification reported green by integrator). Phase 9 not started.
+Status: Phase 9 IN PROGRESS (cleanup migration drops the five consumerless legacy audit tables; seed builders are moving demo audit history to `EntityAuditLog`; verification pending).
 
 Current phase:
-- Phase 8 — Audit writes for currently-unaudited domains (Completed; verification reported green)
+- Phase 9 — Cleanup migration + seeds (In progress)
 
 Next phase:
-- Phase 9 — Cleanup migration + seeds (not started)
+- Phase 10 — Final full verification + contract sync (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -93,7 +93,7 @@ Progress log:
 | Phase 6 | Replace SignatureAuditEvent | Completed | Signature writers, embedded drawer trail, timeline signature source, seed, frontend drawer, OpenAPI/types moved to EntityAuditLog; legacy table kept for Phase 9 | this file (Phase 6 section) |
 | Phase 7 | Timeline/dashboard single-source registry; retire dedup | Completed | Explicit `timeline_event_sources` registry derives the change-log suppression set; `_DEDUP_ACTIONS` retired; single-source proven (no duplicate events); dashboard recent-activity locked EntityAuditLog-only with activity_type/label union test-locked; OpenAPI + frontend types unchanged | this file (Phase 7 section) |
 | Phase 8 | Add missing audit writes | Completed | Added missing EntityAuditLog writes/actors for the live Phase-8 surfaces; backend/OpenAPI/frontend verification reported green by integrator, with existing frontend unused-export/tag hints noted | this file (Phase 8 section) |
-| Phase 9 | Cleanup migration + seeds | Not started | Drop legacy tables, update seeds | TBD |
+| Phase 9 | Cleanup migration + seeds | In progress | Reversible cleanup migration drops legacy audit tables; seeds/model registry/docs being updated | this file (Phase 9 section) |
 | Phase 10 | Final full verification + contract sync | Not started | Final repo-wide contract sync + full verification (frontend consumers already migrated per-phase 1/3/4/5/6) | TBD |
 
 ## Current Files Created
@@ -765,3 +765,38 @@ Risks/blockers:
 
 Next safe step:
 - Phase 9 may proceed with the cleanup migration + seed rewrite. Do not start Phase 10 final verification until Phase 9 is complete.
+
+## Phase 9 — Cleanup migration + seeds
+
+Status:
+- In progress; verification pending.
+
+Date:
+- 2026-06-30
+
+Goal:
+- Drop the five consumerless legacy audit tables in one reversible Alembic migration, remove stale model registration/export surfaces, and move demo seed audit history off legacy tables and onto `EntityAuditLog` through canonical writer/policy paths. No Phase 10 final verification work.
+
+Files changed:
+- Migration: `backend/alembic/versions/0004_drop_legacy_audit_tables.py` drops `vat_audit_logs`, `annual_report_status_history`, `binder_lifecycle_logs`, `binder_intake_edit_logs`, and `signature_audit_events`; downgrade recreates columns, PKs, FKs, and indexes from the initial migration. No enum type is dropped (`annualreportstatus` is shared).
+- Backend model cleanup: removed legacy model imports from `app/model_registry.py`; removed standalone legacy model files for VAT, annual-report status history, and binder lifecycle/intake logs; removed the embedded `SignatureAuditEvent` model/relationship from `signature_request.py`; removed the annual-report package export.
+- Seed cleanup: annual-report status demo history, binder lifecycle/intake-edit demo history, and signature lifecycle demo evidence now write `EntityAuditLog` via `EntityAuditWriter` / signature audit helpers. The seed orchestrator no longer calls legacy table builders.
+- Tests/docs: read-only regression test now counts `EntityAuditLog`; canonical audit/domain docs updated to state only `EntityAuditLog` + `UserAuditLog` remain.
+
+Production code changed:
+- yes
+
+Migrations changed:
+- yes (`0004_drop_legacy_audit_tables.py`)
+
+Schemas/OpenAPI changed:
+- no intended request/response schema change.
+
+Frontend changed:
+- no
+
+Tests/checks run:
+- pending
+
+Result:
+- pending verification

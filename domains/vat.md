@@ -65,7 +65,7 @@ Indexes include active unique `(client_record_id, period) WHERE deleted_at IS NU
 
 `VatInvoice` has a unique constraint on `(work_item_id, invoice_type, invoice_number)` and indexes on `(work_item_id, invoice_type)` and `invoice_date`. Cite: `backend/app/vat/models/vat_invoice.py:101-110`.
 
-**Audit storage:** VAT no longer writes or reads `VatAuditLog` in the active product flow. VAT mutations write `EntityAuditLog` through `EntityAuditWriter` and the generic audit policy. The legacy `vat_audit_logs` table/model still exists only until the Phase 9 cleanup migration; no current VAT route/service reads it.
+**Audit storage:** VAT no longer writes or reads `VatAuditLog` in the active product flow. VAT mutations write `EntityAuditLog` through `EntityAuditWriter` and the generic audit policy. The legacy `vat_audit_logs` table/model was dropped by the Phase 9 cleanup migration; no current VAT route/service/seed reads or writes it.
 
 ## Enums / statuses
 

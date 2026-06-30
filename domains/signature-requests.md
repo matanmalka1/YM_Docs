@@ -84,7 +84,7 @@ Indexes: `(client_record_id)`, `(business_id)`, `(annual_report_id)`, `(status)`
 
 Source: `backend/app/signature_requests/signature_request_audit.py`, `backend/app/audit/models/audit_entity_audit_log.py`.
 
-Phase 6 moved production signature audit writes/reads from the legacy `signature_audit_events` table to generic `EntityAuditLog` rows with `entity_type = "signature_request"`. The legacy `SignatureAuditEvent` model/table remain registered only for the Phase 9 cleanup migration; production code must not write or read them.
+Phase 6 moved production signature audit writes/reads from the legacy `signature_audit_events` table to generic `EntityAuditLog` rows with `entity_type = "signature_request"`. Phase 9 dropped the legacy `SignatureAuditEvent` model/table and kept demo signature audit history on the same `EntityAuditLog` writer path.
 
 Embedded advisor details (`GET /api/v1/signature-requests/{request_id}`) still return `SignatureRequestWithAuditResponse.audit_trail`, but each item is now `SignatureRequestAuditItemResponse`: `action`, `actor_type`, `actor_display_name`, `performed_at`, `note`, plus surfaced forensic metadata fields (`client_record_id`, `signer_name`, `signer_email`, `business_id`, `annual_report_id`, `document_id`, `ip_address`, `user_agent`, `content_hash`, `content_hash_missing`, `signed_document_key`, `reason`).
 
@@ -193,7 +193,7 @@ From `backend/app/signature_requests/README.md` (audited 2026-03-22) and model d
 
 3. **Audit actions are namespaced strings.** Signature audit actions are not database enums; they are controlled by audit constants and the fail-closed write policy.
 
-4. **Legacy `SignatureAuditEvent` table retained until cleanup.** The old table/model remain only for Phase 9 cleanup; current production audit behavior is `EntityAuditLog`.
+4. **Signature audit storage is canonical.** The old `SignatureAuditEvent` table/model are removed; current production and demo-seed audit behavior is `EntityAuditLog`.
 
 5. **Content hash is SHA-256 of caller-supplied text.** The service does not hash the stored file — it hashes `content_to_hash` provided at creation time. This allows hashing of a canonical serialization without streaming from S3/R2.
 

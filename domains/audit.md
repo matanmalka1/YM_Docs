@@ -13,12 +13,14 @@ Source of truth: mandatory
 The audit domain stores append-only change records for selected business entities and exposes one read-only HTTP endpoint for staff to inspect those records. In the current implementation, writes happen indirectly through `EntityAuditWriter` from other domains; the `audit` module itself owns the generic table, response schema, repository query path, and entity-type validation for read access.
 Last verified against code + backend/openapi.json: 2026-06-30.
 
-## Two audit models (target shape)
+## Two audit models
 
-The audit refactor (see `docs/audit-refactor-implementation-plan.md`) converges on exactly two audit models with **distinct shapes** — do not conflate them:
+The audit refactor (see `docs/audit-refactor-implementation-plan.md`) has converged on exactly two audit models with **distinct shapes** — do not conflate them:
 
 - **`EntityAuditLog`** (table `entity_audit_logs`, this domain) — business mutations + evidence events. Carries `actor_type`, `actor_display_name`, and JSON-object `old_value`/`new_value`/`metadata_json`. `performed_by` is nullable (system / external-signer rows have no `users.id`).
 - **`UserAuditLog`** (table `user_audit_logs`, owned by the `users` domain) — auth/security/admin-access events. Has **no** `old_value`/`new_value` and **no** `actor_type`; it stores a JSON-object `metadata_json` plus `actor_display_name` + `target_display_name` snapshots and the closed `AuditAction`/`AuditStatus` enums.
+
+No per-domain legacy audit tables remain in the active schema. `vat_audit_logs`, `annual_report_status_history`, `binder_lifecycle_logs`, `binder_intake_edit_logs`, and `signature_audit_events` were dropped by the Phase 9 cleanup migration (`backend/alembic/versions/0004_drop_legacy_audit_tables.py`). The reversible downgrade recreates those historical tables for migration rollback only; application code and seeds do not import, write, or read them.
 
 **Actor snapshot convention (§5 of the plan).** Display names are immutable snapshots captured at **write time** from the route's `current_user.full_name` and threaded alongside the actor id — never joined from `users` at read time (a rename must not rewrite historical audit display). `EntityAuditLog.actor_type` is one of `user | system | external_signer`; for `system`/`external_signer` rows `performed_by` is `NULL` and `actor_display_name` carries the system label / signer name. As of Phase 1 every existing `EntityAuditLog` write passes `actor_type` (default `"user"`) + `actor_display_name`, and the `UserAuditLog` auth/admin writers capture `actor_display_name` (+ `target_display_name` where a target user exists).
 
@@ -53,7 +55,7 @@ The audit domain owns one persisted SQLAlchemy model:
 | `note` | `Text` | yes | optional audit note |
 | `performed_at` | `datetime` | no | defaults to `utcnow` |
 
-Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the PostgreSQL expression index `idx_entity_audit_client_ctx` on `((metadata_json->>'client_record_id'), performed_at)` (created in migration; SQLite dev may table-scan). Source: `backend/app/audit/models/audit_entity_audit_log.py`; migrations `backend/alembic/versions/0002_audit_jsonb_actor.py` + `0003_audit_actor_type_notnull.py`.
+Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the PostgreSQL expression index `idx_entity_audit_client_ctx` on `((metadata_json->>'client_record_id'), performed_at)` (created in migration; SQLite dev may table-scan). Source: `backend/app/audit/models/audit_entity_audit_log.py`; migrations `backend/alembic/versions/0002_audit_jsonb_actor.py`, `0003_audit_actor_type_notnull.py`, and `0004_drop_legacy_audit_tables.py`.
 
 ### Response schema
 
@@ -91,7 +93,7 @@ This domain does not use Python enums for audit entity types or actions. As of P
 - **Actor validation matrix (§5a)** — fail-closed on every write: `actor_type ∈ {user, system, external_signer}`; `user` requires `performed_by`; `system`/`external_signer` require `performed_by = None` AND `actor_display_name`. For `user` rows `actor_display_name` is strongly encouraged but NOT fail-closed (the `performed_by` FK gives a read-time fallback); strict enforcement + universal name-threading is a tracked follow-up (see progress log). Source: `backend/app/audit/audit_write_policy.py`.
 - **Fail-closed payload safety (§16)** — a per-`(entity_type, action)` policy (`ACTION_POLICIES`): a positive top-level field allowlist for `old_value`/`new_value` (bounded by the request/snapshot shapes, so document content / unexpected fields reject — they are in no allowlist), required + allowed `metadata_json` keys, and `metadata_json`-must-be-an-object (a list/scalar rejects, never silently skips). The action's `<entity_type>.` prefix must match the row's entity_type. Defense-in-depth: a recursive forbidden-key denylist (`password*`/`token*`/`secret*`/`signing*`/`*content*`/keys + raw bytes) and compact-UTF-8-JSON size caps (`old_value`/`new_value` 32 KiB each, `metadata_json` 16 KiB). An action with no registered policy is rejected. Source: `backend/app/audit/audit_write_policy.py`.
 - **Sensitive-data hook** — sensitive entity types (`signature_request`) pass through a service-owned hook. Under the current two-role model both ADVISOR and SECRETARY preserve the same forensic fields; forbidden data is rejected at write time. There is no lower-privilege authenticated role, so no per-role redaction exists. Source: `backend/app/audit/services/audit_trail_service.py`.
-- **`metadata_json.client_record_id`** is enriched on every client-scoped write where a client context exists (client/business/legal identity graph, charge/invoice, annual-report/VAT, binder/signature, advance payment, document, authority contact, note, task, correspondence, notification, reminder when resolvable). Firm-level tax-calendar generation uses firm-level metadata instead.
+- **`metadata_json.client_record_id`** is enriched on every client-scoped write where a client context exists (client/business/legal identity graph, charge/invoice, annual-report/VAT, binder/signature, advance payment, document, authority contact, note, task, correspondence, notification, reminder when resolvable). Firm-level tax-calendar generation uses firm-level metadata instead. Demo seed history uses the same `EntityAuditWriter`/policy path for annual-report status history, binder lifecycle/intake edits, and signature evidence; no seed builder writes legacy audit tables.
 
 ## Error codes
 

@@ -114,8 +114,8 @@ As of the audit refactor (Phase 5), binder lifecycle and intake-edit history is 
 generic `EntityAuditLog` table (`app/audit`), **not** in per-domain log tables. The legacy
 `BinderLifecycleLog` / `BinderIntakeEditLog` repositories, the `BinderAuditService`, the
 `GET /binders/{id}/audit` route and the `BinderAuditEntry`/`BinderAuditResponse` schemas are removed.
-The `binder_lifecycle_logs` / `binder_intake_edit_logs` **tables** survive until the Phase-9 cleanup
-migration; nothing reads or writes them anymore.
+The `binder_lifecycle_logs` / `binder_intake_edit_logs` tables and model files were dropped in the
+Phase 9 cleanup migration. Demo seed lifecycle/intake history is written through `EntityAuditWriter`.
 
 - **Binder lifecycle** rows anchor on `entity_type=binder` with rich semantic actions
   (`binder.created`, `binder.material_received`, `binder.marked_full`, `binder.reopened`,
