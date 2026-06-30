@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 2 COMPLETED (writer helpers + append-only repositories + registry/scope/authz + fail-closed write validation + metadata enrichment + action namespacing + frontend sync). Phase 3 not started.
+Status: Phase 3 COMPLETED (VAT audit moved end-to-end from legacy `VatAuditLog` read/write path to generic `EntityAuditLog`, including frontend VAT History migration). Phase 4 not started.
 
 Current phase:
-- Phase 2 — Writer helpers / repository / registry / authz / validation (Completed)
+- Phase 3 — Replace VAT audit (Completed)
 
 Next phase:
-- Phase 3 — Replace VAT audit (not started)
+- Phase 4 — Replace AnnualReportStatusHistory + child actions (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -87,7 +87,7 @@ Progress log:
 | Phase 0 | Baseline, exact inventory, enum audit | Completed | Three review rounds; counts 30/63/73, 20 legacy-model-class/13 consumer/38 test files, 11 missing-actor fns; 4 open items decided | docs/audit-refactor-phase-0-report.md |
 | Phase 1 | Schema + JSON switch + actor threading + generic-audit contract sync | Completed | entity_audit_logs/user_audit_logs only (no legacy drops): migrations 1a→1b (PG round-trip + fail-safe proven), serializer/reader JSON-object switch, threaded actor into 30 EntityAuditLog writers + UserAuditLog snapshots, regenerated generic-audit OpenAPI/types/frontend, docs/domains/audit.md | this file (Phase 1 section) |
 | Phase 2 | Writer/repository + registry/authz | Completed | Append-only repos; writer record_action/record_external_action + §5a actor matrix + §16 validation (no-op removed); repo client-context queries; AuditEntityRegistry + resolve_scope (23 types) + role authz; envelope entity_deleted; metadata enrichment + namespaced actions; frontend synced | this file (Phase 2 section) |
-| Phase 3 | Replace VAT audit | Not started | Move VAT audit to EntityAuditLog | TBD |
+| Phase 3 | Replace VAT audit | Completed | VAT writes/read UI moved to EntityAuditLog generic audit; legacy VAT audit route/repo/schema/seed removed; table kept for Phase 9 | this file (Phase 3 section) |
 | Phase 4 | Replace AnnualReportStatusHistory | Not started | Move status + child actions to EntityAuditLog | TBD |
 | Phase 5 | Replace binder lifecycle/intake logs | Not started | Move binder audit to EntityAuditLog | TBD |
 | Phase 6 | Replace SignatureAuditEvent | Not started | Move signature audit and drawer trail to EntityAuditLog | TBD |
@@ -450,7 +450,7 @@ Next safe step:
 - **Decision recorded (actor matrix):** narrow option chosen by the user — structural invariants fail-closed for all actor types and `actor_display_name` required for system/external_signer; for `user` it is encouraged but not fail-closed (FK fallback). Follow-up logged: strict `user → display required` + threading display names through internal orchestration/cascade/seed/excel paths (deferred, likely Phase 8).
 - **Decision recorded (§16 allowlist):** per-action field allowlist governs `metadata_json` (defined §8 contract); `old_value`/`new_value` carry the audited domain change, guarded by the recursive forbidden-key denylist + size caps.
 - Verification: backend `ruff`/`pyright` (0/0/0)/`vulture`/audit-scripts green, SQLite `create_all` builds, full `pytest` green (the user's full-suite run showed 5 stale failures whose fixes landed mid-run; re-running those 5 passes). Frontend typecheck/lint/test(59)/format/arch/arch:strict/knip green. No migration added.
-- Phase 3 (Replace VAT audit) not started.
+- Phase 3 (Replace VAT audit) completed; Phase 4 not started.
 
 ### Phase 2 — review-round fixes (2026-06-29)
 
@@ -465,3 +465,33 @@ A code review found two P1 and several P2 issues; all addressed:
 - **P2 — deterministic `generated.ts`:** the "21k churn" was a missing `prettier` step; with `gen + prettier` the diff is the 2 audit-relevant lines. Pinned `openapi-typescript@7.13.0` as a devDependency, `gen:types` now runs the local binary + `prettier --write`, and `generated.ts` was regenerated deterministically (`entity_deleted: boolean` required, matching the generator; the surgical optional `?` was wrong).
 - **Policy gaps caught by production-path tests (now fixed):** added `annual_report.deleted` policy; allowlisted `advance_rate_updated_at` (server-stamped, audited on `client.updated`) and `source_vat_categories` (vat-import expense provenance).
 - Verification after fixes: `tests/charges tests/clients tests/businesses tests/annual_reports tests/audit` → 324 passed, 1 skipped; `ruff`/`pyright` green. Audit test files updated by a second pass (Codex) for the required-metadata policy: 48 passed.
+
+### Phase 3 — COMPLETED (2026-06-30)
+
+Goal:
+- Replace VAT audit end-to-end: move VAT audit writes/reads off the legacy `VatAuditLog` repository/schema/route and onto generic `EntityAuditLog`, including the VAT frontend History tab. Keep the legacy table/model for the Phase 9 cleanup migration.
+
+Files changed:
+- Backend: `app/audit/audit_constants.py`, `app/audit/audit_write_policy.py`, VAT route/service/repository modules under `app/vat/`, new `app/vat/vat_audit.py`, `openapi.json`, and VAT/binder tests.
+- Deleted backend code: `app/vat/repositories/vat_audit_log_repository.py`, `app/vat/schemas/vat_audit.py`, and the VAT-local `GET /vat/work-items/{id}/audit` route. `VatAuditLog` model/table remain until Phase 9.
+- Seed: removed `create_vat_audit_logs` and its orchestrator call. Demo VAT rows are created directly, so they no longer fabricate legacy VAT audit rows.
+- Frontend: VAT History moved from the deleted VAT audit API/hook/utils to the generic audit feature; VAT action/field labels added; `generated.ts` regenerated after OpenAPI export.
+- Docs: `docs/domains/audit.md`, `docs/domains/vat.md`, `docs/flows/05-vat-work-item-creation.md`, and `docs/vat-history-product-followup.md` document the Phase 3 behavior and the product follow-up around invoice events no longer appearing in a strict work-item trail.
+
+Implementation summary:
+- Added fail-closed VAT action policies for `vat_work_item.created/status_changed/filed/amount_overridden/updated/deleted` and `vat_invoice.created/updated/amount_changed/deleted`.
+- Promoted VAT audit actions to canonical namespaced constants in `app/audit/audit_constants.py`; removed the bare VAT `ACTION_STATUS_CHANGED` collision from VAT constants.
+- Repointed VAT mutations to `EntityAuditWriter` with user actors and `actor_display_name` threaded from the route's current user.
+- Work-item events anchor on `entity_type=vat_work_item`; invoice events anchor on `entity_type=vat_invoice`, with `metadata_json.vat_work_item_id` linking back to the owning work item.
+- Generic reads are served by `/api/v1/audit/vat_work_item/{id}` and `/api/v1/audit/vat_invoice/{id}` through `AuditTrailService`.
+
+Verification reported for Phase 3:
+- Backend static/subset checks green: pyright 0/0/0, ruff check + format clean, vulture clean, audit scripts clean except the known pre-existing unused-routes reminders baseline, OpenAPI contract sync clean, SQLite `create_all` OK, seed reset OK.
+- Targeted pytest: 317 passed, 1 skipped across VAT/binders/audit/timeline/dashboard/openapi/error-doc coverage, including new VAT write, read, and atomicity tests.
+- Frontend VAT audit migration checks green: `npm run gen:types`, typecheck, lint, test, format, arch checks, and unused/knip.
+
+Behavior note:
+- Invoice add/update/delete/amount-change events now live on the `vat_invoice` audit trail. A VAT work-item History tab that reads only `/audit/vat_work_item/{id}` shows only work-item lifecycle events, not invoice events. This is the intended entity split. Product review of whether a combined VAT-period history view is needed is tracked in `docs/vat-history-product-followup.md`.
+
+Next safe step:
+- Phase 4 — Replace `AnnualReportStatusHistory` + child actions end-to-end, including annual-report audit frontend and timeline status-events repointing. Do not start Phase 5+ until Phase 4 is reviewed.

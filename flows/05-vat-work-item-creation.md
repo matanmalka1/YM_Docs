@@ -26,7 +26,7 @@ backend/app/vat/services/intake.py
     → work_item_repo.create()
     → materializer.link_vat_work_item()
     → db.flush()
-    → work_item_repo.append_audit()
+    → EntityAuditWriter.record_action()
 ```
 
 ## 3. Sequence
@@ -71,15 +71,18 @@ backend/app/vat/services/intake.py
 
 11. `db.flush()`.
 
-12. `work_item_repo.append_audit(...)`:
-    - Action: `ACTION_WORK_ITEM_CREATED_PENDING` or `ACTION_MATERIAL_RECEIVED`.
-    - Writes audit row with status and period.
+12. `EntityAuditWriter.record_action(...)`:
+    - Entity: `vat_work_item`.
+    - Action: `vat_work_item.created`.
+    - `new_value`: initial `status` and `period`.
+    - `metadata_json`: `client_record_id`, `period`, and `tax_year`.
+    - Writes the generic `EntityAuditLog` row in the caller's transaction.
 
 ## 4. Domains Involved
 
 | Domain | Role |
 |--------|------|
-| `vat` | Creates VatWorkItem, writes audit |
+| `vat` | Creates VatWorkItem, writes generic entity audit |
 | `tax_calendar` | Find-or-creates TaxCalendarEntry |
 | `clients` | Reads ClientRecord, LegalEntity (guard) |
 
@@ -89,7 +92,7 @@ backend/app/vat/services/intake.py
 |--------|--------|
 | `VatWorkItem` | Created with initial status |
 | `TaxCalendarEntry` | Find-or-created (shared global row per period + obligation type + frequency) |
-| `VatWorkItem` audit | 1 row appended |
+| `EntityAuditLog` | 1 `vat_work_item.created` row appended |
 | `due_date_original` | Snapshot of TaxCalendarEntry.due_date at creation |
 | `due_date_effective` | Snapshot of TaxCalendarEntry.due_date at creation |
 

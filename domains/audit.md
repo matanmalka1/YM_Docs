@@ -11,7 +11,7 @@ Source of truth: mandatory
 # Audit
 
 The audit domain stores append-only change records for selected business entities and exposes one read-only HTTP endpoint for staff to inspect those records. In the current implementation, writes happen indirectly through `EntityAuditWriter` from other domains; the `audit` module itself owns the generic table, response schema, repository query path, and entity-type validation for read access.
-Last verified against code + backend/openapi.json: 2026-06-29.
+Last verified against code + backend/openapi.json: 2026-06-30.
 
 ## Two audit models (target shape)
 
@@ -67,6 +67,7 @@ This domain does not use Python enums for audit entity types or actions. As of P
 - Generic verbs (`created`/`updated`/`deleted`/`restored`/`status_changed`) are *bare* building blocks; the writer composes the namespace via `entity_action(entity_type, verb)` → e.g. `client.created`, `annual_report.status_changed`. `client.entity_type_changed` is a first-class semantic action (`ACTION_ENTITY_TYPE_CHANGED`).
 - Charge-specific actions are pre-namespaced: `charge.issued`, `charge.paid`, `charge.canceled` (`ACTION_CHARGE_*`).
 - Annual-report actions are pre-namespaced: `annual_report.updated` (detail edits), `annual_report.deadline_updated`, `annual_report.{income,expense}_line_{added,updated,deleted}`, `annual_report.annex_line_{added,updated,deleted}`.
+- VAT actions are pre-namespaced. Work-item actions anchor on `vat_work_item`: `created`, `status_changed`, `filed`, `amount_overridden`, `updated`, `deleted`. Invoice actions anchor on `vat_invoice`: `created`, `updated`, `amount_changed`, `deleted`.
 
 `ALLOWED_READ_ENTITY_TYPES` is **derived from the registry** (`allowed_read_entity_types()`), never hand-maintained.
 
@@ -88,7 +89,7 @@ This domain does not use Python enums for audit entity types or actions. As of P
 - **Actor validation matrix (§5a)** — fail-closed on every write: `actor_type ∈ {user, system, external_signer}`; `user` requires `performed_by`; `system`/`external_signer` require `performed_by = None` AND `actor_display_name`. For `user` rows `actor_display_name` is strongly encouraged but NOT fail-closed (the `performed_by` FK gives a read-time fallback); strict enforcement + universal name-threading is a tracked follow-up (see progress log). Source: `backend/app/audit/audit_write_policy.py`.
 - **Fail-closed payload safety (§16)** — a per-`(entity_type, action)` policy (`ACTION_POLICIES`): a positive top-level field allowlist for `old_value`/`new_value` (bounded by the request/snapshot shapes, so document content / unexpected fields reject — they are in no allowlist), required + allowed `metadata_json` keys, and `metadata_json`-must-be-an-object (a list/scalar rejects, never silently skips). The action's `<entity_type>.` prefix must match the row's entity_type. Defense-in-depth: a recursive forbidden-key denylist (`password*`/`token*`/`secret*`/`signing*`/`*content*`/keys + raw bytes) and compact-UTF-8-JSON size caps (`old_value`/`new_value` 32 KiB each, `metadata_json` 16 KiB). An action with no registered policy is rejected. Source: `backend/app/audit/audit_write_policy.py`.
 - **Sensitive-data hook** — sensitive entity types (`signature_request`) pass through a service-owned hook. Under the current two-role model both ADVISOR and SECRETARY preserve the same forensic fields; forbidden data is rejected at write time. There is no lower-privilege authenticated role, so no per-role redaction exists. Source: `backend/app/audit/services/audit_trail_service.py`.
-- **`metadata_json.client_record_id`** is enriched on every existing client/business/charge/annual-report write (plus `business_id`/`tax_year` where relevant) so client-context reads and the §8b expression index work.
+- **`metadata_json.client_record_id`** is enriched on every existing client/business/charge/annual-report/VAT write (plus `business_id`/`tax_year`/VAT period/work-item context where relevant) so client-context reads and the §8b expression index work.
 
 ## Error codes
 
@@ -114,7 +115,7 @@ Still-true decisions preserved from the shared historical reference `backend/doc
 
 1. `AuditTrail` is the accountability log for audited entity changes, separate from the operational `Timeline`. Source: `backend/docs/history-vs-timeline.md:18-22`.
 2. The system should not dump the full audit stream into timeline views; timeline may use only selected high-value audit-derived events, while audit remains the complete record. Source: `backend/docs/history-vs-timeline.md:20-22`.
-3. Generic audit inspection is registry-driven (Phase 2). `client`, `business`, `charge`, and `annual_report` are the families that currently *write* audit; the registry additionally declares the full §6 entity set so reads/scope are defined for every audited type as later phases add their writes. `ALLOWED_READ_ENTITY_TYPES` is derived from the registry. Source: `backend/app/audit/audit_entity_registry.py`.
+3. Generic audit inspection is registry-driven. As of Phase 3, `client`, `business`, `charge`, `annual_report`, `vat_work_item`, and `vat_invoice` write generic entity audit rows. The registry additionally declares the full §6 entity set so reads/scope are defined for every audited type as later phases add their writes. `ALLOWED_READ_ENTITY_TYPES` is derived from the registry. Source: `backend/app/audit/audit_entity_registry.py`.
 
 ## Future / planned
 

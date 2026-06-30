@@ -10,9 +10,9 @@ Source of truth: mandatory
 
 # VAT
 
-The VAT domain manages period-based VAT work items for a `ClientRecord`: material intake, invoice data entry, review, filing, audit history, client summaries, and VAT exports. The implemented aggregate is `VatWorkItem`, with `VatInvoice` rows as source documents and `VatAuditLog` rows as append-only workflow history.
+The VAT domain manages period-based VAT work items for a `ClientRecord`: material intake, invoice data entry, review, filing, audit history, client summaries, and VAT exports. The implemented aggregate is `VatWorkItem`, with `VatInvoice` rows as source documents. VAT audit writes now use the generic `EntityAuditLog` model: work-item lifecycle events are recorded on `vat_work_item`, and invoice events are recorded on `vat_invoice`.
 
-Last verified against code + backend/openapi.json: 2026-06-14.
+Last verified against code + backend/openapi.json: 2026-06-30.
 
 ## Endpoints
 
@@ -39,13 +39,19 @@ All paths listed below exist in `backend/openapi.json`.
 | `GET` | `/api/v1/vat/work-items/{item_id}` | Get one enriched work item (full `VatWorkItemResponse`) |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/work-items` | List one client's work items (thin `VatWorkItemListItem`); paginated (default `page_size=200`), filterable by `year`, `period`, `status`, `assigned_to`, `due_after`/`due_before` (date, vs `due_date_effective`). Ordered by `period desc, id desc` |
 | `GET` | `/api/v1/vat/work-items` | List work items across clients (thin `VatWorkItemListItem`); supports exact `client_record_id` and legacy fuzzy `client_name` filters |
-| `GET` | `/api/v1/vat/work-items/{item_id}/audit` | Get audit trail for a work item |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/summary` | Get client-level VAT period and annual aggregates |
 | `GET` | `/api/v1/vat/clients/{client_record_id}/export` | Export a client's VAT data as Excel or PDF |
 
-Router sources: `backend/app/vat/api/routes_intake.py:14-22`, `backend/app/vat/api/routes_work_items.py`, `backend/app/vat/api/routes_data_entry.py:16-104`, `backend/app/vat/api/routes_status.py:16-50`, `backend/app/vat/api/routes_filing.py:13-24`, `backend/app/vat/api/routes_grouped.py:17-46`, `backend/app/vat/api/routes_queries.py:25-158`, `backend/app/vat/api/routes_client_summary.py:12-38`.
+Router sources: `backend/app/vat/api/vat_routes_intake.py`, `backend/app/vat/api/vat_routes_work_items.py`, `backend/app/vat/api/vat_routes_data_entry.py`, `backend/app/vat/api/vat_routes_status.py`, `backend/app/vat/api/vat_routes_filing.py`, `backend/app/vat/api/vat_routes_grouped.py`, `backend/app/vat/api/vat_routes_queries.py`, `backend/app/vat/api/vat_routes_client_summary.py`.
 
-VAT export OpenAPI documents both successful download media types, Excel and PDF, as binary file responses rather than `application/json` with an empty schema (`backend/app/vat/api/routes_client_summary.py:50-57`, `backend/openapi.json`).
+VAT audit inspection is now served by the audit domain's generic endpoint, not by a VAT-local route:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/v1/audit/vat_work_item/{item_id}` | Work-item lifecycle/history trail |
+| `GET` | `/api/v1/audit/vat_invoice/{invoice_id}` | Invoice-level audit trail |
+
+VAT export OpenAPI documents both successful download media types, Excel and PDF, as binary file responses rather than `application/json` with an empty schema (`backend/app/vat/api/vat_routes_client_summary.py`, `backend/openapi.json`).
 
 List/detail DTO split: the three work-item list endpoints return the thin `VatWorkItemListItem` — only the fields the VAT list/grouped table/cards render (identity, period, status, `net_vat`/`final_vat_amount`/`is_overridden`, the displayed deadline fields, `filed_at`, `updated_at`, `available_actions`). Detail-only fields (raw `total_*` amounts, `override_justification`, `submission_method`/`submission_reference`, `filed_by`/`filed_by_name`, `assigned_to`/`assigned_to_name`, `statutory_deadline`, amendment links, `client_status`, `pending_materials_note`) are served only by `GET /vat/work-items/{item_id}` as the full `VatWorkItemResponse`; the list-row click navigates to the detail page, which refetches by id (`backend/app/vat/schemas/vat_report.py`, `backend/app/vat/api/serializers.py`).
 
@@ -59,7 +65,7 @@ Indexes include active unique `(client_record_id, period) WHERE deleted_at IS NU
 
 `VatInvoice` has a unique constraint on `(work_item_id, invoice_type, invoice_number)` and indexes on `(work_item_id, invoice_type)` and `invoice_date`. Cite: `backend/app/vat/models/vat_invoice.py:101-110`.
 
-**`VatAuditLog`** (`vat_audit_logs`) is append-only workflow history. Columns: `id`; `work_item_id` FK to `vat_work_items.id` non-null; `performed_by` FK to `users.id` non-null; free-string `action`; optional `old_value`, `new_value`, `note`; nullable `invoice_id` FK to `vat_invoices.id` with `SET NULL`; `performed_at`. Cite: `backend/app/vat/models/vat_audit_log.py:24-46`.
+**Audit storage:** VAT no longer writes or reads `VatAuditLog` in the active product flow. VAT mutations write `EntityAuditLog` through `EntityAuditWriter` and the generic audit policy. The legacy `vat_audit_logs` table/model still exists only until the Phase 9 cleanup migration; no current VAT route/service reads it.
 
 ## Enums / statuses
 
@@ -108,17 +114,16 @@ Other VAT enums:
 - Credit notes are stored with positive amounts but contribute as negative values during aggregation. Cite: `backend/app/vat/repositories/vat_invoice_aggregation_repository.py:18-27`.
 - Work-item VAT totals are recalculated after invoice create/update/delete. Output VAT includes standard-rate income VAT; input VAT is expense VAT multiplied by `deduction_rate`; `net_vat = output - input`. Cite: `backend/app/vat/services/data_entry_common.py:51-60`, `backend/app/vat/repositories/vat_invoice_aggregation_repository.py:29-87`, `backend/app/vat/repositories/vat_work_item_write_repository.py:151-171`.
 - `ready-for-review` only accepts `data_entry_in_progress`; `send-back` requires a non-empty correction note and transitions back to `data_entry_in_progress`. Cite: `backend/app/vat/services/data_entry_status.py:17-49`, `backend/app/vat/services/data_entry_status.py:52-90`.
-- Filing requires transition to be allowed by `VALID_TRANSITIONS`, permits optional override only with justification, and writes final filing fields plus audit entries. Cite: `backend/app/vat/services/constants.py:7-25`, `backend/app/vat/services/filing.py:46-114`.
-- The `filed` VAT audit entry uses the work item's `filed_at` as its `performed_at`, so filing history displays the actual filing timestamp rather than a later sync/seed/write timestamp. Cite: `backend/app/vat/services/filing.py:111-123`, `backend/app/seed/builders/demo/vat.py:466-499`.
+- Filing requires transition to be allowed by `VALID_TRANSITIONS`, permits optional override only with justification, and writes final filing fields plus generic `EntityAuditLog` entries. If an override amount is supplied, `vat_work_item.amount_overridden` is written before `vat_work_item.filed`; otherwise only `vat_work_item.filed` is written. Cite: `backend/app/vat/services/vat_filing_service.py`.
 - Filing requires `assigned_to` to be non-null; filing an unassigned item raises `VAT.ASSIGNEE_REQUIRED`. Cite: `backend/app/vat/services/filing.py:66-67`.
 - Generic work-item PATCH is limited to operational metadata: `assigned_to` and `pending_materials_note`. It uses partial-update semantics, so omitted fields are not changed and explicit `null` clears nullable metadata. It does not update status, period, client identity, VAT totals, filing fields, amendment fields, or calendar snapshot fields.
 - Filed work items reject generic metadata PATCH and DELETE with `VAT.FILED_IMMUTABLE`; filed VAT periods are records of filing and must not be hidden through delete.
-- Work-item DELETE is soft delete only for non-filed mistaken obligations: it sets `deleted_at`, `deleted_by`, and `updated_at`, preserves invoices and audit logs, and appends a VAT audit entry. Soft-deleted items are excluded from list, lookup, detail, and client-summary query results through existing `deleted_at IS NULL` repository filters.
+- Work-item DELETE is soft delete only for non-filed mistaken obligations: it sets `deleted_at`, `deleted_by`, and `updated_at`, preserves invoices and generic audit history, and writes `vat_work_item.deleted`. Soft-deleted items are excluded from list, lookup, detail, and client-summary query results through existing `deleted_at IS NULL` repository filters.
 - `is_amendment=True` requires `amends_item_id`; omitting it raises `VAT.AMENDMENT_ID_REQUIRED`. Amendment validation (client match, filed status, cycle detection) runs only when `amends_item_id` is provided. Cite: `backend/app/vat/services/filing.py:69-73`.
 - Amendments can point to an existing filed work item for the same client, and amendment cycles are rejected. Cite: `backend/app/vat/services/filing.py:24-44`.
 - `business_activity_id` on invoice update must belong to the same legal entity as the work item's client record; mismatched or non-existent IDs return `BUSINESS_ACTIVITY.NOT_FOUND` (404, no existence leak). Cite: `backend/app/vat/services/data_entry_invoice_update.py:79-87`.
 - `due_date_original` is immutable after it is first set. If `due_date_effective` differs from `due_date_original`, a non-empty `due_date_override_reason` is required. Cite: `backend/app/vat/models/due_date_snapshot_events.py:9-46`.
-- Audit actions are stored as strings from service constants, not enum values. Cite: `backend/app/vat/models/vat_audit_log.py:3-12`, `backend/app/vat/services/constants.py:27-35`.
+- VAT audit actions are namespaced strings from `backend/app/audit/audit_constants.py`, not enums. Work-item actions are `vat_work_item.created`, `vat_work_item.status_changed`, `vat_work_item.filed`, `vat_work_item.amount_overridden`, `vat_work_item.updated`, and `vat_work_item.deleted`. Invoice actions are `vat_invoice.created`, `vat_invoice.updated`, `vat_invoice.amount_changed`, and `vat_invoice.deleted`. Every VAT audit row must carry `metadata_json.client_record_id`; invoice rows also carry `metadata_json.vat_work_item_id` and invoice context. Cite: `backend/app/vat/vat_audit.py`, `backend/app/audit/audit_write_policy.py`.
 
 ## Error codes
 
@@ -173,7 +178,7 @@ No open known issues.
 6. **Filed VAT periods are immutable for invoice mutation.** Confirmed in `backend/app/vat/services/data_entry_common.py:32-35`.
 7. **Credit notes reverse totals without storing negative document amounts.** Confirmed in `backend/app/vat/models/vat_invoice.py:79-81` and `backend/app/vat/repositories/vat_invoice_aggregation_repository.py:18-27`.
 8. **Business activity is optional tagging, not the VAT owner.** `business_activity_id` may be null on invoices, and VAT work items remain owned by the client record. Confirmed in `backend/app/vat/models/vat_invoice.py:52-56`.
-9. **Audit action names are flexible strings.** They are intentionally not enum-backed to avoid migrations for new actions. Confirmed in `backend/app/vat/models/vat_audit_log.py:3-12`.
+9. **VAT audit is entity-scoped.** Work-item lifecycle history belongs to `vat_work_item`; invoice add/update/delete/amount-change history belongs to `vat_invoice` with the owning work item in `metadata_json.vat_work_item_id`. A work-item History tab that reads only `/audit/vat_work_item/{id}` will not show invoice events. Product follow-up for a possible aggregated VAT-period history view is tracked in `docs/vat-history-product-followup.md`.
 
 ## Future / planned
 
