@@ -612,17 +612,21 @@ Frontend changed:
 - yes (drawer contract/rendering, labels, generated types)
 
 Tests/checks run:
-- Backend focused: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m pytest tests/signature_requests tests/timeline/service/test_timeline_signature_lifecycle.py` → 43 passed.
-- Backend focused lint: `APP_ENV=test JWT_SECRET=x ./.venv/bin/ruff check app/audit app/signature_requests app/timeline app/annual_reports/services/annual_report_status_service.py app/seed/builders/demo/signature_requests.py tests/signature_requests tests/timeline/service/test_timeline_signature_lifecycle.py --fix` → clean after import/order fixes.
-- OpenAPI/types: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json`; `npm run gen:types` rerun after export. Diff is signature-schema only for generated types.
-- Frontend focused: `npm run typecheck` and `npm run lint` passed.
+- Backend focused: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m pytest tests/signature_requests/api/test_signature_requests.py tests/timeline/service/test_timeline_client_builders.py tests/timeline/service/test_timeline_signature_lifecycle.py` → 13 passed.
+- Backend full: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m pytest` → 1567 passed, 1 skipped.
+- Backend static: `ruff format --check .` → 923 files already formatted; `ruff check .` → pass; `pyright` → 0 errors, 0 warnings, 0 informations; `vulture` → pass.
+- Audit scripts: migration chain linear (3 files), role coverage 214 protected routes, pagination 31/31, enum sync clean, unused-routes script exit 0 with the existing reminders candidates (`GET/POST /api/v1/reminders/`, `GET /api/v1/reminders/{reminder_id:int}`, `POST /api/v1/reminders/{reminder_id:int}/cancel`).
+- OpenAPI/types: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi --output openapi.json`; `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.check_contract_sync --path openapi.json` → in sync; `npm run gen:types` rerun after export.
+- Frontend: `npm run typecheck`, `npm run lint`, `npm run test` → 17 files / 60 tests passed, `npm run format:check`, `npm run arch:check`, `npm run arch:check:strict`, `npm run unused` all exit 0. `npm run unused` still reports the existing tag hint `VAT_WORK_ITEM_STATUS_VALUES -> @auditContract`.
 
 Result:
-- COMPLETED. Production signature-request audit no longer writes or reads `SignatureAuditEvent`; embedded advisor audit history is authorized through `AuditTrailService` and displays the new item shape; timeline signature events keep the same five event types; signature auto-submit no longer uses `_SYSTEM_USER_ID=0`; OpenAPI/generated types are synced for the signature surface. No migration added.
+- COMPLETED and verification-closed. Production signature-request audit no longer writes or reads `SignatureAuditEvent`; embedded advisor audit history is authorized through `AuditTrailService` and displays the new item shape; timeline signature events keep the same five event types; signature auto-submit no longer uses `_SYSTEM_USER_ID=0`; OpenAPI/generated types are synced for the signature surface. No migration added.
 
 Important findings:
 - The Phase-2 signature policy predeclared `signature_request.signed` with `signed_document_key` required. Phase 6 corrected this to match §8a: `signed_document_key` is captured only when available, while `content_hash` is captured when available and otherwise `content_hash_missing=true`.
+- Post-hoc review closed the remaining verification gaps: missing-hash signing succeeds and records `content_hash_missing=true`; viewed/declined forensic metadata is visible to both ADVISOR and SECRETARY; declined reason metadata is allowed by policy; `signature_request.annual_report_signed` is preserved; annual-report auto-submit writes a system actor without `_SYSTEM_USER_ID=0`; embedded audit is chronological while the generic audit endpoint remains newest-first.
 - The embedded audit service method returns items in chronological order to preserve the old drawer behavior; the generic audit endpoint remains newest-first.
+- The full backend run caught a stale timeline-client-builder fixture that still used old `event_type`/`occurred_at` names; it was updated to the generic `EntityAuditLog` shape.
 - Remaining `SignatureAuditEvent` references are the retained legacy ORM model/table and historical docs/Phase-0 inventory, not production writers/readers.
 
 Decisions made:
@@ -630,7 +634,7 @@ Decisions made:
 - Kept decline reason as the audit `note` snapshot for timeline parity; cancellation/expiry reasons are additionally stored in metadata when available.
 
 Risks/blockers:
-- Full backend/frontend suites were not yet run at this point in the log; run them before final merge if this branch is used as the release gate.
+- No Phase-6 blockers. Residual verification notes are existing baseline reports only: reminders unused-route candidates from the backend route audit and the VAT `@auditContract` tag hint from frontend unused analysis.
 
 Next safe step:
 - Phase 7 — Rebuild timeline/dashboard single-source registry and duplicate handling. Do not drop legacy `signature_audit_events` until Phase 9.
