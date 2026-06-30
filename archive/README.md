@@ -41,6 +41,8 @@ Each captured the old `backend/app/<domain>/README.md` (or equivalent legacy spe
 - `migration-phases.md` — historical backend domain migration execution plan (structural migration complete). Replaced by `docs/project/backend-module-map.md` (package inventory) and `docs/domains/*` (canonical behavior).
 - `frontend-ui-audit-todo.md` — frontend UI audit (16 findings: RTL, a11y, state/table, forms). All findings resolved in code before archiving; durable rules live in `docs/frontend/ui-guidelines.md`. Historical only.
 - `design-system-audit-plan.md` — 2026-06-28 design-system reuse & primitive-API audit (full catalog F1–F19). Batch 1 (safe) + Batch 2 (additive props) done in code; conventions landed in `docs/frontend/ui-guidelines.md`. Remaining Batch 3 follow-up tracked at `docs/frontend/design-system-followup.md`. This catalog is historical only.
+- `audit-refactor-progress.md` — phase-by-phase execution log (Phases 0–10) of the audit-model refactor that collapsed seven audit models to two (`EntityAuditLog` + `UserAuditLog`). Refactor complete. Current canonical audit behavior: `docs/domains/audit.md`. Historical only.
+- `audit-refactor-phase-0-report.md` — Phase-0 baseline/inventory for that refactor (write-site counts, enum ownership, action/authorization matrices). Inputs to the now-complete refactor; superseded by the shipped code and `docs/domains/audit.md`. The implementation-plan companion doc was deleted (not archived) when the work shipped. Historical only.
 
 ### Historical generated scans / gap analyses
 

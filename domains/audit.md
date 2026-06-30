@@ -15,7 +15,7 @@ Last verified against code + backend/openapi.json: 2026-06-30.
 
 ## Two audit models
 
-The audit refactor (see `docs/audit-refactor-implementation-plan.md`) has converged on exactly two audit models with **distinct shapes** — do not conflate them:
+The audit refactor (history archived at `docs/archive/audit-refactor-progress.md`) has converged on exactly two audit models with **distinct shapes** — do not conflate them:
 
 - **`EntityAuditLog`** (table `entity_audit_logs`, this domain) — business mutations + evidence events. Carries `actor_type`, `actor_display_name`, and JSON-object `old_value`/`new_value`/`metadata_json`. `performed_by` is nullable (system / external-signer rows have no `users.id`).
 - **`UserAuditLog`** (table `user_audit_logs`, owned by the `users` domain) — auth/security/admin-access events. Has **no** `old_value`/`new_value` and **no** `actor_type`; it stores a JSON-object `metadata_json` plus `actor_display_name` + `target_display_name` snapshots and the closed `AuditAction`/`AuditStatus` enums.
@@ -111,7 +111,7 @@ Registry: `docs/backend/error-codes.md`.
 
 ## Known issues
 
-- **§5a follow-up (deferred):** `actor_display_name` is fail-closed only for `system`/`external_signer`; for `user` rows it is encouraged but not enforced (the `performed_by` FK gives a read-time fallback). Audit rows written by internal machine paths (obligation orchestrator, freeze/close cascade, seed, excel import) therefore may carry no name snapshot and are not rename-stable. Strict `user → display required` + threading a display name through every such path is tracked for a later phase. See `docs/audit-refactor-progress.md` and `docs/audit-refactor-implementation-plan.md` §5a.
+- **§5a follow-up (deferred):** `actor_display_name` is fail-closed only for `system`/`external_signer`; for `user` rows it is encouraged but not enforced (the `performed_by` FK gives a read-time fallback). Audit rows written by internal machine paths (obligation orchestrator, freeze/close cascade, seed, excel import) therefore may carry no name snapshot and are not rename-stable. Strict `user → display required` + threading a display name through every such path is tracked for a later phase. See `docs/archive/audit-refactor-progress.md` (§5a follow-up).
 
 ## Decisions (preserved)
 
