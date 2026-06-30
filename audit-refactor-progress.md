@@ -2,13 +2,13 @@
 
 ## Current Status
 
-Status: Phase 6 COMPLETED (signature-request audit, embedded drawer trail, and timeline signature source moved to generic `EntityAuditLog`). Phase 7 not started.
+Status: Phase 7 COMPLETED (timeline change-log feed suppression derived from an explicit event-source registry; `_DEDUP_ACTIONS` retired; dashboard recent-activity locked as EntityAuditLog-only with its activity_type/label union test-locked). Phase 8 not started.
 
 Current phase:
-- Phase 6 — Replace SignatureAuditEvent (Completed)
+- Phase 7 — Timeline/dashboard single-source registry; retire dedup (Completed)
 
 Next phase:
-- Phase 7 — Rebuild timeline/dashboard (not started)
+- Phase 8 — Audit writes for currently-unaudited domains (not started)
 
 Phase 0 report:
 - docs/audit-refactor-phase-0-report.md (revised twice; status COMPLETED)
@@ -91,7 +91,7 @@ Progress log:
 | Phase 4 | Replace AnnualReportStatusHistory | Completed | Annual-report status writes/read UI/timeline moved to EntityAuditLog generic audit; legacy AR audit route/repo/schema removed; table kept for Phase 9 | this file (Phase 4 section) |
 | Phase 5 | Replace binder lifecycle/intake logs | Completed | Binder lifecycle + intake-edit audit moved to EntityAuditLog; timeline + dashboard binder sources repointed; legacy route/service/repos/schemas removed; frontend on generic route | this file (Phase 5 section) |
 | Phase 6 | Replace SignatureAuditEvent | Completed | Signature writers, embedded drawer trail, timeline signature source, seed, frontend drawer, OpenAPI/types moved to EntityAuditLog; legacy table kept for Phase 9 | this file (Phase 6 section) |
-| Phase 7 | Rebuild timeline/dashboard | Not started | Single-source registry, no duplicates | TBD |
+| Phase 7 | Timeline/dashboard single-source registry; retire dedup | Completed | Explicit `timeline_event_sources` registry derives the change-log suppression set; `_DEDUP_ACTIONS` retired; single-source proven (no duplicate events); dashboard recent-activity locked EntityAuditLog-only with activity_type/label union test-locked; OpenAPI + frontend types unchanged | this file (Phase 7 section) |
 | Phase 8 | Add missing audit writes | Not started | Add remaining domain audit coverage | TBD |
 | Phase 9 | Cleanup migration + seeds | Not started | Drop legacy tables, update seeds | TBD |
 | Phase 10 | Final full verification + contract sync | Not started | Final repo-wide contract sync + full verification (frontend consumers already migrated per-phase 1/3/4/5/6) | TBD |
@@ -521,6 +521,15 @@ Verification reported for Phase 4:
 - Signature auto-submit annual-report transition now uses a real generic-audit system actor instead of `_SYSTEM_USER_ID=0`.
 - Verification recorded in the full Phase 6 section below.
 
+### Phase 7 — COMPLETED (2026-06-30)
+
+- New `app/timeline/timeline_event_sources.py` registry makes "one source per category" explicit; `timeline_audit_aggregator.build_entity_audit_events` now derives its suppression set from `suppressed_actions_for(...)` and the hand-kept `_DEDUP_ACTIONS` dict was removed (filtering role preserved, proven equal to the legacy set).
+- New `tests/timeline/service/test_timeline_single_source.py` proves zero duplicate timeline events (no two share `(event_type, charge-id, binder-id, timestamp)`); `binder.handed_over` single-sourced to the live builder, `annual_report.status_changed` single-sourced to the dedicated builder. `tests/dashboard/service/test_recent_activity_service.py` extended to lock the activity_type/label union (no generic fallbacks).
+- Read-only consolidation: no audit write repointed, no migration, no legacy table dropped, no seed touched. OpenAPI export byte-identical to committed `openapi.json`; `gen:types` zero drift; both VERIFY surfaces unchanged.
+- Files: backend `timeline_event_sources.py` (new), `timeline_audit_aggregator.py`; tests `test_timeline_single_source.py` (new), `test_recent_activity_service.py`; docs `domains/timeline.md`, `domains/dashboard.md`, this log. `domains/audit.md` and `backend/architecture.md` unchanged (no read-flow / architecture rule changed).
+- Checks: full pytest 1574 passed / 1 skipped; ruff/pyright/vulture clean (only pre-existing `database.py` vulture FPs); audit scripts clean (reminders baseline only); contract sync in sync; frontend lint/typecheck/test/arch/unused green. Seed reset NOT run — Alembic uses Postgres-only `CREATE SEQUENCE`, no Postgres in sandbox; `create_all` (SQLite) passed; integrator to re-run seed reset on Postgres.
+- Plan-vs-code note: plan §4 lists annual_report "submitted" as a source, but only `annual_report.status_changed` exists in code; registry mirrors code.
+
 ## Phase 5 — Replace binder lifecycle + intake logs
 
 Status:
@@ -638,3 +647,60 @@ Risks/blockers:
 
 Next safe step:
 - Phase 7 — Rebuild timeline/dashboard single-source registry and duplicate handling. Do not drop legacy `signature_audit_events` until Phase 9.
+
+## Phase 7 — Timeline/dashboard single-source registry; retire dedup
+
+Status:
+- Completed
+
+Date:
+- 2026-06-30
+
+Goal:
+- Make "one source per category" EXPLICIT for the client timeline, prove zero duplicate timeline events, and retire the hand-kept `_DEDUP_ACTIONS` heuristic — without repointing any audit stream (Phases 4–6 already did that). Lock the dashboard recent-activity contract as EntityAuditLog-only. Timeline/dashboard READ consolidation only.
+
+Files changed:
+- Backend (new): `app/timeline/timeline_event_sources.py` — the explicit event-source registry (`TIMELINE_EVENT_SOURCES`, one `TimelineEventSource` per plan-§4 category) and `suppressed_actions_for(entity_type)`, which derives the change-log feed's suppression set from the registry. `AUDIT_AGGREGATOR_ENTITY_TYPES` documents the 4 entity types the feed scopes.
+- Backend (rewire): `app/timeline/timeline_audit_aggregator.py` — `build_entity_audit_events` now derives its per-entity suppression set from `suppressed_actions_for(...)` instead of the hand-kept `_DEDUP_ACTIONS` dict. The `_DEDUP_ACTIONS` symbol and its now-unused constant imports were removed. Behaviour identical; entity-type scope unchanged (client/business/charge/annual_report only).
+- Backend (tests, new): `tests/timeline/service/test_timeline_single_source.py` — (1) registry-level proof that the derived suppression set equals the exact legacy `_DEDUP_ACTIONS` set per entity, that each category has exactly one source, and that binder/signature are outside the aggregator scope; (2) a DB-driven full client timeline (binder received→full→reopen→full→ready→revert→ready→handover, plus annual_report `status_changed` + a non-suppressed `annual_report.updated`) asserting no two events share `(event_type, charge-id, binder-id, timestamp)` identity, that `binder.handed_over` is the live builder only (never a lifecycle row), and that `annual_report.status_changed` is the dedicated builder only (never re-emitted by the change-log feed).
+- Backend (tests, extended): `tests/dashboard/service/test_recent_activity_service.py` — locks the `activity_type` union (`created`/`updated`/`done`/`charge`), asserts every labeled action declares an explicit `activity_type` (no silent `"updated"` fallback), and every typed action has a display label (no generic-label fallback).
+- Docs: `docs/domains/timeline.md` (new change-log-feed + event-source-registry sections with the one-source-per-category table; rule #5 wording now points at the registry instead of "dedup heuristics"), `docs/domains/dashboard.md` (recent-activity locked-contract paragraph), and this progress log. `docs/domains/audit.md` unchanged (no audit read-flow statement changed — suppression is a timeline concern, not an `AuditTrailService` concern). `docs/backend/architecture.md` untouched (no architecture rule changed).
+
+Production code changed:
+- yes (timeline change-log aggregator + new registry module; read-side only)
+
+Migrations changed:
+- no (no migration added; chain still linear, 3 files)
+
+Schemas/OpenAPI changed:
+- no (OpenAPI export byte-identical to committed `openapi.json`; `/clients/{id}/timeline` event_type union and `/dashboard/overview` activity_type/recent_activity item schema unchanged)
+
+Frontend changed:
+- no (`gen:types` produced zero drift vs committed `generated.ts`; no source change)
+
+Tests/checks run:
+- Backend full: `APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m pytest` → 1574 passed, 1 skipped (was 1567; +7 new Phase-7 tests).
+- Targeted (load-bearing): `pytest tests/timeline tests/dashboard tests/core/test_openapi_audit_paths.py tests/regression/test_readonly_endpoints_no_side_effects.py` → 62 passed.
+- Backend static: `ruff format --check` (changed files) clean; `ruff check .` → All checks passed; `pyright` (full) → 0 errors / 0 warnings / 0 informations; `vulture` → only the pre-existing `app/database.py` event-callback false positives (untouched by this phase, present pre-Phase-7).
+- Audit scripts: migration chain linear (3 files); role coverage 214 protected routes; pagination 31/31; enum sync clean; unused-routes = exactly the pre-existing reminders baseline (4 candidates). SQLite `create_all` OK.
+- Contract VERIFY: `export_openapi.py` → diff vs committed `openapi.json` = 0 lines; `check_contract_sync --path openapi.json` → in sync. Both VERIFY surfaces (`/clients/{id}/timeline`, `/dashboard/overview` + `RecentActivityItem`) byte-identical.
+- Frontend: `gen:types` (pinned openapi-typescript@7.13.0 + prettier) → 0-line drift in `generated.ts`; `typecheck`, `lint`, `test` (18 files / 61 tests), `format:check`, `arch:check`, `arch:check:strict`, `unused` all green (the 3 unused exports + 1 `@auditContract` tag hint are the existing binder/VAT baseline, not from this phase).
+
+Result:
+- COMPLETED. The timeline change-log feed's suppression set is now derived from one explicit, readable registry; `_DEDUP_ACTIONS` is retired with its filtering role preserved (proven equal to the legacy set). Zero duplicate timeline events proven via the new single-source test. Dashboard recent-activity is verified EntityAuditLog-only with its activity_type/label union locked by tests. No audit write repointed, no migration, no legacy table dropped, no seed touched. OpenAPI + frontend types unchanged.
+
+Important findings:
+- The plan-§4 table lists "annual_report status changed / **submitted**", but no `annual_report.submitted` audit action exists in code — the only dedicated annual-report audit source is `annual_report.status_changed`. The registry mirrors the code (status_changed only); this is a doc-vs-code wording gap in the plan, not a behaviour gap. Flagged here; no code change made.
+- The committed `openapi.json` and `generated.ts` were NOT stale relative to the app for these surfaces: export and `gen:types` both produced zero diff. The earlier "pre-existing stale generated files" note did not bite this phase (read-only change, schema-neutral).
+- The aggregator only scopes client/business/charge/annual_report, so binder/signature `owns_audit_actions` in the registry are never selected by `suppressed_actions_for` — they are recorded for documentation completeness. No category was found to have two live sources (the §4 duplicate-bug stop-condition did not trigger).
+
+Decisions made:
+- Registry models suppression as "the audit actions a dedicated builder owns" (`owns_audit_actions`), keyed by the namespaced action's entity prefix, and intersected with the aggregator's entity scope. This reproduces `_DEDUP_ACTIONS` exactly while making the rationale explicit and per-category.
+- The new single-source test asserts signature single-sourcing at the registry level (signature excluded from the aggregator scope) rather than driving a full signature-service flow in the same test; the live signature timeline path is already covered by `test_timeline_signature_lifecycle.py` (Phase 6). This avoids duplicating heavy signature plumbing while still proving the no-double-source guarantee.
+
+Risks/blockers:
+- Seed reset was NOT run in this environment: the project's Alembic migrations use Postgres-only `CREATE SEQUENCE`, so `alembic upgrade head` (a precondition of `seed_reset`) cannot run against SQLite, and no Postgres instance is available in this sandbox. The change touches no seed builder, no model, and no migration; SQLite `create_all` passing confirms import/schema health. Seed reset should be re-run by the integrator against Postgres (expected clean — no seed/model surface changed).
+- No other blockers. Legacy `signature_audit_events` and the other four legacy tables remain for the Phase 9 cleanup migration.
+
+Next safe step:
+- Phase 8 — add `EntityAuditLog` writes for the currently-unaudited domains (the §13 missing-actor surfaces and any domain not yet emitting generic audit), per the plan. Do NOT drop legacy tables or touch seeds (Phase 9). Phase 7 changed only timeline/dashboard reads, so Phase 8 starts from a clean single-source timeline.

@@ -96,6 +96,8 @@ Composed of `monthly`, `bimonthly`, and nested `advance_payments` (itself monthl
 | `href` | str | Deep-link path |
 | `activity_type` | str | One of `created`, `charge`, `done`, `updated` |
 
+**Locked contract (Phase 7).** Recent activity is sourced from a **single `EntityAuditLog` stream** — no other audit source feeds it. The `activity_type` union (`created`, `charge`, `done`, `updated`) and the `_ACTION_LABELS` / `_ACTIVITY_TYPES` coverage are the locked contract: every labeled action declares an explicit `activity_type`, and every typed action has a display label, so a future action rename can never silently drop a row to the generic `"updated"` fallback or the `"בוצעה פעולה ב…"` label. Enforced by `tests/dashboard/service/test_recent_activity_service.py` (`test_activity_type_union_is_locked`, `test_every_labeled_action_has_an_explicit_activity_type`, `test_every_typed_action_has_a_label`).
+
 ## Enums / statuses
 
 Dashboard itself defines no enums. It references enums from other domains:

@@ -87,6 +87,33 @@ The domain has no enum models of its own. Event types are string constants assem
 |---|---|
 | `annual_report_status_changed` | One row per `EntityAuditLog` entry with action `annual_report.status_changed` |
 
+### Change-log feed / entity-audit events (`backend/app/timeline/timeline_audit_aggregator.py`)
+
+The "יומן שינויים" feed surfaces the remaining `EntityAuditLog` rows for the client, its businesses, charges, and annual reports as generic change events. It is scoped to **exactly four entity types** (`client`, `business`, `charge`, `annual_report`); binder and signature audit reach the timeline through their own readers, never this feed.
+
+| `event_type` | Trigger |
+|---|---|
+| `client_record_changed` | `EntityAuditLog` `client.*` rows **not owned by a live builder** |
+| `business_changed` | `EntityAuditLog` `business.*` rows |
+| `charge_changed` | `EntityAuditLog` `charge.*` rows **not owned by a live builder** |
+| `annual_report_changed` | `EntityAuditLog` `annual_report.*` rows **not owned by a dedicated builder** |
+
+### Event-source registry — one source per category (`backend/app/timeline/timeline_event_sources.py`)
+
+Each logical timeline category has **exactly one** source: a dedicated *live builder* or a generic *EntityAuditLog action*. The registry (`TIMELINE_EVENT_SOURCES`) is the single readable source-of-truth for that mapping. The change-log feed derives its suppression set from the registry (`suppressed_actions_for`) — an audit action a live builder already owns is never re-emitted as a raw change-log row. This replaced the hand-kept `_DEDUP_ACTIONS` dict (retired in Phase 7); single-source behaviour is proven by `tests/timeline/service/test_timeline_single_source.py`.
+
+| Category | Single source |
+|---|---|
+| client created | live builder (`client_created_event`) — suppresses `client.created` in the feed |
+| business changed | EntityAuditLog `business.*` (change-log feed) |
+| charge created / issued / paid + invoice attached | live builders (`charge_*`, `invoice_attached`) — suppress `charge.created`/`.issued`/`.paid` in the feed |
+| annual_report status changed | dedicated builder reading EntityAuditLog `annual_report.status_changed` — suppresses that action in the feed |
+| binder received / handed_over | live builders (`binder_received`, `binder_handed_over`) |
+| binder lifecycle (marked_full / reopened / ready / reverted) | EntityAuditLog `binder.*` via `_append_lifecycle_change_events` (excludes received / handed_over) |
+| signature lifecycle (sent / viewed / signed / declined / canceled / expired) | EntityAuditLog `signature_request.*` via `list_signature_lifecycle_events` |
+| document uploaded | live `PermanentDocument` builder (`document_uploaded_event`) |
+| notifications sent / failed | live `Notification` builders |
+
 ### Client / document events (`backend/app/timeline/services/timeline_client_builders.py`)
 
 | `event_type` | Trigger |
@@ -130,7 +157,7 @@ All rules sourced from `backend/app/timeline/services/timeline_service.py` unles
 
 4. **Per-client bulk safety cap: `_TIMELINE_BULK_LIMIT = 500`.** Applied to high-volume sources: charges, permanent documents, signature lifecycle events, annual report status audit events, and notifications. Events beyond this cap per source are silently truncated — oldest events disappear without notice. (`timeline_service.py:39`, `timeline_repository.py:11`)
 
-5. **Binder lifecycle source (Phase 5).** Binder lifecycle events are read from `EntityAuditLog` `binder.*` rows via an explicit action allowlist (`marked_full`, `reopened`, `marked_ready_for_handover`, `reverted_ready`) — `binder.created`, `binder.material_received`, and `binder.handed_over` are excluded so reception/handover stay single-sourced from the live `binder_received`/`binder_handed_over` builders. This replaced the legacy `BinderLifecycleLog` reader and its old-value/new-value dedup heuristics. (`timeline_service.py`)
+5. **Binder lifecycle source (Phase 5).** Binder lifecycle events are read from `EntityAuditLog` `binder.*` rows via an explicit action allowlist (`marked_full`, `reopened`, `marked_ready_for_handover`, `reverted_ready`) — `binder.created`, `binder.material_received`, and `binder.handed_over` are excluded so reception/handover stay single-sourced from the live `binder_received`/`binder_handed_over` builders. This replaced the legacy `BinderLifecycleLog` reader. Single-source guarantees are now enforced by the explicit event-source registry (`timeline_event_sources.py`), which replaced the old `_DEDUP_ACTIONS` heuristic in Phase 7. (`timeline_service.py`)
 
 6. **Annual report events from audit, not report row.** Events are emitted per `EntityAuditLog` row where `entity_type = annual_report` and `action = annual_report.status_changed` (one event per audited status transition), not from the current report state. (`timeline_repository.py:63-110`, `timeline_service.py:206-207`)
 
