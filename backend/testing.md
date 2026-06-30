@@ -22,12 +22,12 @@ Source of truth: mandatory
 - Standard backend auth fixtures include `test_user`, `secretary_user`, `auth_token`, `secretary_token`, `advisor_headers`, and `secretary_headers`.
 - The standard HTTP integration fixture is `client`; it overrides `get_db` to use `test_db`.
 - Parameterized test-data fixtures are `user_factory`, `client_factory`, `business_factory`,
-  `client_business_factory`, and `annual_report_factory`. Prefer them over repeating ORM constructors
-  or adding equivalent per-file setup helpers.
+  `create_client_with_business`, and `annual_report_factory`. Prefer them over repeating ORM
+  constructors or adding equivalent per-file setup helpers.
 - Factory defaults create unique identities. Pass only fields relevant to the behavior under test.
-- `user_factory` and `client_business_factory` commit by default because their common consumers are
-  API tests. The other factories flush by default; pass `commit=True` only when a commit boundary is
-  part of the setup requirement.
+- `user_factory` and `create_client_with_business` commit by default because their common consumers
+  are API tests. The other factories flush by default; pass `commit=True` only when a commit boundary
+  is part of the setup requirement.
 - Tests should use identity helpers such as `seed_client_identity()` and `seed_business()` to create the `LegalEntity` -> `ClientRecord` -> `Business` graph.
 - Prefer service tests for business logic. Service tests instantiate the service directly with `test_db` and should not mock repositories or sessions.
 - HTTP integration tests should use `TestClient` for routing, auth, request/response contracts, and middleware behavior.
