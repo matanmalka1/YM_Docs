@@ -14,7 +14,9 @@ YM Tax CRM is an internal staff CRM for clients, binders, billing, charges, tax 
 
 The staff-facing roles are `ADVISOR` for full access and `SECRETARY` for operational access with limited write permissions.
 
-The backend is Python 3.12+, FastAPI, Uvicorn, SQLAlchemy 2.0 ORM, Alembic, and Pydantic v2.
+The backend is Python 3.13, FastAPI, Uvicorn, SQLAlchemy 2.0 ORM, Alembic, and Pydantic v2. Render's
+native Python runtime tops out at 3.13, so the code must stay 3.13-compatible even where local
+machines run 3.14; see `docs/backend/architecture.md` for the rules this implies.
 
 Backend authentication uses JWT HS256, bcrypt password hashing, and `token_version` invalidation.
 

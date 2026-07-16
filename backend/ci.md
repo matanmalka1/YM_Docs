@@ -44,7 +44,7 @@ push to main / pull_request
 | Job | Runs | Notes |
 |-----|------|-------|
 | **lint** | `ruff check .` + `ruff format --check .` | Installs only ruff (fast). `alembic/` is excluded per `pyproject.toml`. |
-| **typecheck** | `pyright` | Lenient — `pyrightconfig.json` disables most `report*` checks, so it catches undefined names / bad imports / syntax, not strict typing. `--pythonpath` bypasses the config's absolute local `venvPath`. |
+| **typecheck** | `pyright` | Lenient — `[tool.pyright]` in `pyproject.toml` disables most `report*` checks, so it catches undefined names / bad imports / syntax, not strict typing. `--pythonpath` supplies the CI interpreter, since the config's `venvPath` has no `.venv` here. |
 | **test** | `pytest --cov=app` | In-memory SQLite; sets `APP_ENV=test` itself; `JWT_SECRET` is the only required env. Coverage is reported, not enforced. |
 | **openapi-sync** | `check_contract_sync.py` | Ensures committed `openapi.json` matches the app. No DB. See [Why openapi-sync matters](#why-openapi-sync-matters). |
 | **migrations** | head-divergence + Postgres roundtrip + `alembic check` | Real Postgres 17 service (matches Neon in production). |
@@ -97,8 +97,7 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 | File | Role |
 |------|------|
 | `backend/.github/workflows/ci.yml` | the workflow |
-| `backend/pyproject.toml` | ruff config; `target-version = "py314"`; `alembic` excluded from lint |
-| `backend/pyrightconfig.json` | pyright config; absolute local `venvPath` (bypassed in CI via `--pythonpath`); most `report*` checks disabled |
+| `backend/pyproject.toml` | ruff config (`target-version = "py313"`, must not exceed 3.13; `alembic` excluded from lint) and pyright config under `[tool.pyright]`; most `report*` checks disabled. A local `pyrightconfig.json` would silently override the pyright section — do not reintroduce one |
 | `backend/scripts/tooling/check_contract_sync.py` | compares committed `openapi.json` to the live app |
 | `backend/pytest.ini` | pytest config (SQLite, `APP_ENV=test`) |
 | `backend/alembic/versions/*` | migrations validated by the roundtrip |
@@ -114,7 +113,15 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 | `JWT_SECRET` | `ci-test-only` | Required for app import; value is throwaway. |
 | `DATABASE_URL` | `postgresql+psycopg2://postgres:postgres@localhost:5432/binder_crm` | Migrations job only — points alembic at the Postgres service. Scheme must be `+psycopg2` (the installed driver). |
 
-Python is pinned to `3.13.4` across all jobs, matching Render's production runtime (Render supports 3.8–3.13 only; 3.14 is not yet available there) and the frontend [api-drift](../frontend/api-drift-ci.md) job.
+Python is pinned to `3.13.4` across all jobs, matching Render's production runtime and the frontend
+[api-drift](../frontend/api-drift-ci.md) job.
+
+This pin is load-bearing, not cosmetic. Render supports Python 3.8–3.13 only, and an unsupported
+`PYTHON_VERSION` does not fail the build — it silently falls back to Render's default. Local machines
+run 3.14, where PEP 649 defers annotation evaluation, so code that raises `NameError` on 3.13 imports
+fine locally. CI on 3.13 is what catches that, because merely importing the app reproduces the
+failure. If CI is moved to 3.14, that safety net disappears and the breakage reappears only on
+deploy. See `docs/backend/architecture.md` for the 3.13 rules this enforces.
 
 ---
 
@@ -129,6 +136,9 @@ cd backend
 
 # typecheck
 ./.venv/bin/pyright
+
+# annotations that would NameError on Render's 3.13 but not on a local 3.14
+./.venv/bin/python scripts/audit/check_eager_annotations.py --fail-on-findings
 
 # tests (+ coverage)
 APP_ENV=test JWT_SECRET=x ./.venv/bin/pytest --cov=app --cov-report=term-missing

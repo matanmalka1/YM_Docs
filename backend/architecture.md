@@ -13,6 +13,20 @@ Source of truth: mandatory
 
 # Backend Architecture
 
+## Runtime and language
+
+- Backend code must run on Python 3.13. Render's native Python runtime tops out at 3.13, so an
+  unsupported `PYTHON_VERSION` in `render.yaml` does not fail the build — it silently falls back to
+  Render's default and the app crashes on import.
+- Do not use syntax or semantics newer than 3.13, even though local machines may run 3.14.
+  `except (A, B):` must keep its parentheses; unparenthesized `except A, B:` (PEP 758) is 3.14-only
+  and a `SyntaxError` on 3.13.
+- `target-version` in `pyproject.toml` must stay at or below `py313`. Under `py314`, `ruff format`
+  rewrites `except (A, B):` into the 3.14-only form, so formatting on save reintroduces the crash.
+- Any module whose annotations reference a `TYPE_CHECKING`-only import, or a class defined later in
+  the same file, must declare `from __future__ import annotations`. Python 3.14 defers annotation
+  evaluation (PEP 649) and 3.13 does not, so these raise `NameError` on Render while passing
+  locally. `scripts/audit/check_eager_annotations.py` detects both cases statically.
 - Backend code must follow Router -> Service -> Repository -> DB.
 - Routed backend domains must follow this vertical slice:
 
