@@ -114,7 +114,7 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 | `JWT_SECRET` | `ci-test-only` | Required for app import; value is throwaway. |
 | `DATABASE_URL` | `postgresql+psycopg2://postgres:postgres@localhost:5432/binder_crm` | Migrations job only — points alembic at the Postgres service. Scheme must be `+psycopg2` (the installed driver). |
 
-Python is pinned to `3.14` across all jobs, matching the backend target and the frontend [api-drift](../frontend/api-drift-ci.md) job.
+Python is pinned to `3.13.4` across all jobs, matching Render's production runtime (Render supports 3.8–3.13 only; 3.14 is not yet available there) and the frontend [api-drift](../frontend/api-drift-ci.md) job.
 
 ---
 
