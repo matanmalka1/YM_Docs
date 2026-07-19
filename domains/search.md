@@ -10,53 +10,58 @@ Source of truth: mandatory
 
 # Search
 
-The search domain exposes one role-gated unified endpoint that composes client, binder, and permanent-document lookups into a single response. It is an orchestration layer over other domains' repositories and does not own persisted tables of its own.
-Last verified against code + backend/openapi.json: 2026-06-14.
+The search domain exposes one role-gated unified endpoint that composes client/binder projections, permanent documents, and operational items into one response. It is an orchestration layer over other domains and does not own persisted tables of its own.
+Last verified against code + backend/openapi.json: 2026-07-19.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/api/v1/search` | Unified search across client records, active binders, and matching permanent documents with optional filters and pagination. |
+| `GET` | `/api/v1/search` | Unified search across client/binder relations, documents, tasks, VAT work items, annual reports, charges, and advance payments. |
 
-The module router is defined with `prefix="/search"` at `backend/app/search/api/search.py:11-18`, and the effective path exists in `backend/openapi.json:7484-7673`.
+The module router is defined with `prefix="/search"` in `backend/app/search/api/search_routes.py`, and the effective path is published in `backend/openapi.json`.
 
 ## Model & fields
 
-This domain has no `backend/app/search/models/` package and no search-owned persisted SQLAlchemy models; `backend/app/search` contains only `api/`, `schemas/`, and `services/` directories (`find backend/app/search -maxdepth 2 -type d`).
+This domain has no `backend/app/search/models/` package and no search-owned persisted SQLAlchemy models; its repositories build read-only projections over models owned by the source domains.
 
 The domain-owned response projections are:
 
-- `SearchResult` (`backend/app/search/schemas/search.py:4-14`): `result_type` (non-null `str`), `client_record_id` (non-null `int`), `office_client_number` (`int | None`), `client_name` (non-null `str`), `id_number` (`str | None`), `client_status` (`str | None`), `binder_id` (`int | None`), `binder_number` (`str | None`).
+- `SearchResult`: one DB-projected client/binder relation. `result_type` is `client` when there is no matching binder and `binder` when binder identity is present; the row always carries the owning client's identity and may carry binder identity.
 - `DocumentSearchResult` (`backend/app/search/schemas/search.py:17-28`): `id` (non-null `int`), `client_record_id` (non-null `int`), `office_client_number` (`int | None`), `client_name` (non-null `str`), `business_id` (`int | None`), `business_name` (`str | None`), `document_type` (non-null `str`), `original_filename` (`str | None`), `tax_year` (`int | None`).
-- `SearchResponse` (`backend/app/search/schemas/search.py:31-38`): `results` (non-null list), `documents` (non-null list with default empty list), `page` (non-null `int`), `page_size` (non-null `int`), `total` (non-null `int`).
+- `OperationalSearchItem`: a thin cross-domain result carrying its type, entity id, owning client identity, display title/detail, raw status, optional amount, and frontend deep link.
+- `OperationalSearchGroup`: up to 5 preview items plus the full matching `total` for one domain.
+- `OperationalSearchResults`: grouped `tasks`, `vat_work_items`, `annual_reports`, `charges`, and `advance_payments`.
+- `SearchResponse`: the existing `results` and `documents`, the grouped `operational` result block, and primary-result pagination metadata.
 
 ## Enums / statuses
 
 Search accepts these real enum values from code:
 
-- `ClientStatus`: `active`, `frozen`, `closed` (`backend/app/clients/enums.py:4-7`).
+- `ClientStatus`: `active`, `frozen`, `closed` (`backend/app/clients/client_enums.py`).
 - `EntityType`: `osek_patur`, `osek_murshe`, `company_ltd`, `employee` (`backend/app/common/enums.py:20-33`).
 - `BinderLocationStatus`: `in_office`, `ready_for_handover`, `handed_over` (`backend/app/binders/models/binder.py:20-24`).
 - `BinderCapacityStatus`: `open`, `full` (`backend/app/binders/models/binder.py:26-28`).
 
-Returned `SearchResult.result_type` values are `client` and `binder`, as emitted by `SearchService.search()` (`backend/app/search/services/search_service.py:75-90,118-128,157-168`) and described by the schema comment at `backend/app/search/schemas/search.py:7`.
+Returned `SearchResult.result_type` values are `client` and `binder`, as projected by `SearchResultRepository.search_primary(...)` and constrained by the schema literal.
 
 ## Domain rules & invariants
 
-- Access is router-gated to `ADVISOR` and `SECRETARY` via `require_role(...)` (`backend/app/search/api/search.py:11-15`).
+- Access is router-gated to `ADVISOR` and `SECRETARY` via `require_role(...)` in `backend/app/search/api/search_routes.py`.
 - `SearchResult.client_name` always identifies the owning client, including for binder results. A business name must not replace it because a binder belongs to the client record and may contain material spanning all of that client's businesses.
-- The endpoint accepts optional filters `search`, `client_record_id`, `id_number`, `binder_number`, `client_status`, `entity_type`, `binder_location_status`, `binder_capacity_status`, `filename`, plus paginated `page>=1` and `1<=page_size<=100` (`backend/app/search/api/search.py:18-32`).
-- `search` is the only broad/free-text parameter. It matches client identity fields through `ClientRecordRepository.search(...)`, including legal/client name and ID number, and it also drives binder-number and permanent-document text matching where relevant.
-- `client_record_id` scopes results to an exact client record. For `search + client_record_id`, permanent-document matches use the client-scoped document query and do not return documents belonging to other clients.
-- Document matches are produced whenever either `search` or `filename` is present; otherwise `documents` is an empty list (`backend/app/search/services/search_service.py:50-58`).
-- If there is at least one client-side filter and no binder-side filter, search uses `ClientRecordRepository.search(...)` with DB-level pagination and returns only `client` rows in `results` (`backend/app/search/services/search_service.py:55-95`).
-- Any binder-side search path is assembled in memory, then paginated after result construction; the service hard-limits mixed-mode client fetches to `500` and binder fetches to `1000` (`backend/app/search/services/search_service.py:13-17,97-173`).
-- In binder mode, `search` is reused as a binder-number filter only when `binder_number` is absent and neither `client_record_id` nor `id_number` is provided (`backend/app/search/services/search_service.py:131-142`).
-- Active-binder enrichment for client rows comes from `map_active_by_clients(...)`, which returns only binders that are `in_office`, `open`, and not soft-deleted (`backend/app/search/services/search_service.py:71-72`; `backend/app/binders/repositories/binder_repository.py:501-525`).
-- Binder result rows come from `list_active(...)`, which excludes handed-over binders unless `binder_location_status == handed_over`, filters by optional location/capacity/binder number, and paginates before returning (`backend/app/search/services/search_service.py:131-141`; `backend/app/binders/repositories/binder_repository.py:156-205`).
-- Document search is capped at `50` results, searches filename-only when `filename` is present without `search`, otherwise searches `original_filename` or `document_type`, and returns only non-deleted, non-superseded documents (`backend/app/search/services/document_search_service.py:10,21-49`; `backend/app/documents/permanent_documents/repositories/permanent_document_repository.py:158-185`).
-- Document search enriches each result with `office_client_number` and `client_name` from `get_full_records_bulk(...)`, which itself filters to non-deleted client records (`backend/app/search/services/document_search_service.py:28-47`; `backend/app/clients/repositories/client_record_read_repository.py:117-126`).
+- The endpoint accepts optional filters `search`, `client_record_id`, `id_number`, `binder_number`, `client_status`, `entity_type`, `binder_location_status`, `binder_capacity_status`, `filename`, plus paginated `page>=1` and `1<=page_size<=100`.
+- `search` is the broad/free-text parameter. In primary results it explicitly matches client name, ID number, office client number, or binder number. It is never silently reassigned to the dedicated `binder_number` filter.
+- Primary search is one joined, DB-paginated projection owned by `SearchResultRepository`. Client filters and binder filters are combined with `AND`; the exact `total` comes from the same filtered statement. There is no in-memory concatenation or safety ceiling.
+- Each client/binder relation is emitted once. A client with a matching binder is not also emitted as a second client-only row. Multiple rows for one client are possible only when distinct binders independently match the filters.
+- `client_record_id` scopes results to an exact client record. For `search + client_record_id`, permanent-document matches cannot return documents belonging to other clients.
+- Document matches are produced whenever either `search` or `filename` is present; otherwise `documents` is an empty list.
+- A non-empty `search` value also searches operational items across task title/description, VAT period, annual-report year/reference, charge period/description, and advance-payment period/notes. All groups additionally match entity id, client name, office client number, client ID number, and an active binder number belonging to the client.
+- The advanced client/binder filters define a shared client scope for documents and operational groups. Thus client status/entity type and binder number/location/capacity constrain those secondary result sections as well as the primary table.
+- `client_record_id`, when supplied, scopes every result section to that exact client. Selecting a client without free text returns the latest operational previews for that client. Each operational group returns at most 5 preview rows and an exact count; it does not flatten unlike entity types into the primary paginated `results` list.
+- Operational result links identify the concrete entity. Advance-payment links carry `advance_payment_id`; the client advance-payments screen loads that record through its client-owned detail endpoint and opens its drawer even when the record is outside the currently displayed year, filters, or page.
+- Primary binder joins exclude soft-deleted and handed-over binders by default. An explicit `binder_location_status=handed_over` searches handed-over binders instead.
+- Document search is capped at `50`, returns only non-deleted/non-superseded documents, applies `search` to filename or document type, applies `filename` to filename, and combines both with `AND` when both are present.
+- Document search enriches each result with `office_client_number` and `client_name` from `get_full_records_bulk(...)`, which itself filters to non-deleted client records (`backend/app/search/services/search_document_search_service.py`; `backend/app/clients/repositories/client_record_read_repository.py`).
 
 ## Error codes
 
@@ -64,7 +69,7 @@ No `SEARCH.*` domain error codes are raised inside `backend/app/search`; `rg -n 
 
 ## Known issues
 
-No open known issues.
+- Operational groups are intentionally previews: each returns five rows and an exact total. There is no group-specific pagination inside the Search page.
 
 ## Resolved issues
 
@@ -76,8 +81,8 @@ No still-valid search-specific decisions were found in `backend/docs/domain_deci
 
 ## Future / planned
 
-No search-specific future/planned behavior could be verified from `backend/docs/domain_decisions_v3.md` or search-specific legacy docs. Nothing is documented here as current unless it is implemented in code.
+No planned search-domain behavior is documented here.
 
 ## Historical notes
 
-No search-specific `backend/docs/**` legacy file was found, so no archive file was created for this domain.
+The completed 2026-07-19 filter-refactor tracker is preserved at `docs/archive/search-filters-refactor-2026-07-19.md`.

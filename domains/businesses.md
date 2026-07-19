@@ -10,7 +10,7 @@ Source of truth: mandatory
 
 # Businesses
 
-The businesses domain manages operational business activities that belong to a client. A single client (legal entity) may hold multiple businesses representing distinct operational activities. The legal and tax identity is anchored on the `LegalEntity`; `Business` represents an activity under that entity. This domain also owns the client status-card aggregation endpoint, which summarises cross-domain state (VAT, annual report, charges, advance payments, binders, documents) for a given client and year.
+The businesses domain manages operational business activities that belong to a client. A single client (legal entity) may hold multiple businesses representing distinct operational activities. The legal and tax identity is anchored on the `LegalEntity`; `Business` represents an activity under that entity. This domain also owns the client status-card aggregation endpoint, which summarises cross-domain state (VAT, annual report, charges, advance payments, binders, documents, and open tasks) for a given client and year.
 
 Last verified against code + backend/openapi.json: 2026-05-29.
 

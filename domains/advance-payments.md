@@ -14,7 +14,7 @@ The advance-payments domain manages periodic tax prepayments (מקדמות מס 
 
 The expected amount formula is: `turnover_amount × advance_rate / 100 = calculated_amount`. An optional `override_amount` replaces `expected_amount` when set.
 
-Last verified against code + backend/openapi.json: 2026-06-14.
+Last verified against code + backend/openapi.json: 2026-07-19.
 
 ## Endpoints
 
@@ -23,6 +23,7 @@ All paths confirmed present in `backend/openapi.json`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments` | List payments for a client (paginated; filter by year, status) |
+| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Read one payment owned by the client, including live-turnover enrichment when needed |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments` | Create a single advance payment (ADVISOR only) |
 | `PATCH` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Update payment fields (ADVISOR only) |
 | `DELETE` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Soft-delete a payment (ADVISOR only) |
@@ -108,6 +109,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP). `expected_amount = override_amount ?? calculated_amount`. (`advance_payment_service.py:74-92`)
 - **Status auto-derivation on update:** When `paid_amount` or `override_amount` changes, `status` is automatically recalculated: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`. (`advance_payment_service.py:202-228`)
 - **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
+- **Client-owned detail lookup:** Reading a single payment requires both `client_record_id` and `payment_id`. A missing, deleted, or differently owned payment returns `ADVANCE_PAYMENT.NOT_FOUND` instead of exposing another client's record. The lookup is independent of the list's active year, filters, and pagination.
 - **Annual report invalidation hook:** When a payment is marked `paid`, the service invalidates any open annual report tax calculation for the same client+year. Failure is non-critical and does not fail the update. (`api/advance_payments.py:155-164`)
 - **TaxCalendarEntry required:** Every payment must link to a `TaxCalendarEntry` (NOT NULL FK). The service calls `TaxCalendarMaterializationService.ensure_periodic_entry` to create or reuse the entry at creation time. (`advance_payment_service.py:152-157`)
 - **due_date_original immutable:** Once set, `due_date_original` cannot change. Enforced by SQLAlchemy event listener. (`models/due_date_snapshot_events.py:24-31`)

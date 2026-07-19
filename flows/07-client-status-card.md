@@ -24,7 +24,7 @@ Router: `backend/app/businesses/api/client_status_card_router.py`
 
 1. `ClientRecordRepository.get_by_id(client_id)` — verify client exists; raise 404 if not.
 2. `resolved_year = year or utcnow().year`.
-3. Six independent sequential queries (no batching between them):
+3. Seven independent sequential queries (no batching between them):
 
    **a. VAT summary card** (`_vat_card`):
    - `VatWorkItemRepository.list_by_client_record(client_record_id)` — all non-deleted VAT work items.
@@ -54,7 +54,11 @@ Router: `backend/app/businesses/api/client_status_card_router.py`
    - `PermanentDocumentRepository.list_by_client_record(client_record_id)`.
    - Compute: `total_count`, `present_count` (where `is_present == True`).
 
-4. Return `ClientStatusCardResponse` with all 6 cards.
+   **g. Tasks card** (`_tasks_card`):
+   - `TaskRepository.list_by_client_id(...)` scoped to `status=OPEN`.
+   - Compute: `open_count` for non-deleted tasks explicitly related to the client.
+
+4. Return `ClientStatusCardResponse` with all 7 cards.
 
 ## 4. Domains Involved
 
@@ -68,6 +72,7 @@ Router: `backend/app/businesses/api/client_status_card_router.py`
 | `advance_payments` | AdvancePayment read |
 | `binders` | Binder read |
 | `permanent_documents` | PermanentDocument read |
+| `tasks` | Open client-task count |
 
 ## 5. Side Effects
 
@@ -105,10 +110,11 @@ All card values are computed from live DB state. Nothing is cached or stored.
 | `periods_filed` | Count of VatWorkItems with status FILED for the year |
 | `total_outstanding` (charges) | Sum of all ISSUED Charge.amount for the client (all years) |
 | `in_office_count` | Binders where location_status == IN_OFFICE |
+| `open_count` (tasks) | Count of non-deleted client tasks with status OPEN |
 
 ## 12. N+1 Risk
 
-Low: 6 flat queries per request.
+Low: 7 flat queries per request.
 
 **Potential issue**: `_charges_card` uses `page_size=10_000`. For clients with many charges, this loads all rows into memory. No pagination or aggregate-only query.
 
@@ -117,8 +123,7 @@ Low: 6 flat queries per request.
 ## 13. Tests
 
 - `tests/businesses/api/test_business_binders_api.py` (partial coverage)
-
-**GAP**: No dedicated test for `StatusCardService.get_status_card()`. Aggregation logic and field computations are not tested directly.
+- `tests/businesses/service/test_business_status_card_service.py` (open client-task aggregation)
 
 ## 14. Documentation Target
 
