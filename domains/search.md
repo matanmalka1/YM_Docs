@@ -45,6 +45,7 @@ Returned `SearchResult.result_type` values are `client` and `binder`, as emitted
 ## Domain rules & invariants
 
 - Access is router-gated to `ADVISOR` and `SECRETARY` via `require_role(...)` (`backend/app/search/api/search.py:11-15`).
+- `SearchResult.client_name` always identifies the owning client, including for binder results. A business name must not replace it because a binder belongs to the client record and may contain material spanning all of that client's businesses.
 - The endpoint accepts optional filters `search`, `client_record_id`, `id_number`, `binder_number`, `client_status`, `entity_type`, `binder_location_status`, `binder_capacity_status`, `filename`, plus paginated `page>=1` and `1<=page_size<=100` (`backend/app/search/api/search.py:18-32`).
 - `search` is the only broad/free-text parameter. It matches client identity fields through `ClientRecordRepository.search(...)`, including legal/client name and ID number, and it also drives binder-number and permanent-document text matching where relevant.
 - `client_record_id` scopes results to an exact client record. For `search + client_record_id`, permanent-document matches use the client-scoped document query and do not return documents belonging to other clients.
