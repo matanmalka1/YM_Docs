@@ -14,7 +14,7 @@ The advance-payments domain manages periodic tax prepayments (מקדמות מס 
 
 The expected amount formula is: `turnover_amount × advance_rate / 100 = calculated_amount`. An optional `override_amount` replaces `expected_amount` when set.
 
-Last verified against code + backend/openapi.json: 2026-07-19.
+Last verified against code + backend/openapi.json: 2026-07-20.
 
 ## Endpoints
 
@@ -23,12 +23,13 @@ All paths confirmed present in `backend/openapi.json`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments` | List payments for a client (paginated; filter by year, status) |
-| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Read one payment owned by the client, including live-turnover enrichment when needed |
+| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Read one payment owned by the client, including `available_turnover` enrichment when the period is not snapshotted |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments` | Create a single advance payment (ADVISOR only) |
 | `PATCH` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Update payment fields (ADVISOR only) |
 | `DELETE` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Soft-delete a payment (ADVISOR only) |
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments/kpi` | Annual KPI aggregates for a client |
-| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/prefill-turnover` | Look up VAT-report turnover for prefilling a new payment |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/refresh-turnover` | Snapshot the period's VAT turnover onto the payment and recompute amounts (ADVISOR only) |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/refresh-turnover` | Bulk snapshot for explicitly listed `payment_ids`; filed returns only, non-atomic (ADVISOR only) |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/generate` | Generate full-year schedule for a client (ADVISOR only) |
 | `GET` | `/api/v1/advance-payments/overview` | Cross-client overview (paginated; filter by year, month, status, exact `client_record_id`, legacy fuzzy `client_search`, etc.) |
 | `GET` | `/api/v1/advance-payments/overview/batches` | Month-batch summaries for the overview grouping; supports exact `client_record_id` |
@@ -56,6 +57,8 @@ Cite: `backend/app/advance_payments/models/advance_payment.py`
 | `expected_amount` | Numeric(10,2) | No | default 0.00; derived from `calculated_amount` or `override_amount` |
 | `paid_amount` | Numeric(10,2) | No | default 0.00 |
 | `turnover_amount` | Numeric(14,2) | Yes | snapshot of turnover at time of record; `NULL` = unknown, not zero |
+| `turnover_source` | `TurnoverSource` enum | Yes | provenance of `turnover_amount`; `NULL` exactly when `turnover_amount` is `NULL` |
+| `turnover_snapshot_at` | datetime | Yes | when `turnover_amount` was frozen; also `NULL` on rows backfilled by migration `8a1c47d0b3e2` |
 | `advance_rate` | Numeric(5,2) | Yes | snapshot of advance rate at creation; frozen — changes to `LegalEntity.advance_rate` do not affect existing records |
 | `calculated_amount` | Numeric(12,2) | No | `turnover_amount × advance_rate / 100`; derived display value |
 | `override_amount` | Numeric(12,2) | Yes | replaces `expected_amount` when set |
@@ -86,6 +89,13 @@ Cite: `backend/app/advance_payments/models/advance_payment.py:83-171`.
 
 `overdue` is **not** an enum value. It is a computed response field `timing_status` derived from `due_date` and `status` at read time.
 
+**`TurnoverSource`** (`backend/app/advance_payments/models/advance_payment.py`):
+| Value | Meaning |
+|-------|---------|
+| `manual` | Typed by an advisor (create or PATCH) |
+| `vat_filed` | Snapshotted by the refresh command; every covered month was filed |
+| `vat_pending` | Snapshotted by the refresh command with `confirm_pending`; at least one covered month was not filed |
+
 **`PaymentMethod`** (`backend/app/advance_payments/models/advance_payment.py:66-74`):
 | Value | Notes |
 |-------|-------|
@@ -106,6 +116,15 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **No duplicate active period:** `UNIQUE(client_record_id, period) WHERE deleted_at IS NULL`. Duplicate insert raises `ADVANCE_PAYMENT.CONFLICT`. (`advance_payment_service.py:137-141`)
 - **Frequency independence:** `advance_payment_frequency` must never be derived from `vat_reporting_frequency`. These are independent. (`domain_decisions_v3.md` §2, INV-07)
 - **advance_rate snapshot frozen:** `advance_rate` is a snapshot at creation time. Changes to `LegalEntity.advance_rate` do not backfill existing records. (INV-06)
+- **turnover snapshot frozen:** `turnover_amount` never follows later amendments to the VAT return it came from. Filing or amending a `VatWorkItem` writes nothing to `AdvancePayment`; the only paths that set `turnover_amount` are create, PATCH, and the refresh command.
+- **turnover_source tracks the writer:** create and PATCH set `manual`; the refresh command sets `vat_filed` or `vat_pending`. A PATCH that overwrites a VAT-sourced turnover resets the source to `manual`, so the label never outlives the figure it described. Clearing `turnover_amount` clears both provenance columns.
+- **Refresh is all-or-nothing per period:** the command snapshots only when *every* month covered by `period_months_count` has a VAT work item, so a half-covered bi-monthly period cannot snapshot a silently halved turnover. The result is `vat_filed` only when every covered month is filed; a mixed filed/unfiled bi-monthly period is `vat_pending`.
+- **Unfiled VAT requires explicit confirmation:** refreshing from a `READY_FOR_REVIEW` return raises `ADVANCE_PAYMENT.VAT_NOT_FILED` unless the request passes `confirm_pending`. The chosen source is recorded on the row and in the audit entry.
+- **Refresh does not override an override:** the command recomputes `calculated_amount`, but `expected_amount` still resolves to `override_amount` when one is set.
+- **Bulk refresh takes explicit ids, never a filter:** `payment_ids` is required (1..`MAX_BULK_REFRESH_PAYMENTS`). A filter-based form is deliberately absent — a filter can match rows the advisor never saw, and this command writes to every row it matches. Ownership of every id is checked before any write, so a foreign or unknown id fails the whole request with `ADVANCE_PAYMENT.NOT_FOUND`.
+- **Bulk refresh never snapshots unfiled returns:** there is no bulk `confirm_pending`. Confirming an unfiled figure is a judgement about one period and cannot be given meaningfully for a batch, so `vat_pending` periods are counted in `skipped_not_filed` instead.
+- **Bulk refresh is not atomic:** each period is an independent business fact, so a period that cannot be snapshotted is counted, not raised, and does not roll back its neighbours. Skips are split into `skipped_no_vat` and `skipped_not_filed` because the two demand different follow-ups (chase the return vs. wait for filing). Every refreshed payment gets its own `advance_payment.turnover_refreshed` audit entry — there is no grouped batch entry.
+- **One turnover rule, one implementation:** `TurnoverLookupRepository._resolve` is the only place that decides what a period can draw from VAT. `resolve_turnover` (one period), `resolve_turnover_for_client`, and `resolve_turnover_for_clients` differ only in how many periods they ask about. Never add a fourth path or re-derive the coverage/source rule at a call site.
 - **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP). `expected_amount = override_amount ?? calculated_amount`. (`advance_payment_service.py:74-92`)
 - **Status is server-owned:** Clients cannot set `status` through the PATCH contract. The service derives it on create and whenever `paid_amount`, `expected_amount`, `turnover_amount`, or `override_amount` changes: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`.
 - **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
@@ -123,8 +142,8 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - `timing_status`: `"overdue"` if `status != paid AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
 - `paid_late`: `True` if `status == paid AND paid_at.date() > due_date_effective`. Falls back to `due_date` when `due_date_effective` is NULL.
 - `delta`: `expected_amount - paid_amount`.
-- `live_turnover`: populated by the router from `TurnoverLookupRepository` when `turnover_amount is None`.
-- `missing_turnover`: `True` when `turnover_amount is None AND live_turnover is None`.
+- `available_turnover`: `{amount, source}` or `null`. Populated by the router from `TurnoverLookupRepository` only when `turnover_amount is None`. It is what the period *could* be snapshotted from — never the payment's turnover — and feeds no amount on the record. `source` is `vat_filed | vat_pending`; `manual` cannot appear. Clients must not render it in the same slot as `turnover_amount`.
+- `missing_turnover`: `True` when `turnover_amount is None AND available_turnover is None`.
 - `MonthBatchSummary.due_this_month_count`: count of non-paid payments whose effective due date falls in the current Israeli calendar month. The frontend must not infer this count from the reporting period month.
 
 ## Error codes
@@ -140,6 +159,8 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 | `ADVANCE_PAYMENT.CONFLICT` | 409 | Active payment already exists for `(client_record_id, period)` |
 | `ADVANCE_PAYMENT.NOT_FOUND` | 404 | Payment ID not found for the given client |
 | `ADVANCE_PAYMENT.RATE_INVALID` | 400 | VAT rate is zero when attempting reverse calculation (`advance_payment_calculator.py`) |
+| `ADVANCE_PAYMENT.VAT_TURNOVER_NOT_FOUND` | 404 | Refresh found no VAT work item covering every month of the period |
+| `ADVANCE_PAYMENT.VAT_NOT_FILED` | 409 | Refresh found only unfiled VAT returns and the request did not pass `confirm_pending` |
 | `CLIENT.CLOSED` | 403 | Client is closed — cannot create payment |
 | `CLIENT.FROZEN` | 403 | Client is frozen — cannot create payment |
 
@@ -158,6 +179,12 @@ From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived leg
 1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. `paid_late` is similarly computed from `paid_at` versus the effective due date. Decision confirmed in advance_payments_spec.md §Closed Decisions and current schemas.
 
 2. **Turnover snapshot vs. live.** `turnover_amount` is a snapshot frozen on write. For pending/partial payments, `live_turnover` is fetched from `VatWorkItem` at read time via `TurnoverLookupRepository` when `turnover_amount is None`. No hard dependency on VAT report existing before advance payment.
+
+   `available_turnover` is a *discovery* signal, not a second source of truth for the money: `calculated_amount`, `expected_amount`, and `status` are derived only from the stored `turnover_amount`. The advance payment is created before its period's VAT return exists, so a window where `turnover_amount is NULL` is unavoidable; `available_turnover` exists to show that the window can now be closed. Turning it into a snapshot is an explicit advisor action (the refresh command), never an automatic consequence of VAT filing.
+
+   It was named `live_turnover` until 2026-07-20 and was rendered in the same UI slot as `turnover_amount`, which made a screen show one turnover while the entity held another. The rename to `available_turnover` plus the added `source` is what lets the UI render it as a pending action instead of a value.
+
+   **Behaviour change in the same revision:** the read path now surfaces unfiled (`READY_FOR_REVIEW`) returns too, where it previously considered only `FILED` ones. A period whose VAT is still in review therefore stops counting as `missing_turnover` and starts advertising a `vat_pending` candidate. `missing_turnover` now means "nothing stored and nothing to snapshot", which is a different question from "nothing filed".
 
 3. **Edit via drawer, not inline.** UI uses a drawer component for editing payments (UI decision, not enforced in backend).
 
@@ -179,10 +206,10 @@ These items are explicitly **not yet implemented**. Do not describe as current b
 
 - **Remove legacy `AdvancePayment.due_date`.** The old `due_date` column coexists with `due_date_original` and `due_date_effective`. Plan: audit all consumers to use `due_date_effective`, then drop `due_date`. (`domain_decisions_v3.md` §3.3, §9)
 - **Explicit due-date override endpoint.** No dedicated endpoint for updating `due_date_effective` exists yet. If added, it must enforce `due_date_override_reason`, permission checks, and must block updates to terminal-state records. (`domain_decisions_v3.md` §9, INV-09)
-- **`reported_turnover` / `turnover_source_vat_report_id` snapshot fields.** The legacy spec proposed storing a VAT-report snapshot ID at payment time (`advance_payments_spec.md` §שינויים נדרשים). These fields do **not exist** in the current model; the current approach uses `turnover_amount` as an unlinked snapshot and `TurnoverLookupRepository` for live lookups.
-- **Turnover drift warning.** Legacy spec proposed a ⚠ alert when the VAT report's turnover changed after the advance payment was recorded. Not implemented.
+- **`turnover_source_vat_report_id` FK.** The legacy spec proposed storing the source VAT-report ID on the payment (`advance_payments_spec.md` §שינויים נדרשים). Partially addressed: `turnover_source` and `turnover_snapshot_at` now record *what kind* of source and *when*, but the specific `vat_work_item_ids` live only in the `advance_payment.turnover_refreshed` audit entry, not as a column.
+- **Turnover drift warning.** Legacy spec proposed a ⚠ alert when the VAT report's turnover changed after the advance payment was recorded. Not implemented; `turnover_snapshot_at` is the field a drift check would compare against.
+- **Bulk refresh from the cross-client overview.** The bulk endpoint is id-based and therefore screen-agnostic, but only the client tab calls it today. Wiring it to the overview needs a decision about what "all ready" means when a filter matches far more rows than the page shows.
 - **`missing_turnover` blocking batch "mark ready".** Legacy spec proposed that `missing_turnover` blocks batch operations. Currently `missing_turnover` is a read signal only and does not block individual or batch writes.
-- **Optional rename of `advance_rate` to `rate_used`.** Considered in `domain_decisions_v3.md` §3.3; deferred — current code uses `advance_rate`.
 
 ## Historical notes
 
