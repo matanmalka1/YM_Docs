@@ -46,6 +46,14 @@ implementation rules.
 - Use semantic status variants for success, warning, error, and informational states. Do not encode
   product status using arbitrary colors. `StatsCard`'s `variant` uses semantic tone names
   (`info|positive|negative|warning|purple|neutral`), not color names — pass the tone, never a color.
+- Never use a raw Tailwind color family that already has a semantic ramp in `index.css` `@theme`:
+  `blue`→`primary`, `indigo`→`info`, `emerald`/`green`→`positive`, `amber`/`yellow`→`warning`,
+  `red`→`negative`. `npm run arch:check` fails on these (`TOKEN_DRIFT`). `gray` (surfaces) and `slate`
+  (text) are the two intentional neutral roles, and hues with no semantic ramp (`orange`, `purple`,
+  `violet`, `rose`, …) are free-standing accents — both stay allowed. Two files are exempt by design:
+  `features/vatReports/constants/visualizationTokens.ts` (categorical chart palette, spans hues on
+  purpose) and `components/ui/overlays/Alert.tsx` (two-hue gradient stops). Use a line-level
+  `arch-check-disable` comment only for a new, documented exception.
 - Use `cn()` for conditional classes. Avoid inline styles unless the value is truly dynamic and
   cannot be represented by existing classes or component props.
 - The narrow display/layout primitives (`SegmentedControl`, `Chip`/`ChipLabel`, `ActionSurface`,
