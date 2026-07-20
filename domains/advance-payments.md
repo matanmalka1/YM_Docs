@@ -107,7 +107,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **Frequency independence:** `advance_payment_frequency` must never be derived from `vat_reporting_frequency`. These are independent. (`domain_decisions_v3.md` §2, INV-07)
 - **advance_rate snapshot frozen:** `advance_rate` is a snapshot at creation time. Changes to `LegalEntity.advance_rate` do not backfill existing records. (INV-06)
 - **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP). `expected_amount = override_amount ?? calculated_amount`. (`advance_payment_service.py:74-92`)
-- **Status auto-derivation on update:** When `paid_amount` or `override_amount` changes, `status` is automatically recalculated: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`. (`advance_payment_service.py:202-228`)
+- **Status is server-owned:** Clients cannot set `status` through the PATCH contract. The service derives it on create and whenever `paid_amount`, `expected_amount`, `turnover_amount`, or `override_amount` changes: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`.
 - **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
 - **Client-owned detail lookup:** Reading a single payment requires both `client_record_id` and `payment_id`. A missing, deleted, or differently owned payment returns `ADVANCE_PAYMENT.NOT_FOUND` instead of exposing another client's record. The lookup is independent of the list's active year, filters, and pagination.
 - **Annual report invalidation hook:** When a payment is marked `paid`, the service invalidates any open annual report tax calculation for the same client+year. Failure is non-critical and does not fail the update. (`api/advance_payments.py:155-164`)
@@ -125,6 +125,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - `delta`: `expected_amount - paid_amount`.
 - `live_turnover`: populated by the router from `TurnoverLookupRepository` when `turnover_amount is None`.
 - `missing_turnover`: `True` when `turnover_amount is None AND live_turnover is None`.
+- `MonthBatchSummary.due_this_month_count`: count of non-paid payments whose effective due date falls in the current Israeli calendar month. The frontend must not infer this count from the reporting period month.
 
 ## Error codes
 
