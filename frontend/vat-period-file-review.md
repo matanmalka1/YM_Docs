@@ -18,7 +18,7 @@ Source of truth: review and backlog only — not source of truth for current beh
 Review of `frontend/src/features/vatReports` detail surface as of 2026-07-20. Each finding is
 stated with its evidence and the proposed target shape.
 
-**Status: P1 is done. P2–P8 are open.**
+**Status: P1 and P2 done, P3 partly done (one step declined on purpose). P4–P8 open.**
 
 ## Surface under review
 
@@ -73,34 +73,52 @@ create, update, and delete. Not unified deliberately: post-FILED totals are snap
 be recomputed (`vat_work_item.py:81`), so switching the stored values to live computation would make
 a filed period's summary drift from what was filed.
 
-## P2 — Filing state is managed by three ad-hoc workarounds
+## P2 — Filing state managed by three ad-hoc workarounds — **DONE**
 
-Filing is irreversible, but there is no single "this work item is mutating" state. Three separate
-mechanisms stand in for it:
+The original finding: no single "this work item is mutating" state, so three mechanisms stood in for
+one — an `isFilingPending` boolean drilled page → summary bar → file modal → back up, a
+`ACTION_CHANGE_COOLDOWN_MS = 1500` timer guarding against a click landing on an action that appeared
+under the cursor, and a hand-patched `setQueryData({ ...prev, status: 'filed' })`.
 
-1. `isFilingPending` — a boolean created in `useVatWorkItemDetailPage`, passed page → summary bar →
-   file modal → back up, purely to disable invoice editing (`VatInvoiceTab.tsx:22`).
-2. `ACTION_CHANGE_COOLDOWN_MS = 1500` in `useVatWorkItemActions.ts` — a timer that blocks all
-   actions after any status change, because the button set re-renders under the cursor and a second
-   click could land on a different action.
-3. `queryClient.setQueryData(..., { ...prev, status: 'filed' })` in `useFileVatReturn.ts:21` — a
-   hand-patched cache entry that sets one field, before the real invalidation lands.
+Replaced by one lifecycle state:
 
-Each is a symptom of the same gap. Target: one in-flight state per work item. While any lifecycle
-mutation is pending, every action and every invoice mutation is disabled, and the UI waits for the
-server response rather than patching a field. The cooldown timer, the pending flag, and the manual
-`setQueryData` all disappear.
+- `api/mutationKeys.ts` — the four lifecycle mutations (materials complete, ready for review, send
+  back, file) share `vatMutationKeys.lifecycle(workItemId)`.
+- `hooks/useVatLifecyclePending.ts` — `useIsMutating` on that key. Any component on the page asks
+  for the state; nothing passes it down.
+- Each mutation awaits `invalidateVatWorkItem` inside `onSuccess`, so it stays pending until the
+  refreshed work item is on screen. That is what makes the cooldown timer unnecessary: the buttons
+  are disabled across the swap by the mutation's own lifetime, not by a fixed delay.
+- The optimistic `setQueryData` is gone — the refetch lands before pending clears.
 
-## P3 — `available_actions` arrives from the server, then is re-implemented client-side
+Invoice mutations are deliberately **not** tagged with the lifecycle key. They carry their own
+pending state; tagging them would make `canEdit` flip false during an ordinary invoice add and blank
+out the table's edit affordances mid-interaction.
 
-The backend sends `available_actions`. The frontend translates it through four predicate helpers
-(`canMarkMaterialsComplete`, `canMarkReadyForReview`, `canFile`, `canSendBack`) into four
-hand-written `<Button>` blocks in `VatActionButtons.tsx`, each repeating the same
-variant/size/isLoading/disabled props, plus three matching handlers in `useVatWorkItemActions.ts`.
+Two latent bugs fell out with it:
 
-Adding one lifecycle action means editing three files. Target: a declarative action map keyed by the
-server's action key (`label`, `icon`, `variant`, `mutation`), rendered in a loop. The predicates
-collapse into `available_actions.includes(key)`.
+- `handleSendBack` swallowed errors and resolved either way, so the note form closed — and the typed
+  note was lost — on a failed send-back. It now resolves `false` on failure and the form stays open.
+- The same shape applied to filing; `fileVatReturn` already returned a boolean, now sourced from the
+  mutation instead of a manual `try/finally`.
+
+The three lifecycle actions moved onto `useMutationWithToast`, which gained an optional
+`mutationKey` passthrough. This closes P8 for those actions. Filing and the invoice mutations keep
+their boolean-returning wrappers — result inspection is the documented case the helper cannot
+express.
+
+## P3 — `available_actions` re-implemented client-side — **PARTLY DONE**
+
+Done: `VatActionButtons` no longer re-checks `useRole().isAdvisor` on top of the action list. The
+backend already omits `file_vat_return` and `send_back` for non-advisors
+(`vat_report_actions._is_advisor`, covered by `test_ready_for_review_secretary_actions`), so the
+client-side check was a second source that could drift. `available_actions` is now the only answer
+to which actions exist. `useRole` left `VatWorkItemSummaryBar` entirely.
+
+Not done, deliberately: converting the four explicit `<Button>` blocks into a declarative map plus
+loop. `ChargeActionButtons` uses the identical explicit shape, so converting VAT alone would leave
+the codebase with two action-bar patterns for no behavior change. Revisit only as a joint
+VAT + charges convergence, not as a VAT-local cleanup.
 
 ## P4 — Income and expense are one entity rendered as two tabs
 
@@ -186,8 +204,8 @@ with the page as pure slot composition.
 ## Suggested order
 
 1. ~~**P1** — move VAT math to the server.~~ Done.
-2. **P2 + P3** — single in-flight state and a declarative action list. These two are one change;
-   doing either alone leaves the other's workarounds in place.
+2. ~~**P2 + P3** — single in-flight state, single source for action availability.~~ Done, minus the
+   declined map+loop step.
 3. **P7** — state vocabulary, including keeping the header on error.
 4. **P4 + P5** — merge the invoice tabs and move filtering to the server.
 5. **P6** — route-based tabs and page-hook contract alignment.
