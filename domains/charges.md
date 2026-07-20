@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The charges domain owns office-managed billing charges linked to a `client_record_id`, with an optional business scope and optional annual-report linkage. It exposes a small lifecycle surface: create a draft charge, transition it through issued/paid/canceled states, soft-delete eligible charges, and list/get charges with enrichment used by the CRM UI.
 
-Last verified against code + backend/openapi.json: 2026-06-11 for `updated_at` (#46); full-domain verification remains 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-07-20 for draft editing (`PATCH`) and the `delete_charge` action fix; 2026-06-11 for `updated_at` (#46); full-domain verification remains 2026-05-29.
 
 ## Endpoints
 
@@ -23,6 +23,7 @@ All paths below exist in `backend/openapi.json:6195-6675`. All routes require `A
 | `POST` | `/api/v1/charges` | Create a draft charge for a client record, optionally scoped to one business |
 | `GET` | `/api/v1/charges` | List non-deleted charges (thin `ChargeListItem`) with business/client/status/type/period/date filters, pagination, and per-status stats |
 | `GET` | `/api/v1/charges/{charge_id}` | Fetch one non-deleted charge by id |
+| `PATCH` | `/api/v1/charges/{charge_id}` | Partially update a **draft** charge (amount, type, period, months, business scope, description) |
 | `POST` | `/api/v1/charges/{charge_id}/issue` | Transition a draft charge to `issued` and stamp `issued_at` / `issued_by` |
 | `POST` | `/api/v1/charges/{charge_id}/mark-paid` | Transition an issued charge to `paid` and stamp `paid_at` / `paid_by` |
 | `POST` | `/api/v1/charges/{charge_id}/cancel` | Cancel a draft or issued charge and optionally store `cancellation_reason` |
@@ -44,7 +45,7 @@ Model: `Charge` in `backend/app/charges/models/charge.py:31-101`.
 | `amount` | `Numeric(10,2)` | No | always stored in ILS; no currency column |
 | `period` | `String(7)` | Yes | optional `YYYY-MM` first covered month; indexed |
 | `months_covered` | int | No | defaults to `1`; current schema allows `1..2` |
-| `description` | text | Yes | persisted but not accepted by current create API |
+| `description` | text | Yes | not accepted by create; set via `PATCH` on a draft charge |
 | `created_at` | datetime | No | default `utcnow` |
 | `updated_at` | datetime | Yes | `onupdate=utcnow`; set on real mutation (issue/pay/cancel/soft-delete); NULL until first update — never faked from `created_at` (#46) |
 | `created_by` | int FK -> `users.id` | Yes | actor who created the charge |
@@ -110,6 +111,8 @@ Source: `backend/app/charges/schemas/charge.py:81-84`.
 - Amount must be positive. The request schema enforces `gt=0`, and the service re-checks `amount <= 0` and raises `CHARGE.AMOUNT_INVALID`. (`backend/app/charges/schemas/charge.py:16`, `backend/app/charges/services/billing_service.py:67-68`)
 - New charges are always created in `draft` status with optional `period` and `months_covered`, and the create audit payload records only `amount` and `charge_type`. (`backend/app/charges/repositories/charge_repository.py:20-43`, `backend/app/charges/services/billing_service.py:79-97`)
 - `period` must match `YYYY-MM`, and `months_covered` is currently limited to at most `2`. (`backend/app/charges/schemas/charge.py:18-26`, `backend/app/charges/services/constants.py:2-3`)
+- Editing is restricted to `draft`. `PATCH` applies only client-sent keys (`exclude_unset`), so an omitted field is left untouched while an explicit `business_id: null` clears the business scope. `amount`, `charge_type`, and `months_covered` map to NOT NULL columns, so an explicit null is rejected at the schema layer with 422. A changed `business_id` re-runs the same scope validation as create. The `client_record_id` anchor is deliberately not editable — moving a charge between clients would split its audit trail and invalidate the existing business scope; delete the draft and recreate instead. (`backend/app/charges/services/charge_billing_service.py`, `backend/app/charges/schemas/charge.py`)
+- A `PATCH` whose values all match the stored row is a no-op: no audit row is written and `updated_at` is left alone. (`backend/app/charges/services/charge_billing_service.py`)
 - Lifecycle transitions are strict:
   - only `draft` can move to `issued`; issuing stamps `issued_at` and `issued_by`. (`backend/app/charges/services/billing_service.py:99-123`)
   - only `issued` can move to `paid`; paying stamps `paid_at` and `paid_by`. (`backend/app/charges/services/billing_service.py:125-149`)
@@ -129,7 +132,7 @@ Registry: `docs/backend/error-codes.md`.
 | `CLIENT_RECORD.NOT_FOUND` | `_validate_charge_scope` or `create_charge` cannot find the client record (`backend/app/charges/services/billing_service.py`) |
 | `CHARGE.AMOUNT_INVALID` | Amount is zero/negative in the service layer (`backend/app/charges/services/billing_service.py:67-68`) |
 | `CHARGE.NOT_FOUND` | Requested charge id does not exist for get/issue/pay/cancel/delete (`backend/app/charges/services/billing_service.py:101-102`, `127-128`, `158-159`, `186-187`, `199-201`) |
-| `CHARGE.INVALID_STATUS` | Status transition or delete is not allowed from the current state (`backend/app/charges/services/billing_service.py:104-107`, `130-133`, `160-161`, `189-191`) |
+| `CHARGE.INVALID_STATUS` | Status transition, edit, or delete is not allowed from the current state (`backend/app/charges/services/billing_service.py:104-107`, `130-133`, `160-161`, `189-191`) |
 | `CHARGE.CONFLICT` | Cancel is requested for an already canceled charge (`backend/app/charges/services/billing_service.py:162-163`) |
 
 Cross-domain codes raised through called guards:
@@ -141,6 +144,7 @@ No open known issues.
 
 ## Resolved issues
 
+- **Charges-002** (2026-07-20): `get_charge_actions` emitted `delete_charge` only for `draft`, while `BillingService.delete_charge` allows soft-delete from `draft` **or** `canceled`. Because the detail page gates its delete button on `available_actions`, a canceled charge could never be deleted from the UI even though the endpoint accepted it. Fixed: the delete descriptor is now emitted for both statuses.
 - **Charges-001** (2026-06-15): `billing_service.py` raised `CHARGE.CLIENT_NOT_FOUND` and `CHARGE.CLIENT_RECORD_NOT_FOUND` (domain-prefixed codes) for a missing client record — both non-standard and inconsistent with the `CLIENT_RECORD` namespace. Replaced both with `CLIENT_RECORD.NOT_FOUND` via `get_client_or_raise`; removed the now-dead `CLIENT_NOT_FOUND` constant from `charges/services/messages.py`.
 - **F-013** (2026-06-05): List `stats` did not respect most list filters. Fixed: `stats_by_status()` now accepts and applies `business_id`, `period`, `issued_after`, and `issued_before` in addition to `client_record_id` and `charge_type`. `list_charges_paginated()` threads all active filters through.
 - **F-014** (2026-06-05): OpenAPI advertised `X-Idempotency-Key` as optional on bulk action, but runtime rejected missing keys. Fixed: `require_idempotency_key` header parameter changed from `str | None` with `default=None` to required `str`. FastAPI now generates `required: true` and returns 422 for missing header.
