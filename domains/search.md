@@ -34,9 +34,9 @@ Domain-owned response projections:
 
 - `SearchClientMatch`: one client the term resolved to — `id`, `office_client_number`, `name`,
   `id_number`, `status`, `matched_binder_numbers`, `href`.
-- `SearchItem`: one record of any type, in the shape every type shares — `result_type`, `id`,
-  `client_record_id`, `office_client_number`, `client_name`, `title`, `detail`, `status`,
-  `amount`, `href`.
+- `SearchItem`: one record of any type, in the thin shape the feed renders — `result_type`, `id`,
+  `title`, `detail`, `status`, `amount`, `occurred_on`, `href`. Client identity stays on the
+  selected `SearchClientMatch`; repeating it on every item would add unused list payload.
 - `SearchItemGroup`: up to `PREVIEW_LIMIT` (5) items plus the exact total behind them.
 - `SearchItemGroups`: the eight groups — `binders`, `documents`, `vat_work_items`,
   `annual_reports`, `advance_payments`, `charges`, `tasks`, `notifications`.
