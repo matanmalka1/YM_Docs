@@ -78,7 +78,6 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 - `docs/frontend/api-drift-ci.md` — frontend GitHub Actions drift check against the backend OpenAPI baseline.
 - `docs/frontend/page-refactor-status.md` — tracking only; not an architecture source of truth.
 - `docs/frontend/design-system-followup.md` — tracking only; remaining Batch 3 design-system primitive-API follow-up items (full audit catalog archived at `docs/archive/design-system-audit-plan.md`).
-- `docs/search-filters-followup.md` — tracking only; unified Search page filter backlog (why advanced filters UNION instead of intersect), from the 2026-06-28 read-through.
 - `docs/vat-history-product-followup.md` — tracking only; product review item for VAT work-item vs invoice audit history discoverability after the audit refactor.
 - `frontend/DESIGN.md` — design-token catalog and visual reference; implementation rules remain in `docs/frontend/ui-guidelines.md`.
 
@@ -167,9 +166,11 @@ Cross-cutting & infra:
 ## Research & proposals (not source of truth)
 
 - `docs/research/annual-report-research.md` — external tax research supporting the annual-report model.
-- `docs/research/global-search-proposal.md` — proposal to make the search term match records, not
-  only clients. Describes behavior that does **not** exist; current search behavior is
-  `docs/domains/search.md` ★.
+- `docs/research/global-search-spec.md` — the approved global-search specification (decisions
+  D1–D8; phase 1 implemented 2026-07-21). Historical record of the decisions; current search
+  behavior is `docs/domains/search.md` ★.
+- `docs/research/global-search-implementation-prompt.md` — the phase-1 execution brief derived
+  from the spec (issue breakdown MAT-92–95); tracking only.
 
 ## Flows (cross-domain)
 

@@ -19,7 +19,7 @@ This glossary is a **disambiguation index, not a behavior source of truth**. Eac
 | ClientRecord | The CRM anchor row for a client engagement; the operational entity most domains attach to. | `docs/domains/clients.md` |
 | client | Informal prose word for a ClientRecord. Not a distinct model. | `docs/domains/clients.md` |
 | `client_record_id` | **Preferred/canonical operational anchor.** Use this as the filter/scoping field that points to `ClientRecord.id`. | `docs/architecture/api-contracts.md`, `docs/domains/clients.md` |
-| `client_id` | Legacy/contextual name. In client route **path params** it means `ClientRecord.id`; in some endpoints (e.g. search) it is a real, intentional field. May appear in older prose/API contexts — **check the owning doc or `backend/openapi.json` before use, and do not globally rename real `client_id` fields.** | `docs/domains/clients.md`, `docs/domains/search.md` |
+| `client_id` | Legacy/contextual name. In client route **path params** it means `ClientRecord.id`; in some schemas (e.g. businesses) it is a real, intentional field. May appear in older prose/API contexts — **check the owning doc or `backend/openapi.json` before use, and do not globally rename real `client_id` fields.** | `docs/domains/clients.md`, `docs/domains/businesses.md` |
 | LegalEntity | Stable legal/tax identity (unique by `id_number_type` + `id_number`); a ClientRecord points at one. | `docs/domains/legal-entities.md` |
 | Person | A natural person in the identity graph. | `docs/domains/legal-entities.md` |
 | PersonLegalEntityLink | Join row linking a Person to a LegalEntity (e.g. OWNER). | `docs/domains/legal-entities.md` |
