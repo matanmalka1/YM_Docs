@@ -72,9 +72,16 @@ Domain-owned response projections:
   own matching exactly, handed-over binders included — an explanation that omits the binder the
   user typed would be worse than none. It is empty for name or ID matches — there is nothing to
   explain then.
+- **How the parts combine.** The typed term is one `OR` across the four identifiers above: a
+  client matches if *any* of them does. Every other parameter is `AND`ed onto that. So a term
+  plus a filter means "a client this term identifies **and** that the filter admits", never
+  either-or.
 - The advanced filters (`client_record_id`, `id_number`, `client_status`, `entity_type`,
   `binder_number`, `binder_location_status`, `binder_capacity_status`) narrow the client list.
   Client filters and binder filters are combined with `AND`.
+- `id_number` and `binder_number` remain API parameters, but the search screen no longer sends
+  them: the term already matches both columns, so a second input over the same data only raised
+  the question of how the two combined. They stay for API clients that want the narrower match.
 - The **binder filter** path is separate from the term: its join excludes soft-deleted and
   handed-over binders by default, and an explicit `binder_location_status=handed_over` searches
   handed-over binders instead. A term and a binder filter combine with `AND`, so filtering by
