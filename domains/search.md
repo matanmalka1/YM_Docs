@@ -123,6 +123,13 @@ died (D2) they had no consumer.
   from **one** query. Expansion (`/search/items`) runs the single relevant branch with real
   `LIMIT/OFFSET` + count. A resolved search request costs ≤ 4 queries total (the deleted
   dossier path cost 19).
+- **Phase-1 usage measurement.** Every authenticated `GET /search` emits one
+  `global_search_phase1_usage` structured log event after the existing queries complete. It
+  records only the parsed term's length and classification (`period`, `integer`, or `text`), the
+  resolved-client total, all eight per-type match totals, and whether the complete result was
+  empty. The raw term is never logged because it can contain client names or identity numbers.
+  The event reuses the response totals and adds no database query; its purpose is the phase-2
+  gate in `docs/research/global-search-spec.md` §9.
 - **Ordering** — identical in preview and expansion: rank, then the type's anchor date
   descending with NULLs last (via a portable boolean sort key), then `id` descending.
 - **Phase-1 matching is exact and case-sensitive.** In particular, notification `recipient`
