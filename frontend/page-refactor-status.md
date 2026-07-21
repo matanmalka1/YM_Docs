@@ -139,3 +139,14 @@ Completed:
 Remaining:
 
 - Browser-check the annual-report detail financial, annex, tax-calculation, and status-transition states before treating the widget-level visual verification as complete.
+
+## Client-details tab contract — compliance
+
+| Tab | Status |
+|-----|--------|
+| binders, notifications, tasks, charges | Compliant — full parity via pinned-client page hooks (`useBindersPage`/`useNotificationsPage`/`useTasksPage`/`useChargesPage`) |
+| tax-calendar, annual-reports, vat, advance-payments, timeline, documents, notes | Compliant chrome (`DetailTabPanel` + section states; notes branches on scope — business scope stays `Card`) |
+| details (overview) | Compliant — `ClientRelatedData` reduced to counts linking to the client's own tabs |
+| communication | Composite cards; business_id first-business filter bug removed (correspondence now client-wide) |
+
+Remaining known drift: timeline keeps its feature-specific `TimelineFilterPanel` (deliberate).

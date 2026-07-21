@@ -223,6 +223,9 @@ Classify every page before refactoring:
 
 Type determines which hooks and components are expected.
 
+Client-details tabs (rendered under `/clients/:clientId/<tab>`) must additionally follow
+`docs/frontend/client-tab-contract.md`.
+
 ---
 
 ## Naming rules

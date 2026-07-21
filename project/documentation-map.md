@@ -71,6 +71,7 @@ Official docs index and navigation map. Paths are relative to the root of the pr
 
 - `docs/frontend/architecture.md` ★ — frontend architecture rules.
 - `docs/frontend/page-structure.md` ★ — mandatory page, hook, component, API-layer, and URL-state structure.
+- `docs/frontend/client-tab-contract.md` ★ — mandatory structure, capability-parity, and state contract for client-details tabs.
 - `docs/frontend/ui-guidelines.md` ★ — mandatory UI composition, Hebrew/RTL, accessibility, responsive, and interaction rules.
 - `docs/frontend/testing.md` ★ — frontend testing rules.
 - `docs/frontend/commands.md` ★ — frontend commands.

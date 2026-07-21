@@ -12,15 +12,15 @@ Source of truth: mandatory
 
 The tasks domain owns office-managed manual tasks. A task can be standalone, or it can be linked to a source record from another workflow domain so it can participate in the shared work queue. The domain itself is small: one `Task` model, CRUD/lifecycle endpoints, and source-link validation.
 
-Last verified against code + backend/openapi.json: 2026-06-15.
+Last verified against code + backend/openapi.json: 2026-07-21.
 
 ## Endpoints
 
-All endpoints require role `ADVISOR` or `SECRETARY` via the router-level dependency in `backend/app/tasks/api/routes.py` and `backend/app/clients/api/client_tasks.py`. All paths below exist in `backend/openapi.json`.
+All endpoints require role `ADVISOR` or `SECRETARY` via the router-level dependency in `backend/app/tasks/api/routes.py`. All paths below exist in `backend/openapi.json`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /api/v1/tasks | List non-deleted tasks with status/priority/assignee/source/due-date filters and pagination |
+| GET | /api/v1/tasks | List non-deleted tasks with status/priority/assignee/source/due-date/`client_record_id` filters and pagination |
 | POST | /api/v1/tasks | Create a new manual task |
 | POST | /api/v1/tasks/bulk-complete | Bulk-complete up to 100 tasks; partial success; requires `X-Idempotency-Key` |
 | POST | /api/v1/tasks/bulk-assign | Bulk-assign (or unassign) up to 100 tasks; partial success; requires `X-Idempotency-Key` |
@@ -29,7 +29,6 @@ All endpoints require role `ADVISOR` or `SECRETARY` via the router-level depende
 | POST | /api/v1/tasks/{task_id}/complete | Mark an open task as done |
 | POST | /api/v1/tasks/{task_id}/cancel | Mark an open task as canceled |
 | DELETE | /api/v1/tasks/{task_id} | Soft-delete a task |
-| GET | /api/v1/clients/{client_record_id}/tasks | List non-deleted tasks scoped to a specific client (`client_record_id`), with status/assignee/source/due-date filters and pagination |
 
 ## Model & fields
 
@@ -99,7 +98,7 @@ These five domains also own the `client_record_id` backfill: when a task is link
 - A task may be either standalone (`source_domain=None` and `source_id=None`) or linked. Partial links are rejected: create/update must provide both fields together, or clear both together (`backend/app/tasks/services/task_service.py:84-105,145-152`).
 - A linked task must reference a supported source domain and an existing, non-soft-deleted source record. Unsupported source types raise `TASK.INVALID_SOURCE`; missing/deleted linked records raise `TASK.NOT_FOUND` (`backend/app/tasks/services/task_service.py:145-157`, `backend/app/tasks/services/source_validator.py:14-29`).
 - New tasks are persisted through `TaskRepository.create()` with model defaults, so status starts as `open`, priority defaults to `normal`, and `created_by_user_id` is copied from the authenticated caller when present (`backend/app/tasks/services/task_service.py:28-43`, `backend/app/tasks/repositories/task_repository.py:48-57`, `backend/app/tasks/models/task.py:37-44`).
-- `GET /api/v1/tasks` lists only tasks where `deleted_at IS NULL`, ordered by `created_at DESC`, and supports filters for `status`, `priority`, `assigned_to_user_id`, `assigned_role`, `source_domain`, `source_id`, `due_before`, and `due_after` (`backend/app/tasks/repositories/task_repository.py:59-98`).
+- `GET /api/v1/tasks` lists only tasks where `deleted_at IS NULL`, ordered by `created_at DESC`, and supports filters for `client_record_id`, `status`, `priority`, `assigned_to_user_id`, `assigned_role`, `source_domain`, `source_id`, `due_before`, and `due_after` (`backend/app/tasks/repositories/task_repository.py:59-98`).
 - `get()` treats soft-deleted rows as not found. Every mutating operation (`update`, `complete`, `cancel`, `delete`) loads through `get()` first, so deleted tasks cannot be mutated (`backend/app/tasks/services/task_service.py:71-143`).
 - Tasks in terminal states cannot be edited. `update()` rejects both `done` and `canceled` tasks with `TASK.CONFLICT` (`backend/app/tasks/services/task_service.py:71-82`).
 - Completion and cancellation are one-way transitions from `open` only. Completing a canceled task, completing an already-done task, canceling a done task, or canceling an already-canceled task all raise `TASK.CONFLICT` (`backend/app/tasks/services/task_service.py:107-131`).
@@ -111,7 +110,7 @@ These five domains also own the `client_record_id` backfill: when a task is link
 - A task created without a source link but with an explicit `client_record_id` is validated: the client must exist, or `CLIENT_RECORD.NOT_FOUND` is raised.
 - When a task's source is changed via PATCH, `client_record_id` is recomputed from the new source (source authoritative).
 - When a task's source is cleared via PATCH (`source_domain=null, source_id=null`), `client_record_id` is preserved (the task becomes a manual client-scoped task). `client_record_id` is not directly patchable; scope only changes through source updates or at creation time.
-- `GET /api/v1/clients/{client_record_id}/tasks` only returns tasks where `Task.client_record_id` matches the path parameter (direct column match — no source joins). The client must exist (`CLIENT_RECORD.NOT_FOUND` on unknown id).
+- `GET /api/v1/tasks` accepts `client_record_id` as an optional filter query param (`TaskService.list(client_record_id=...)` → `TaskRepository.list_active(client_record_id=...)`), matching directly against `Task.client_record_id` (no source joins). Unlike the create/update path, this filter does not validate that the client exists: an unknown or nonexistent `client_record_id` simply yields an empty list, not `CLIENT_RECORD.NOT_FOUND`.
 
 ## Domain rules & invariants — bulk operations
 
