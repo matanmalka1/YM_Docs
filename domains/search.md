@@ -14,7 +14,7 @@ Search is a two-phase, client-centric locator. Phase one resolves what the user 
 client record. Phase two returns that client's records from every domain in one shared item
 shape, each carrying a deep link to the record itself. It is an orchestration layer over other
 domains and owns no persisted tables.
-Last verified against code: 2026-07-19.
+Last verified against code: 2026-07-21.
 
 ## Endpoints
 
@@ -64,17 +64,28 @@ Domain-owned response projections:
   owning client because that is how the office locates a client from physical material. Each
   client is returned exactly once no matter how many of its binders match, and the list is
   paginated with `page`/`page_size`.
-- `matched_binder_numbers` explains a match that came from a binder number. It is empty for
-  name or ID matches — there is nothing to explain then.
+  A binder that was handed over still resolves to its owner: where a binder is does not change
+  whose it is, and the typed term identifies rather than filters. Soft-deleted binders never
+  resolve anyone. The binder inside the term's `EXISTS` is aliased, because the statement also
+  joins `Binder` whenever a binder filter is present.
+- `matched_binder_numbers` explains a match that came from a binder number. It mirrors the term's
+  own matching exactly, handed-over binders included — an explanation that omits the binder the
+  user typed would be worse than none. It is empty for name or ID matches — there is nothing to
+  explain then.
 - The advanced filters (`client_record_id`, `id_number`, `client_status`, `entity_type`,
   `binder_number`, `binder_location_status`, `binder_capacity_status`) narrow the client list.
   Client filters and binder filters are combined with `AND`.
-- Binder joins exclude soft-deleted and handed-over binders by default; an explicit
-  `binder_location_status=handed_over` searches handed-over binders instead.
-- **Phase two — the item feed.** Items are always scoped to exactly one client. An explicit
-  `client_record_id` selects it; otherwise a term resolving to exactly one client auto-selects
-  that client. While several clients match, every group is empty — a feed mixing two clients
-  has no meaning.
+- The **binder filter** path is separate from the term: its join excludes soft-deleted and
+  handed-over binders by default, and an explicit `binder_location_status=handed_over` searches
+  handed-over binders instead. A term and a binder filter combine with `AND`, so filtering by
+  location still narrows a client the term found through a handed-over binder.
+- **Phase two — the item feed.** Items are always scoped to exactly one client, and only ever to
+  a client that phase one returned. `client_record_id` requests a client; it does not select one.
+  It narrows resolution like every other filter, so it selects that client only when resolution
+  returns exactly it — a requested client the term or the advanced filters exclude selects
+  nothing, and no group is loaded for it. Without a request, a term resolving to exactly one
+  client auto-selects that client. While several clients match, every group is empty — a feed
+  mixing two clients has no meaning.
 - The typed term does **not** filter items. Once a client is selected the feed shows that
   client's records in full, and narrowing happens by type. "All of this client's data" is the
   contract.
@@ -108,6 +119,22 @@ auth/validation errors and the global error-envelope rules in
 
 ## Decisions (preserved)
 
+- **2026-07-21 — the typed term identifies a client, it does not filter binders.** Searching a
+  binder number used to skip handed-over binders, so a binder physically in the client's hands
+  returned "no client found" while the same number found the client through the dedicated
+  `binder_number` filter with `binder_location_status=handed_over`. The term now matches any
+  non-deleted binder, and `matched_binder_numbers` mirrors it. The binder-filter path keeps its
+  handed-over default — there it is a filter over binder state, which is what the user asked for.
+  Fixed alongside it: the term's binder `EXISTS` auto-correlated to the outer `Binder` join, so
+  any term combined with any binder filter raised at execution time and returned a 500.
+- **2026-07-21 — a requested client cannot outrank client resolution.** `client_record_id` used to
+  select the feed's client before the filtered client list was consulted, so a stale selection kept
+  in the URL served that client's items while the same response reported no matching client. One
+  screen then showed both "no client found" and the previous client's records. The rule is now
+  single: the feed's client is the client resolution returned, for API clients and deep links
+  alike. The frontend derives the selected client, its heading, the feed, and the empty state from
+  that one resolved client, and clears the selection in the same URL write as any filter change
+  that changes which clients resolve.
 - **2026-07-19 — search became client-centric.** The previous contract returned a joined
   client×binder table (`SearchResult` with `result_type: client|binder`), a separate document
   list, and a grouped `operational` block — three different shapes on one page, and one row per
