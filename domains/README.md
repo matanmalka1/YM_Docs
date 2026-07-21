@@ -50,7 +50,7 @@ For terminology disambiguation (e.g. `client_id` vs `client_record_id`, AuditTra
 - [timeline](timeline.md) — unified per-client operational activity feed (reverse-chronological).
 - [dashboard](dashboard.md) — read-only overview and tax-submissions widgets; no persistent tables.
 - [reports](reports.md) — read-only management reports: aging, VAT compliance, advance-payments, annual-report status.
-- [search](search.md) — unified search across clients, active binders, and permanent documents.
+- [search](search.md) — global search: client resolution plus grouped record matching across eight domains.
 
 ## Cross-cutting & infra
 
