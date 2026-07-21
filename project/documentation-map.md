@@ -164,6 +164,13 @@ Cross-cutting & infra:
 - `docs/domains/users.md` ★
 - `docs/domains/health.md` ★
 
+## Research & proposals (not source of truth)
+
+- `docs/research/annual-report-research.md` — external tax research supporting the annual-report model.
+- `docs/research/global-search-proposal.md` — proposal to make the search term match records, not
+  only clients. Describes behavior that does **not** exist; current search behavior is
+  `docs/domains/search.md` ★.
+
 ## Flows (cross-domain)
 
 Cross-domain flow documentation. Each file traces one flow from trigger to side effects, based on actual code.
