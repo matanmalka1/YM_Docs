@@ -65,7 +65,7 @@ Indexes:
 
 Schema notes:
 - `NotificationSendRequest.channel` accepts only `email` or `null`; omitted channel defaults to email in the service (`backend/app/notifications/schemas/notification_schemas.py:32-42`, `backend/app/notifications/services/notification_send_service.py:290`).
-- Both read DTOs add derived `client_name`, `business_name`, `trigger_label`, and `domain_label`; those are enrichment fields, not model columns. The list builds the thin `NotificationListItem` (`_enrich_list_item`) and the detail endpoint builds the full `NotificationResponse` (`_enrich`) (`backend/app/notifications/schemas/notification_schemas.py`, `backend/app/notifications/services/notification_service.py`).
+- Both read DTOs add derived `client_name`, `business_name`, `trigger_label`, and `domain_label`; those are enrichment fields, not model columns. The thin list DTO additionally exposes `client_id_number` and `office_client_number` for the global notifications table. The list builds `NotificationListItem` (`_enrich_list_item`) and the detail endpoint builds the full `NotificationResponse` (`_enrich`) (`backend/app/notifications/schemas/notification_schemas.py`, `backend/app/notifications/services/notification_service.py`).
 
 ## Enums / statuses
 

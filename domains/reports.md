@@ -72,7 +72,8 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 |-------|------|-------|
 | client_record_id | int | |
 | office_client_number | int \| None | From ClientRecord |
-| client_name | str | Resolved from LegalEntity.official_name; falls back to `"לקוח #{id}"` if legal entity missing |
+| client_name | str | Resolved from LegalEntity.official_name |
+| client_id_number | str | From LegalEntity.id_number |
 | total_expected | ApiDecimal | |
 | total_paid | ApiDecimal | |
 | overdue_count | int | |
@@ -83,7 +84,7 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 
 **AnnualReportStatusGroupResponse** (`schemas.py:68`): `status: AnnualReportStatus`, `count`, `clients: list[AnnualReportStatusClientResponse]`. Only statuses with at least one client are included in the response.
 
-**AnnualReportStatusClientResponse** (`schemas.py:60`): `client_record_id`, `client_name`, `form_type: PrimaryAnnualReportForm | None`, `filing_deadline: ApiDateTime | None`, `days_until_deadline: int | None`.
+**AnnualReportStatusClientResponse** (`schemas.py:60`): `client_record_id`, `client_name`, `client_id_number`, `office_client_number`, `form_type: PrimaryAnnualReportForm | None`, `filing_deadline: ApiDateTime | None`, `days_until_deadline: int | None`.
 
 ### AgingReportResponse (`schemas.py:100`)
 `report_date`, `total_outstanding`, `items: list[AgingReportItemResponse]`, `summary: AgingReportSummaryResponse`, `total`, `page`, `page_size`.
