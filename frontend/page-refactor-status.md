@@ -140,6 +140,13 @@ Remaining:
 
 - Browser-check the annual-report detail financial, annex, tax-calculation, and status-transition states before treating the widget-level visual verification as complete.
 
+## Work queue and tasks follow-up (2026-07-22)
+
+- `WorkQueuePage` retains the grouped one-hook composition contract. Urgency cards now drive URL state, system/manual/linked composition is visible, impossible historical status choices were removed, and focused interaction tests cover the cards.
+- `TasksPage` and the client task tab retain capability parity through `useTasksPage`. Both now expose server-backed lifecycle summaries, search/sort/client filters, assignee/client columns, bulk actions, enriched history details, and shared error/cache behavior.
+- The frontend feature cycle was removed: shared source labels/types live in `src/constants/workItemSources.constants.ts`, and task source selection uses the task-owned linkable-source endpoint.
+- Browser flow verification remains required; this IDE session has no authenticated in-app browser state.
+
 ## Client-details tab contract — compliance
 
 | Tab | Status |

@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The tasks domain owns office-managed manual tasks. A task can be standalone, or it can be linked to a source record from another workflow domain so it can participate in the shared work queue. The domain itself is small: one `Task` model, CRUD/lifecycle endpoints, and source-link validation.
 
-Last verified against code + backend/openapi.json: 2026-07-21.
+Last verified against code + backend/openapi.json: 2026-07-22.
 
 ## Endpoints
 
@@ -20,10 +20,11 @@ All endpoints require role `ADVISOR` or `SECRETARY` via the router-level depende
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /api/v1/tasks | List non-deleted tasks with status/priority/assignee/source/due-date/`client_record_id` filters and pagination |
+| GET | /api/v1/tasks | List non-deleted tasks with search, status/priority/assignee/source/due-date/`client_record_id` filters, allowlisted sorting, pagination, enriched client/assignee identity, and status summary |
 | POST | /api/v1/tasks | Create a new manual task |
 | POST | /api/v1/tasks/bulk-complete | Bulk-complete up to 100 tasks; partial success; requires `X-Idempotency-Key` |
 | POST | /api/v1/tasks/bulk-assign | Bulk-assign (or unassign) up to 100 tasks; partial success; requires `X-Idempotency-Key` |
+| GET | /api/v1/tasks/linkable-sources | List client-scoped open system work items that can be selected as a task source, including the existing linked-task count |
 | GET | /api/v1/tasks/{task_id} | Fetch one non-deleted task by id |
 | PATCH | /api/v1/tasks/{task_id} | Partially update a task that is still open |
 | POST | /api/v1/tasks/{task_id}/complete | Mark an open task as done |
@@ -57,6 +58,10 @@ Model: `Task` in `backend/app/tasks/models/task.py:29-69`.
 | `created_at` | datetime | no | default `utcnow` |
 | `updated_at` | datetime | no | default `utcnow`, auto-updated |
 | `deleted_at` | datetime | yes | soft-delete marker |
+
+List/detail responses enrich the persisted identifiers with `assigned_to_user_name`, `client_name`, and `office_client_number`. The detail response also enriches `created_by_user_name`, `completed_by_user_name`, and `canceled_by_user_name`. These are response-only fields resolved in batches; they are not stored on `Task`.
+
+`GET /api/v1/tasks` returns a thin list row plus `summary: { total, open, done, canceled }`. The summary respects all current filters except `status`, so status cards can switch between lifecycle buckets without losing the other filter context.
 
 Indexes: `status`, `priority`, `due_date`, `assigned_to_user_id`, `(source_domain, source_id)`, and `client_record_id` (`backend/app/tasks/models/task.py`).
 
@@ -98,7 +103,8 @@ These five domains also own the `client_record_id` backfill: when a task is link
 - A task may be either standalone (`source_domain=None` and `source_id=None`) or linked. Partial links are rejected: create/update must provide both fields together, or clear both together (`backend/app/tasks/services/task_service.py:84-105,145-152`).
 - A linked task must reference a supported source domain and an existing, non-soft-deleted source record. Unsupported source types raise `TASK.INVALID_SOURCE`; missing/deleted linked records raise `TASK.NOT_FOUND` (`backend/app/tasks/services/task_service.py:145-157`, `backend/app/tasks/services/source_validator.py:14-29`).
 - New tasks are persisted through `TaskRepository.create()` with model defaults, so status starts as `open`, priority defaults to `normal`, and `created_by_user_id` is copied from the authenticated caller when present (`backend/app/tasks/services/task_service.py:28-43`, `backend/app/tasks/repositories/task_repository.py:48-57`, `backend/app/tasks/models/task.py:37-44`).
-- `GET /api/v1/tasks` lists only tasks where `deleted_at IS NULL`, ordered by `created_at DESC`, and supports filters for `client_record_id`, `status`, `priority`, `assigned_to_user_id`, `assigned_role`, `source_domain`, `source_id`, `due_before`, and `due_after` (`backend/app/tasks/repositories/task_repository.py:59-98`).
+- `GET /api/v1/tasks` lists only tasks where `deleted_at IS NULL` and supports `search` over title/description; filters for `client_record_id`, `status`, `priority`, `assigned_to_user_id`, `assigned_role`, `source_domain`, `source_id`, `due_before`, and `due_after`; and allowlisted `sort_by` values `created_at`, `due_date`, `priority`, and `title` with `order=asc|desc`. Sorting is stable with task id as a tie-breaker (`backend/app/tasks/repositories/task_repository.py`).
+- `GET /api/v1/tasks/linkable-sources` reuses the work-queue read model with the client pinned and `scope=system`. It deliberately keeps already-linked system items and returns `linked_tasks_count`, allowing the UI to warn instead of silently enforcing a one-task-per-source rule (`backend/app/tasks/services/task_service.py`).
 - `get()` treats soft-deleted rows as not found. Every mutating operation (`update`, `complete`, `cancel`, `delete`) loads through `get()` first, so deleted tasks cannot be mutated (`backend/app/tasks/services/task_service.py:71-143`).
 - Tasks in terminal states cannot be edited. `update()` rejects both `done` and `canceled` tasks with `TASK.CONFLICT` (`backend/app/tasks/services/task_service.py:71-82`).
 - Completion and cancellation are one-way transitions from `open` only. Completing a canceled task, completing an already-done task, canceling a done task, or canceling an already-canceled task all raise `TASK.CONFLICT` (`backend/app/tasks/services/task_service.py:107-131`).
@@ -132,7 +138,7 @@ Registry: `docs/backend/error-codes.md`.
 | `TASK.INVALID_SOURCE` | Source link is partial or uses an unsupported source domain (`backend/app/tasks/services/task_service.py`) |
 | `TASK.INVALID_ASSIGNEE` | Bulk assign target user not found or inactive (whole-request 404) (`backend/app/tasks/services/task_service.py`) |
 | `TASK.CLIENT_SOURCE_MISMATCH` | Source record belongs to a different client than the explicitly provided `client_record_id` (`backend/app/tasks/services/task_service.py`) |
-| `CLIENT_RECORD.NOT_FOUND` | Provided `client_record_id` does not exist when creating/updating a task or listing client tasks (`backend/app/tasks/services/task_service.py`) |
+| `CLIENT_RECORD.NOT_FOUND` | Explicit `client_record_id` does not exist when creating a standalone task (`backend/app/tasks/services/task_service.py`) |
 
 ## Known issues
 

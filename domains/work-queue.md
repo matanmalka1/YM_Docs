@@ -12,7 +12,7 @@ Source of truth: mandatory
 
 The work-queue domain is a read-only aggregator that turns work from multiple backend domains into one office-facing queue. It does not own a database table or lifecycle of its own; instead it materializes response rows from source records such as VAT work items, annual reports, advance payments, unpaid charges, stale binders, and manual tasks.
 
-Last verified against code + backend/openapi.json: 2026-05-29.
+Last verified against code + backend/openapi.json: 2026-07-22.
 
 ## Endpoints
 
@@ -46,7 +46,7 @@ This module defines no ORM models or database table of its own. Current state li
 | `office_client_number` | int | yes | Lazy-resolved office number |
 | `business_id` | int | yes | Populated only for business-scoped source rows such as charges |
 | `source_summary` | object | yes | Link target summary for standalone linked tasks |
-| `linked_tasks` | list | no | Open linked tasks merged into a system row |
+| `linked_tasks` | list | no | Open linked tasks merged into a system row, including assignee id/name and role |
 | `linked_tasks_count` | int | no | Count of merged open tasks |
 | `warnings` | list | no | Queue warnings such as missing or final linked source |
 | `available_actions` | list | no | UI action descriptors for source/task actions |
@@ -54,7 +54,7 @@ This module defines no ORM models or database table of its own. Current state li
 
 ### Persisted source for manual rows
 
-Standalone/manual queue rows come from `Task` and serialize these persisted fields into `metadata`: `status`, `priority`, `description`, `assigned_to_user_id`, `assigned_role`, `action_key`, `action_payload`, `source_domain`, and `source_id` (`backend/app/work_queue/services/task_items.py:31-60`, `backend/app/tasks/models/task.py:32-61`).
+Standalone/manual queue rows come from `Task` and serialize these persisted fields into `metadata`: `status`, `priority`, `description`, `assigned_to_user_id`, `assigned_role`, `action_key`, `action_payload`, `source_domain`, and `source_id`. They also include response-only `assigned_to_user_name`, resolved in one batched user lookup during queue assembly (`backend/app/work_queue/items/task_items.py`, `backend/app/work_queue/services/work_queue_service.py`).
 
 ### Summary shape
 
