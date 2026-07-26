@@ -27,13 +27,12 @@ Lifecycle facts verified in code (no spec needed): mid-year client join is alrea
 | Case owner (אחראי תיק) | Real need, deferred. Client-level field affecting all modules — separate cross-cutting project, backlog. |
 | Calculation bases (§181ב excess expenses / fixed-amount notice) | Only a handful of such clients — `override_amount` suffices; no basis selector. |
 | Withheld-at-source credit (ניכוי במקור) | Real correctness gap — add a `withheld_amount` credit field (Phase 1). |
-| Client payment reminders | Yes — via the existing notifications module (manual, template-first), not a new mechanism (Phase 2). |
+| Client payment reminders | **No — rejected 2026-07-26** (reversing the 2026-07-23 "yes, via notifications" decision). No advance-payment notification trigger. See the rejected table. |
 | Rate change after 2216 approval | Bulk "from period X onward" rate-update action (Phase 1), not per-period manual edits. |
 | Screen scope | Every feature applies to **both** the org list and the client-tab. New fields/badges are shared components (cheap). List tooling (chips/sort/CSV/selection) is page-level wiring and the tab renders cards, not tables — adapt per view at implementation time. |
 | Reports module | New fields (`withheld_amount`, `payment_reference`) are added as columns to `AdvancePaymentReportView` in the same phase they are built (Phase 1). |
-| Permissions | Payment reminder: SECRETARY allowed (follows the notifications module's existing router policy). Audit-trail viewing: all roles. Edit / delete / batch mark-paid / bulk rate update: ADVISOR only (unchanged). |
+| Permissions | Audit-trail viewing: all roles. Edit / delete / batch mark-paid / bulk rate update / office-wide generate: ADVISOR only (unchanged). |
 | Batch mark-paid on partial rows | Partial payments are included: the action tops up `paid_amount` to `expected_amount` (client settled the difference). Only fully-paid rows are skipped. |
-| Reminder recipient | Same recipient-resolution logic as all other notifications — no advances-specific contact field. |
 | National-insurance advances (מקדמות ב"ל) | Real office need, consciously deferred — a new domain with its own spec, separate project after the income-tax phases. Backlog. |
 | Delivery path | Spec first (this document), then Linear issues, then implementation in phases. |
 
@@ -78,6 +77,8 @@ No backend changes. All data already served.
 
 ## Phase 2 — UX depth (after Phase 1 ships)
 
+**Closed 2026-07-26.** Items 1–3 built; item 4 dropped by the product owner; item 5 is a decision recorded in `docs/domains/advance-payments.md`, not code. Phases 0–2 are complete — this roadmap is now a decision record only, and new advance-payments work needs its own spec.
+
 1. **Period prev/next navigation** on the detail page: siblings = same client, same year; picker + arrows. Built.
 2. **Annual context card** on the detail page, fed by the existing `clientAdvancePaymentsKPI` endpoint (year totals: expected, paid, balance). Built.
 3. **VAT-mismatch filter** on the org list — once the Phase 1 mismatch flag exists (server-computed filter, matching the overdue-filter approach). Built 2026-07-26:
@@ -86,8 +87,8 @@ No backend changes. All data already served.
     - **Its own control, not another status option.** Overdue could join the status select because it describes the same axis; a mismatch cannot — a *paid* period can disagree with its VAT return, so folding it in would make "ממתין + אי-התאמה" unaskable. It is a single toggle (`vat_mismatch=true`), the app's existing spelling for a boolean URL filter.
     - **`MonthBatchSummary.vat_mismatch_count`**, unconditional, mirroring `overdue_count`. The list is month accordions; without a per-batch count the filter would leave every month on screen, each opening onto an empty table.
     - The endpoint takes `vat_mismatch` as a real boolean — `false` returns the rows without a mismatch. A parameter whose `false` silently did nothing would be a hidden fallback; the UI just does not offer that direction yet.
-4. **Payment reminder to client.** Button on the advances list/detail invoking the existing notifications flow (manual, template-first, per the notifications spec) with an advance-payment trigger + template. Integration spec only — no new delivery mechanism, no batch send in v1.
-5. **2216 rate-reduction tracking — decided (2026-07-23): task-based, no bespoke workflow.** Submission happens in שע"מ outside the system; the system only tracks. Model as a regular task in the tasks module ("הגשת 2216 ללקוח X", due date, follow-up); on approval the advisor updates `advance_rate` on the payment (existing field, audited). Revisit only if 2216 volume grows enough to justify dedicated infrastructure. Rate application uses the Phase 1.11 bulk "from period X onward" action.
+4. **Payment reminder to client — dropped 2026-07-26 (product owner).** Not built, and the notification trigger was never added. Moved to the rejected table below; do not re-propose.
+5. **2216 rate-reduction tracking — decided (2026-07-23): task-based, no bespoke workflow.** Recorded in `docs/domains/advance-payments.md` §Decisions (preserved) as the current-state rule. Submission happens in שע"מ outside the system; the system only tracks. Model as a regular task in the tasks module ("הגשת 2216 ללקוח X", due date, follow-up); on approval the advisor updates `advance_rate` on the payment (existing field, audited). Revisit only if 2216 volume grows enough to justify dedicated infrastructure. Rate application uses the Phase 1.11 bulk "from period X onward" action.
 
 ## Rejected (with reasons — do not re-propose without new evidence)
 
@@ -104,6 +105,7 @@ No backend changes. All data already served.
 | Three-role model (viewer/editor/admin) | Current model is `isAdvisor`; role expansion is a product-wide decision, not an advances feature. |
 | Filed/locked (דווח לרשות המסים) state | Filing happens in שע"מ, outside the system, so this is only a manual checkbox; not worth a state machine now. Backlog at most. |
 | Alerts bell with advance alerts | Overlaps the notifications spec (single automatic trigger policy). |
+| Client payment reminder for an advance period (Phase 2.4) | Product owner 2026-07-26: no client-facing message for advance periods. Reverses the 2026-07-23 "yes, via notifications" line before any code was written. No `advance_payment_reminder` trigger, no template, no button — `NotificationTrigger` stays at 13 values. |
 | Access log tab, role switcher, simulated concurrency | Demo theater. |
 
 ## Backlog (real, not now)
@@ -116,5 +118,6 @@ No backend changes. All data already served.
 
 ## Follow-up
 
-- Open Linear issues per phase once this spec is approved.
-- Update `docs/domains/advance-payments.md` only as phases actually merge (current-state doc must not lead the code).
+- Done — all three phases shipped and reflected in `docs/domains/advance-payments.md`.
+- Not browser-verified: the office-wide generate (1.12) and stale-cadence cleanup (1.13) UI has only ever run under typecheck/build. Exercise both before trusting them.
+- Anything new here starts as its own spec; this file stays frozen as the decision record for phases 0–2.

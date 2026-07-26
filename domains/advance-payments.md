@@ -214,6 +214,10 @@ From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived leg
 
 9. **`TaxDeadline` removed.** All deadline lookups go through `TaxCalendarEntry`. New code must not use the `TaxDeadline` name or concept. (`domain_decisions_v3.md` §3.6)
 
+10. **2216 rate-reduction requests are tracked as tasks, not as an advance-payments workflow** (2026-07-23). The request is submitted in שע"מ, outside the system; the system only follows it up. Model it as a regular task in the tasks module ("הגשת 2216 ללקוח X" + due date). When the authority approves, the advisor applies the new rate with the bulk `POST /clients/{id}/advance-payments/bulk-rate-update` action ("from period X onward"), which reprices pending rows and updates the legal entity's default — not by editing periods one by one. There is no 2216 entity, status, or endpoint.
+
+11. **No client-facing notification for advance payments** (2026-07-26). Advance periods do not send reminders to the client: there is no `advance_payment_reminder` trigger, template, or send button, and none is to be added. Follow-up on unpaid periods is internal — the overdue filter, the `timing_status` badge, and the §190 interest indication. (`docs/advance-payments-product-roadmap.md` §Rejected)
+
 ## Future / planned
 
 These items are explicitly **not yet implemented**. Do not describe as current behavior.
