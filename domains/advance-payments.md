@@ -31,13 +31,17 @@ All paths confirmed present in `backend/openapi.json`.
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/refresh-turnover` | Snapshot the period's VAT turnover onto the payment and recompute amounts (ADVISOR only) |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/refresh-turnover` | Bulk snapshot for explicitly listed `payment_ids`; filed returns only, non-atomic (ADVISOR only) |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/generate` | Generate full-year schedule for a client (ADVISOR only) |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/bulk-rate-update` | Reprice the client's pending periods from a month onward and rewrite the legal-entity default rate (ADVISOR only; idempotency key required) |
 | `GET` | `/api/v1/advance-payments/overview` | Cross-client overview (paginated; filter by year, month, status, exact `client_record_id`, legacy fuzzy `client_search`, etc.) |
 | `GET` | `/api/v1/advance-payments/overview/batches` | Month-batch summaries for the overview grouping; supports exact `client_record_id` |
+| `POST` | `/api/v1/advance-payments/bulk-mark-paid` | Top up explicitly listed payments to their expected amount; unpayable rows are reported as skips (ADVISOR only; idempotency key required) |
+| `GET` | `/api/v1/advance-payments/bulk-generate/preview` | Eligible-client count plus active clients that have no frequency configured. Takes no `year` — eligibility is a client property, not a year's |
+| `POST` | `/api/v1/advance-payments/bulk-generate` | Generate annual schedules for one server-sized chunk of eligible clients; repeat with the returned `next_cursor` until it is `null` (ADVISOR only; one idempotency key per chunk) |
 | `GET` | `/api/v1/annual-reports/{report_id}/advances-summary` | Advances summary scoped to an annual report (owned by annual_reports domain) |
 | `GET` | `/api/v1/reports/advance-payments` | Reporting export (owned by reports domain) |
 
 **Auth:** All advance-payments routes require `ADVISOR` or `SECRETARY` role; write operations (POST, PATCH, DELETE, generate) require `ADVISOR`.
-Cite: `backend/app/advance_payments/api/advance_payments.py:23-27`, `advance_payments_overview.py:17-21`, `advance_payment_generate.py:12-14`.
+Cite: `backend/app/advance_payments/api/advance_payment_routes.py`, `advance_payment_routes_overview.py`, `advance_payment_routes_generate.py`.
 
 ## Model & fields
 
@@ -138,6 +142,10 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **anchor = client_record_id:** Workflow objects link to `ClientRecord`, never directly to `LegalEntity`. Joins to `LegalEntity` always go through `ClientRecord`. (INV per `domain_decisions_v3.md` §1)
 - **Selected-client overview filters are exact:** The overview and overview batch endpoints accept `client_record_id` for exact `ClientRecord` matching. `client_search` remains a legacy fuzzy text filter for name, ID number, and office-client-number search.
 - **Schedule generation:** `generate_annual_schedule` skips periods where `entry.due_date < reference_date` (default today) and skips periods that already have an active payment. (`advance_payment_service.py:269-287`)
+- **Office-wide generation is chunked, and the server owns the chunking:** `bulk_generate_annual_schedules` walks eligible clients by keyset on `ClientRecord.id` and returns `next_cursor`; the caller repeats until it is `null`. Batch size (`BULK_GENERATE_CLIENT_CHUNK_SIZE`) and ordering are server decisions — a caller-chosen batch could silently omit clients. Keyset, not offset: a run spans several requests, and an offset would skip or repeat clients if the eligible set changed underneath it. Each chunk needs its own idempotency key so retrying one chunk cannot double-create.
+- **Office-wide eligibility is `ACTIVE` + a configured frequency:** closed and frozen clients are excluded by the query, not skipped later — creating an advance for them is already forbidden. Active clients with no `advance_payment_frequency` are excluded from generation but *reported* by the preview endpoint: unlike a closed client or an already-generated period, a missing frequency leaves the client with no schedule at all and is a data gap the advisor has to close.
+- **Office-wide generation is not atomic across clients:** a client whose own generation raises an `AppError` is collected into `failed` and the chunk continues — one misconfigured client must not cost the chunk its other clients. A database error still fails the whole chunk, because the transaction is no longer trustworthy; the caller retries that chunk under the same idempotency key.
+- **Bulk-created schedules are marked in the audit trail:** rows created by the office-wide run carry `source = "bulk_generate"` in the `advance_payment.created` audit metadata, reusing the existing action rather than adding a new one.
 
 **Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):
 - `timing_status`: `"overdue"` if `status != paid AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
