@@ -78,9 +78,14 @@ No backend changes. All data already served.
 
 ## Phase 2 — UX depth (after Phase 1 ships)
 
-1. **Period prev/next navigation** on the detail page: siblings = same client, same year; picker + arrows.
-2. **Annual context card** on the detail page, fed by the existing `clientAdvancePaymentsKPI` endpoint (year totals: expected, paid, balance).
-3. **VAT-mismatch filter** on the org list — once the Phase 1 mismatch flag exists (server-computed filter, matching the overdue-filter approach).
+1. **Period prev/next navigation** on the detail page: siblings = same client, same year; picker + arrows. Built.
+2. **Annual context card** on the detail page, fed by the existing `clientAdvancePaymentsKPI` endpoint (year totals: expected, paid, balance). Built.
+3. **VAT-mismatch filter** on the org list — once the Phase 1 mismatch flag exists (server-computed filter, matching the overdue-filter approach). Built 2026-07-26:
+
+    - **The rule gets a second form, in SQL.** The Phase 1 flag is computed in Python per returned row; a filter narrows a set that is never all in memory (the overview is server-paginated), so it cannot reuse it. `vat_turnover_mismatch_expr` sits in the same module as `TurnoverLookupRepository._resolve` so the two are read and changed together — the invariant is that a row the filter keeps is a row that carries the flag, and the tests assert exactly that.
+    - **Its own control, not another status option.** Overdue could join the status select because it describes the same axis; a mismatch cannot — a *paid* period can disagree with its VAT return, so folding it in would make "ממתין + אי-התאמה" unaskable. It is a single toggle (`vat_mismatch=true`), the app's existing spelling for a boolean URL filter.
+    - **`MonthBatchSummary.vat_mismatch_count`**, unconditional, mirroring `overdue_count`. The list is month accordions; without a per-batch count the filter would leave every month on screen, each opening onto an empty table.
+    - The endpoint takes `vat_mismatch` as a real boolean — `false` returns the rows without a mismatch. A parameter whose `false` silently did nothing would be a hidden fallback; the UI just does not offer that direction yet.
 4. **Payment reminder to client.** Button on the advances list/detail invoking the existing notifications flow (manual, template-first, per the notifications spec) with an advance-payment trigger + template. Integration spec only — no new delivery mechanism, no batch send in v1.
 5. **2216 rate-reduction tracking — decided (2026-07-23): task-based, no bespoke workflow.** Submission happens in שע"מ outside the system; the system only tracks. Model as a regular task in the tasks module ("הגשת 2216 ללקוח X", due date, follow-up); on approval the advisor updates `advance_rate` on the payment (existing field, audited). Revisit only if 2216 volume grows enough to justify dedicated infrastructure. Rate application uses the Phase 1.11 bulk "from period X onward" action.
 
