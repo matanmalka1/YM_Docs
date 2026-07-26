@@ -14,7 +14,7 @@ The advance-payments domain manages periodic tax prepayments (מקדמות מס 
 
 The expected amount formula is: `turnover_amount × advance_rate / 100 = calculated_amount`. An optional `override_amount` replaces `expected_amount` when set.
 
-Last verified against code + backend/openapi.json: 2026-07-20.
+Last verified against code + backend/openapi.json: 2026-07-26.
 
 ## Endpoints
 
@@ -134,6 +134,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **Status is server-owned:** Clients cannot set `status` through the PATCH contract. The service derives it on create and whenever `paid_amount`, `expected_amount`, `turnover_amount`, or `override_amount` changes: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`.
 - **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
 - **Client-owned detail lookup:** Reading a single payment requires both `client_record_id` and `payment_id`. A missing, deleted, or differently owned payment returns `ADVANCE_PAYMENT.NOT_FOUND` instead of exposing another client's record. The lookup is independent of the list's active year, filters, and pagination.
+- **Detail period navigation is client/year scoped:** The detail screen's picker and previous/next controls list active payments for the current payment's `client_record_id` and calendar year only. Siblings are ordered chronologically by `period`; navigation preserves whether the user entered through the organization list or the client tab. The controls are disabled while the edit form has unsaved changes.
 - **Annual report invalidation hook:** When a payment is marked `paid`, the service invalidates any open annual report tax calculation for the same client+year. Failure is non-critical and does not fail the update. (`api/advance_payments.py:155-164`)
 - **TaxCalendarEntry required:** Every payment must link to a `TaxCalendarEntry` (NOT NULL FK). The service calls `TaxCalendarMaterializationService.ensure_periodic_entry` to create or reuse the entry at creation time. (`advance_payment_service.py:152-157`)
 - **due_date_original immutable:** Once set, `due_date_original` cannot change. Enforced by SQLAlchemy event listener. (`models/due_date_snapshot_events.py:24-31`)
