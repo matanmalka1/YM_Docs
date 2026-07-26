@@ -218,6 +218,8 @@ From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived leg
 
 11. **No client-facing notification for advance payments** (2026-07-26). Advance periods do not send reminders to the client: there is no `advance_payment_reminder` trigger, template, or send button, and none is to be added. Follow-up on unpaid periods is internal — the overdue filter, the `timing_status` badge, and the §190 interest indication. (`docs/advance-payments-product-roadmap.md` §Rejected)
 
+12. **Refresh overwrites the edit form's turnover field unconditionally — no confirmation dialog** (2026-07-26). Pressing "קבע לפי מע״מ" in the detail form re-seeds the turnover input from the mutation result, discarding an unsaved manually typed turnover. This is deliberate, and the alternative was rejected: the command has already written the snapshot server-side by the time the form re-renders, so preserving the local draft would leave the form dirty and make the next Save send the pre-snapshot figure — resetting `turnover_source` to `manual` and destroying the fresh provenance (the MAT-74 defect). A confirmation dialog would also have to run *before* the mutation to mean anything, i.e. block the snapshot itself, and the only thing at risk is a draft the advisor discarded by pressing the refresh button on that same field. No other form field is touched by refresh. (`frontend/src/features/advancedPayments/components/panel/AdvancePaymentDetailView.tsx:91-98`; regression test `frontend/src/features/advancedPayments/hooks/useAdvancePaymentDetailForm.test.ts`)
+
 ## Future / planned
 
 These items are explicitly **not yet implemented**. Do not describe as current behavior.
