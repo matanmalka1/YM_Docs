@@ -172,6 +172,10 @@ Cross-cutting & infra:
   behavior is `docs/domains/search.md` ★.
 - `docs/research/global-search-implementation-prompt.md` — the phase-1 execution brief derived
   from the spec (issue breakdown MAT-92–95); tracking only.
+- `docs/research/backend-layer-bypass-audit.md` — point-in-time static audit of backend paths that
+  bypass or invert the required router/service/repository dependency flow; research only.
+- `docs/research/tax-rules-config-bypass-audit.md` — point-in-time static audit of application
+  paths that bypass, shadow, partially consume, or cannot consume `tax_rules_config`; research only.
 
 ## Flows (cross-domain)
 
