@@ -233,6 +233,36 @@ An obligation that exists is by definition waiting for its inputs, so a separate
 is redundant and is dropped. For an advance payment the "input" is the filed VAT return; for VAT it
 is the client's documents; for an annual report it is the year's material.
 
+**Canonical identifiers** (closes O-8). The enum is `ObligationStatus`, and it lives in
+`app/common/enums.py` beside `ObligationType` — the pair states its own relationship:
+
+| # | Value | Label |
+|---|---|---|
+| 1 | `awaiting_input` | ממתין לחומר |
+| 2 | `input_received` | החומר התקבל |
+| 3 | `in_progress` | בעבודה |
+| 4 | `awaiting_verification` | ממתין לאימות |
+| 5 | `submitted` | הוגש |
+| 6 | `canceled` | בוטל |
+
+`canceled` keeps the US spelling already used by all three domains. `submitted` is preferred over
+`filed`: in English "filed" is bound to tax returns, while the closing act here is the same in all
+three — the obligation is **reported and settled**. An advance payment is reported to the authority
+as well as paid, which is why the product owner defines its close as "confirmed reported and paid".
+`closed` was rejected outright: `AnnualReportStatus.CLOSED` and `ClientStatus.CLOSED` already exist
+with two other meanings.
+
+**Migration mapping.** What the mapping exposes is more useful than the mapping itself:
+
+| Domain | Mapping | What it means |
+|---|---|---|
+| VAT | `pending_materials`→1 · `material_received`→2 · `data_entry_in_progress`→3 · `ready_for_review`→4 · `filed`→5 · `canceled`→6 | a pure rename — every stage already exists |
+| Annual | `not_started` + `collecting_docs`→1 · `in_preparation`→3 · `pending_client`→4 · `submitted` + `closed`→5 · `canceled`→6 | two merges, and **stage 2 is empty** — no existing status lands there. It is a new stage, not a rename |
+| Advance | `pending`→1 **or** 2 depending on whether the turnover is known · `partial`→3 · `paid`→5 | not a mapping but a **derivation**; stage 4 and `canceled` are both new |
+
+This is §4.1.3's claim restated as counts, and it is now estimable: VAT renames, annual reports gain
+one stage, advance payments gain two and lose their money-derived status entirely.
+
 ### 4.1.2 Events advance; only a person locks
 
 The precedent already exists in VAT: entering the first invoice moves the item from
@@ -839,6 +869,10 @@ nothing maintains is a liability, not a feature.
 | D-36 | EC-8 — the obligation trigger fields (`entity_type`, `vat_reporting_frequency`, `advance_payment_frequency`) become **advisor-only**; the rest of the client record stays editable by a secretary. The guard belongs on the fields, not the endpoint. Closes the leak D-24 opened. | 2026-07-27 |
 | D-37 | EC-9 — a narrowed detector returns: a **locked** advance whose stored turnover diverges from the current latest record in its VAT chain is flagged, so the advisor can decide whether to amend. Nothing else D-9 retired comes back. `vat_turnover_mismatch_expr` is narrowed to locked rows rather than deleted. | 2026-07-27 |
 | D-38 | EC-10 — reconciliation clears `AdvancePayment.annual_report_id` when it removes a report, and the column is recorded as a **removal candidate**: no application code populates it. | 2026-07-27 |
+| D-39 | **The six stages are `ObligationStatus` in `app/common/enums.py`** (§4.1.1), beside `ObligationType`: `awaiting_input` · `input_received` · `in_progress` · `awaiting_verification` · `submitted` · `canceled`. `submitted` over `filed` — the closing act is the same in all three, an obligation *reported and settled*, and an advance is reported to the authority as well as paid. `closed` rejected: two other enums already use it. Closes O-8. | 2026-07-27 |
+| D-40 | **`ReportStage` and `POST /annual-reports/{id}/transition` retire.** Not a product judgement — the layer is dead and lossy. `STAGE_TO_STATUS` (`annual_report_constants.py:50`) maps `in_progress` and `final_review` to the *same* status, omits `post_submission` entirely (so that value fails), and `client_signature` dies with D-5. The two remaining stages are plain aliases for `collecting_docs` and `submitted`. In the frontend the enum and endpoint appear **only in `generated.ts`** — no `endpoints.ts` entry, no call site. A lossy alias over seven statuses has nothing left to abstract once there are six shared ones. Closes O-9. | 2026-07-27 |
+| D-41 | **The shared contract gets its own mandatory doc**: a new `docs/domains/tax-lifecycle.md`, `Source of truth: mandatory`, written **after** implementation from the finished code. It is needed because this plan archives when the work lands, and the three domain docs are structurally forbidden from holding it — each one's scope block says *"This file must not contain: other domains' behavior"*, and the shared rules (the six statuses, the transition graph, the reconciliation contract, the uniqueness predicate) belong to no single domain. Splitting them across three would recreate exactly the drift that started this: VAT and annual reports ran the same sequence under different names because nobody compared. Closes O-2. | 2026-07-27 |
+| D-42 | **Both of `ADVANCE_PAYMENT.INVALID_PERIOD`'s conditions move to `TAX_CALENDAR`**, so the code retires entirely. Bi-monthly alignment and unsupported `period_months_count` each have an exact twin in the calendar (`_validate_period_alignment`; `_periodic_rule_type`, whose rule map knows only 1 and 2 — the same set as `SUPPORTED_PERIOD_MONTH_COUNTS`). Splitting them would leave two identical validations answering from two namespaces. Closes O-3 and fixes D-3's scope. | 2026-07-27 |
 | D-9 | **Turnover has exactly one source, and the client decides which** (§4.1.4). VAT-reporting clients draw from the VAT return, always; clients with no VAT reporting have it entered manually. The refresh commands (single and bulk), `turnover_source` as a stored choice, `turnover_snapshot_at`, `available_turnover`, `missing_turnover`, and the entire turnover-mismatch mechanism (`vat_turnover_mismatch_expr`, the `vat_mismatch` filter, `MonthBatchSummary.vat_mismatch_count`) all retire — a mismatch is impossible when there is one source. The figure freezes at the lock, not by a command. | 2026-07-27 |
 
 ## 6. Decisions still open
@@ -846,10 +880,12 @@ nothing maintains is a liability, not a feature.
 | # | Question | Why it blocks | Blocks |
 |---|---|---|---|
 | O-1 | **Rollover policy.** Should next year's obligations be opened by a scheduled job, by an advisor-triggered office-wide generate, or both? Today it is neither reliably — see §3.3.2. | Determines whether Phase 5 needs scheduler infrastructure that does not exist today, and what happens to a client whose frequency is configured mid-year. | Phase 5 |
-| O-2 | Does `docs/domains/tax-lifecycle.md` (Phase 0) carry `Source of truth: mandatory`? Recommended yes — otherwise the five questions have no enforceable home and drift resumes. | Determines whether the three domain docs may keep restating the shared rules. | Phase 0 |
-| O-3 | `ADVANCE_PAYMENT.INVALID_PERIOD` also covers "unsupported `period_months_count`", not only bi-monthly alignment. Under D-3, does that second condition also move to `TAX_CALENDAR`, or stay domain-owned? | Determines the exact scope of the D-3 contract change. | Phase 1 |
+| ~~O-2~~ | ~~Where does the shared contract live?~~ **Closed 2026-07-27 by D-41:** a new `docs/domains/tax-lifecycle.md`, `Source of truth: mandatory`, written after implementation. | — | closed |
+| ~~O-3~~ | ~~Does the "unsupported `period_months_count`" condition also move to `TAX_CALENDAR`?~~ **Closed 2026-07-27 by D-42:** both conditions move; `ADVANCE_PAYMENT.INVALID_PERIOD` retires entirely. | — | closed |
 | ~~O-5~~ | ~~Which stage does a new amendment record start in?~~ **Closed 2026-07-27 by D-21:** a full copy of the original, opening at `in_progress`. | — | closed |
 | ~~O-6~~ | ~~Can a cancelled obligation be revived?~~ **Closed 2026-07-27 by D-23:** terminal, and excluded from the uniqueness rule so a returning client's period can be created fresh. | — | closed |
+| ~~O-8~~ | ~~The six stages have no canonical identifiers.~~ **Closed 2026-07-27 by D-39:** `ObligationStatus` in `app/common/enums.py`, values and migration mapping in §4.1.1. | — | closed |
+| ~~O-9~~ | ~~Does `ReportStage` + `POST /{id}/transition` survive?~~ **Closed 2026-07-27 by D-40:** it retires. Not a product judgement — the layer is dead and lossy. | — | closed |
 | O-7 | Under D-24, what removes an obligation created for a span the client was not yet liable in — e.g. a VAT period for 2026-01 on a client registered in 2026-06? The frequency is correct, so reconciliation will not touch it, and the direct delete is gone. Either reconciliation must also consider the client's liability start date, or one narrow removal path must survive. | Leaves a class of wrong obligations with no removal route. | §4.1.12 |
 | ~~O-4~~ | ~~Should advance payments keep a money-derived status or gain an explicit lifecycle?~~ **Closed 2026-07-27 by D-7 and D-8:** explicit lifecycle, explicit lock, `partial` retired as a status. | — | closed |
 
