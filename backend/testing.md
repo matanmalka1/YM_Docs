@@ -31,9 +31,10 @@ Source of truth: mandatory
   `vat_work_item_factory`, `tax_calendar_entry_factory`, and `authority_contact_factory`. Prefer
   them over repeating ORM constructors or adding equivalent per-file setup helpers.
 - Factory defaults create unique identities. Pass only fields relevant to the behavior under test.
-- `user_factory` and `create_client_with_business` commit by default because their common consumers
-  are API tests. The other factories flush by default; pass `commit=True` only when a commit boundary
-  is part of the setup requirement.
+- Every factory flushes by default with `commit=False`; pass `commit=True` only when a commit
+  boundary is part of the setup requirement.
+- Factories that need an actor reuse the function-scoped `actor_user` dependency. They must not
+  create additional users implicitly.
 - Use the fixture, never the factory class. Importing `tests.factories` inside a test module and
   instantiating a factory bypasses the fixture contract and its per-test sequencing.
 - Factories that own a required foreign key accept the parent as either object or id
