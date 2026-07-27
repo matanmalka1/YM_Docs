@@ -249,7 +249,7 @@ From `backend/docs/domain_decisions_v3.md` (still true, verified against code):
 
 4. **LegalEntity uniqueness is global** (not soft-delete-aware): `UniqueConstraint("id_number_type", "id_number")` on `legal_entities` has no `WHERE deleted_at IS NULL` clause. A legal entity with a given id_number can only ever exist once in the table, even if its ClientRecord is deleted.
 
-5. **office_client_number sequence starts at 100001**: `client_records` table uses a PostgreSQL sequence. In test environments, the sequence is simulated via `before_insert` event to avoid sequence exhaustion (`client_record.py:78`).
+5. **office_client_number sequence starts at 100001**: `client_records.office_client_number` uses the PostgreSQL `client_office_number_seq` sequence through its database server default. Development and test environments both use the real PostgreSQL sequence; the test fixture restarts it at `100001` for deterministic isolation.
 
 ## Future / planned
 
