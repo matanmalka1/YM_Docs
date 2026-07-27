@@ -24,11 +24,12 @@ Source of truth: mandatory
 - Standard backend auth fixtures include `test_user`, `secretary_user`, `auth_token`, `secretary_token`, `advisor_headers`, and `secretary_headers`.
 - The standard HTTP integration fixture is `client`; it overrides `get_db` to use `test_db`.
 - Parameterized test-data fixtures are `user_factory`, `client_factory`, `business_factory`,
-  `create_client_with_business`, `annual_report_factory`, `binder_factory`, `charge_factory`,
+  `create_client_with_business`, `annual_report_factory`, `annual_report_model_factory`,
+  `binder_factory`, `binder_intake_factory`, `binder_intake_material_factory`, `charge_factory`,
   `task_factory`, `advance_payment_factory`, `permanent_document_factory`,
-  `signature_request_factory`, `notification_factory`, `vat_work_item_factory`,
-  `tax_calendar_entry_factory`, and `authority_contact_factory`. Prefer them over repeating ORM
-  constructors or adding equivalent per-file setup helpers.
+  `signature_request_factory`, `notification_factory`, `reminder_factory`, `invoice_factory`,
+  `vat_work_item_factory`, `tax_calendar_entry_factory`, and `authority_contact_factory`. Prefer
+  them over repeating ORM constructors or adding equivalent per-file setup helpers.
 - Factory defaults create unique identities. Pass only fields relevant to the behavior under test.
 - `user_factory` and `create_client_with_business` commit by default because their common consumers
   are API tests. The other factories flush by default; pass `commit=True` only when a commit boundary
@@ -40,6 +41,8 @@ Source of truth: mandatory
   auto-create the parent only when the foreign key is NOT NULL and nothing was passed.
 - `client_factory(legal_entity_id=...)` attaches a new `ClientRecord` to an existing `LegalEntity`.
   In that mode only `ClientRecord` fields are accepted; `LegalEntity`/`Person` fields raise.
+- `business_factory` accepts `deleted_at` and `deleted_by` for repository tests that exercise
+  soft-deleted business rows.
 - The identity helpers `seed_client_identity()` and `seed_business()` are the implementation behind
   `client_factory` / `business_factory` / `create_client_with_business`. Test modules should call the
   fixtures, not these helpers directly.
