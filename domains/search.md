@@ -131,7 +131,7 @@ died (D2) they had no consumer.
   The event reuses the response totals and adds no database query; its purpose is the phase-2
   gate in `docs/research/global-search-spec.md` §9.
 - **Ordering** — identical in preview and expansion: rank, then the type's anchor date
-  descending with NULLs last (via a portable boolean sort key), then `id` descending.
+  descending with NULLs last (via `nullslast(...)`), then `id` descending.
 - **Phase-1 matching is exact and case-sensitive.** In particular, notification `recipient`
   email equality is case-sensitive — a product decision (2026-07-21), to be revisited with the
   phase-2 measurement.

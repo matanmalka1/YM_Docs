@@ -64,7 +64,7 @@ Backend fix commands:
 Seed backend development data:
 
 ```bash
-APP_ENV=development ENV_FILE=.env.development ./.venv/bin/python scripts/seed_fake_data.py --reset
+APP_ENV=development ENV_FILE=.env.development ./.venv/bin/python scripts/dev/seed_fake_data.py --reset
 ```
 
 Export backend OpenAPI for contract review:
