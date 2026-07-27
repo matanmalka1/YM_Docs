@@ -112,7 +112,7 @@ There is no dedicated status enum in this domain. Grouped status is derived from
 - **Rule overlap is forbidden at service layer.** `has_overlapping_rule` treats `NULL effective_to` as open-ended infinity and rejects overlapping ranges for the same `rule_type`. (`backend/app/tax_calendar/services/deadline_rule_service.py:1-35`)
 - **Generation is idempotent and does not mutate business objects.** `generate_for_year` / `generate_for_year_range` create missing shared entries only and skip existing keys. (`backend/app/tax_calendar/services/tax_calendar_entry_service.py:1-18`, `125-156`, `243-282`)
 - **Periodic due-date calculation prefers the official tax-rules registry.** For VAT and advance-payment periodic rules, generation first asks `tax_rules.registry` for the official effective date; if unavailable or failing, it falls back to `DeadlineRule` (`due_day_of_month` + `offset_months`). (`tax_calendar_entry_service.py:6-18`, `85-90`; `backend/app/tax_calendar/integrations/tax_rules_registry.py:19-29`, `52-83`)
-- **Annual due dates never use the registry.** Annual entries compute due date from `tax_year + 1`, shifted by `offset_months`, then clamped to `due_day_of_month`. Per-client annual deadline overrides live on `AnnualReport`, not on `TaxCalendarEntry`. (`tax_calendar_entry_service.py:15-18`, `92-95`)
+- **Annual entry due dates do not currently use the registry, and this is a known defect — not a decision.** Annual entries compute due date from `tax_year + 1`, shifted by `offset_months`, then clamped to `due_day_of_month`, because `_REGISTRY_RULE_TYPES` excludes `ANNUAL_REPORT`. The seeded rule `DefaultDeadlineRule(ANNUAL_REPORT, 31, 4)` is a hardcoded tax deadline living in `backend/app/` with no `source_ids`, which `docs/project/tax-rules-config.md` (mandatory) forbids. See Known issues. The authoritative annual deadline is `AnnualReport.filing_deadline`, derived from `tax_rules_config`; a shared entry cannot carry it, because annual uniqueness is `(obligation_type, tax_year)` — one row per year — while the registry's rules are scoped per entity type. (`tax_calendar_entry_service.py:15-18`, `92-95`, `99-101`; `tax_calendar_bootstrap_service.py:38`)
 - **Bi-monthly periods must start on odd months.** Materialization rejects `period_months_count=2` when the start month is even. (`backend/app/tax_calendar/services/materialization_service.py:197-203`)
 - **Materialization links workflow objects to canonical entries and snapshots due dates.** `link_vat_work_item`, `link_advance_payment`, and `link_annual_report` assign or verify `tax_calendar_entry_id`; VAT and advance payments also backfill `due_date_original` / `due_date_effective` from the entry when empty. (`materialization_service.py:101-131`, `215-222`)
 - **Mismatched existing links are rejected.** If a business object already has a different `tax_calendar_entry_id`, materialization raises `TAX_CALENDAR.LINK_CONFLICT`. (`materialization_service.py:215-222`)
@@ -136,6 +136,35 @@ Registry: `docs/backend/error-codes.md`.
 | `TAX_CALENDAR.LINK_CONFLICT` | 409 | Existing `tax_calendar_entry_id` does not match the canonical entry for the object |
 
 Cite: `backend/app/tax_calendar/services/grouped_items_service.py:27-30`, `backend/app/tax_calendar/services/materialization_service.py:133-142`, `176-212`, `215-222`.
+
+## Known issues
+
+- **The annual deadline rule bypasses `tax_rules_config` and publishes an unsourced date.**
+  `DefaultDeadlineRule(DeadlineRuleType.ANNUAL_REPORT, 31, 4)` is seeded in
+  `tax_calendar_bootstrap_service.py:38` and resolves to 31/05 of `tax_year + 1` for every client.
+  `backend/tax_rules_config` already defines four scoped annual rules with `source_ids`, versions,
+  and official deferrals — individual 31/05, small business 30/04, company 31/07, and form 6111
+  deriving from its parent report, each with tax-year-specific overrides (2025 individual moves to
+  30/06). The seeded value therefore matches only the individual default, in non-override years:
+  it is two months early for companies, wrong for small businesses, and wrong in every deferral
+  year. Being correct for the most common case is why it has stayed invisible.
+
+  This violates `docs/project/tax-rules-config.md` (mandatory): official rule definitions stay in
+  the package, hardcoded tax deadlines must not live in `backend/app/`, and every obligation rule
+  must carry `source_ids`.
+
+  The entry's date is not internal — `tax_calendar_grouped_service.py:139` publishes it as
+  `regulatory_due_date`, a required non-nullable field on the grouped response
+  (`tax_calendar/schemas/tax_calendar_grouped.py:14`) consumed by the frontend
+  (`frontend/src/features/taxCalendar/api/contracts.ts:25`). Advisors are shown it as regulatory
+  fact. Empty annual groups also sort and display by it (`grouped_service.py:204-208`).
+
+  Suggested fix: stop publishing `regulatory_due_date` for annual obligations and re-key empty
+  annual groups; treat `AnnualReport.filing_deadline` as the only annual deadline. The seeded rule
+  row must keep existing regardless, because `TaxCalendarEntry.deadline_rule_id` is a non-null FK —
+  but its date must stop being treated as a deadline. Pointing the entry at the registry instead is
+  not possible without changing the `(obligation_type, tax_year)` uniqueness, since one shared row
+  cannot hold a per-entity-type date.
 
 ## Decisions (preserved)
 

@@ -65,10 +65,12 @@ Cite: `backend/app/advance_payments/models/advance_payment.py`
 | `turnover_snapshot_at` | datetime | Yes | when `turnover_amount` was frozen; also `NULL` on rows backfilled by migration `8a1c47d0b3e2` |
 | `advance_rate` | Numeric(5,2) | Yes | snapshot of advance rate at creation; frozen — changes to `LegalEntity.advance_rate` do not affect existing records |
 | `calculated_amount` | Numeric(12,2) | No | `turnover_amount × advance_rate / 100`; derived display value |
-| `override_amount` | Numeric(12,2) | Yes | replaces `expected_amount` when set |
+| `override_amount` | Numeric(12,2) | Yes | replaces `expected_amount` when set; wins even over `withheld_amount` |
+| `withheld_amount` | Numeric(12,2) | Yes | withheld-at-source credit (ניכוי במקור); subtracted from `calculated_amount` when deriving `expected_amount`. `NULL` = none entered, treated as zero |
 | `status` | `AdvancePaymentStatus` enum | No | `pending \| paid \| partial` |
 | `paid_at` | datetime | Yes | actual payment timestamp |
 | `payment_method` | `PaymentMethod` enum | Yes | |
+| `payment_reference` | String(100) | Yes | bank/authority reference (אסמכתה) of the payment, as reported by the client |
 | `annual_report_id` | int FK → `annual_reports.id` | Yes | optional link to annual report |
 | `tax_calendar_entry_id` | int FK → `tax_calendar_entries.id` (RESTRICT) | No | required — links to shared regulatory deadline |
 | `notes` | String(500) | Yes | |
@@ -131,7 +133,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **Bulk refresh is not atomic:** each period is an independent business fact, so a period that cannot be snapshotted is counted, not raised, and does not roll back its neighbours. Skips are split into `skipped_no_vat` and `skipped_not_filed` because the two demand different follow-ups (chase the return vs. wait for filing). Every refreshed payment gets its own `advance_payment.turnover_refreshed` audit entry — there is no grouped batch entry.
 - **One turnover rule, one implementation:** `TurnoverLookupRepository._resolve` is the only place that decides what a period can draw from VAT. `resolve_turnover` (one period), `resolve_turnover_for_client`, and `resolve_turnover_for_clients` differ only in how many periods they ask about. Never add a fourth path or re-derive the coverage/source rule at a call site.
 - **The mismatch filter is that same rule in SQL:** `vat_turnover_mismatch_expr` (same module) is the only SQL form of the coverage-plus-tolerance rule, and exists because a filter narrows a set the server never loads — the overview is paginated, so a Python check could not back it. It and `_resolve`/`VatTurnoverMismatch.from_comparison` must change together: a row the `vat_mismatch` filter keeps must be a row that carries the flag. It is used by the overview filter (both directions: `true` keeps mismatching rows, `false` keeps the rest) and by `MonthBatchSummary.vat_mismatch_count`. Bi-monthly months are compared within the period's own year, which is safe because a bi-monthly period starts on an odd month and therefore never crosses a year end.
-- **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP). `expected_amount = override_amount ?? calculated_amount`. (`advance_payment_service.py:74-92`)
+- **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP), and stays **gross** — `withheld_amount` is never folded into it. `expected_amount` resolves in order: `override_amount` when set (it is the final say, and wins over `withheld_amount`); otherwise `max(0, calculated_amount - withheld_amount)`, floored at zero. (`advance_payment_service.py:196-216`)
 - **Status is server-owned:** Clients cannot set `status` through the PATCH contract. The service derives it on create and whenever `paid_amount`, `expected_amount`, `turnover_amount`, or `override_amount` changes: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`.
 - **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
 - **Client-owned detail lookup:** Reading a single payment requires both `client_record_id` and `payment_id`. A missing, deleted, or differently owned payment returns `ADVANCE_PAYMENT.NOT_FOUND` instead of exposing another client's record. The lookup is independent of the list's active year, filters, and pagination.

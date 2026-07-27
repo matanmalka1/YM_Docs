@@ -163,9 +163,64 @@ Source grep: `backend/app/annual_reports/services/*`.
 
 ## Known issues
 
-No open known issues.
+Reconciled against `backend/app/annual_reports/README.md` on 2026-07-27; every item below was
+re-verified against code. Items that README still listed as open, but code has since resolved, were
+moved to Resolved issues rather than carried over.
+
+- **VAT balance is summed into income-tax liability.** `total_liability` is computed as
+  `tax_after_credits + ni.total + (vat_balance or 0) - advances_paid`, mixing an income-tax figure,
+  a VAT balance, and an advances credit into one number. The PDF renders that same value labelled
+  `סה"כ חבות (מס + ביטוח לאומי)`, which does not mention VAT — so the label contradicts the
+  arithmetic. Violates the invariant that a domain's published total means what its label says.
+  Suggested fix: drop `vat_balance` from the sum and expose it as a separate informational field.
+  Cite: `backend/app/annual_reports/services/annual_report_tax_service.py:127-129`,
+  `backend/app/annual_reports/annual_report_pdf_builder.py:265`.
+
+- **Persisted `tax_due` / `refund_due` can be stale, and readiness reads them.** Manual
+  income/expense mutations invalidate the persisted result, but two sibling write paths that change
+  the same inputs do not: `VatImportService.auto_populate` creates and deletes financial lines
+  through repositories directly, and `AdvancePaymentService.bulk_mark_paid` sets `status = paid`
+  without invalidating. The readiness gate then reads the stale persisted value. Violates
+  "persisted tax results reflect current financial lines and current advances". Suggested fix: move
+  invalidation into the owning services so every path that changes an input triggers it. Cite:
+  `backend/app/annual_reports/services/annual_report_vat_import_service.py`,
+  `backend/app/advance_payments/services/advance_payment_service.py` (`bulk_mark_paid`),
+  `backend/app/annual_reports/services/annual_report_tax_service.py:179`.
+
+- **`final_balance` is computed twice from different data sources.**
+  `annual_report_query_service.py:150` derives it from the SQL aggregate
+  `AdvancePaymentAggregationRepository.sum_paid_by_client_year`, while
+  `annual_report_advances_summary_service.py:48-63` sums `paid_amount` in Python over a list fetched
+  with `page_size=10000` and rounds the result. The two can disagree whenever the aggregate and the
+  paginated read apply different scoping, and the summary silently undercounts past the page cap.
+  Suggested fix: consolidate onto one aggregate.
+
+- **Signature creation runs inside the status-transition transaction.** A signature-request failure
+  rolls back the status change it was meant to accompany. Suggested fix: decouple, or isolate in a
+  savepoint. Cite: `backend/app/annual_reports/services/annual_report_status_service.py:194`.
+
+- **`AnnualReportDetail.updated_at` is nullable.** Should be `nullable=False` with a default and a
+  backfill migration. Cite: `backend/app/annual_reports/models/annual_report_detail.py:57`.
+
+Unverified external tax constants — these need checking against the authority's published circulars,
+which cannot be confirmed from code:
+
+- **2026 national-insurance ceiling** is `622_920` in `ni_engine.py`; verify against the 2026 NII circular.
+- **2026 tax brackets** in `tax_engine.py`: the 5th-bracket ceiling appears lower than 2025; verify against the 2026 ITA circular.
+- **`DONATION_MINIMUM_ILS = 190`**; verify against the current ITA Section 46 indexed amount (may be 180 for 2024).
 
 ## Resolved issues
+
+- **Stale README items reconciled** (2026-07-27): four items still listed as open in
+  `backend/app/annual_reports/README.md` were verified as already fixed in code and are recorded
+  here rather than as known issues. (1) Signature requests are no longer business-scoped —
+  `annual_report_status_signature_helper.py:77` passes `business_id=None`, so the "silently not
+  created when client has no businesses" failure cannot occur (see also F-002 / F-AR-001 below).
+  (2) `amend_report` now lives in `annual_report_status_service.py:300`, not in the read-named query
+  service. (3) `business_name` no longer appears in any annual-report schema or service. (4)
+  `AnnualReportAnnexData` has `UniqueConstraint(schedule_entry_id, line_number)`; because
+  `annual_report_schedules` is already unique on `(annual_report_id, schedule)`, this is equivalent
+  to the per-report-per-schedule uniqueness the README asked for.
 
 - **MAT-54** (2026-07-23): Signing an annual-report approval could finish as `signed` without submitting the report because readiness checked `client_approved_at` before the signer flow wrote it, then swallowed the failure. Fixed by persisting the external approval timestamp first, isolating the report transition in a savepoint, and reconciling signed approvals whose reports remain `pending_client`.
 - **F-001** (2026-06-04): Income/expense line update and delete paths checked only that the report existed, not that the line belonged to it. Fixed: repository mutation and audit snapshots are scoped by both `line_id` and `annual_report_id`.

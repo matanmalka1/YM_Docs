@@ -24,7 +24,7 @@ Source of truth: mandatory
 - Standard backend auth fixtures include `test_user`, `secretary_user`, `auth_token`, `secretary_token`, `advisor_headers`, and `secretary_headers`.
 - The standard HTTP integration fixture is `client`; it overrides `get_db` to use `test_db`.
 - Parameterized test-data fixtures are `user_factory`, `client_factory`, `business_factory`,
-  `create_client_with_business`, `annual_report_factory`, `annual_report_model_factory`,
+  `create_client_with_business`, `annual_report_service_factory`, `annual_report_row_factory`,
   `binder_factory`, `binder_intake_factory`, `binder_intake_material_factory`, `charge_factory`,
   `task_factory`, `advance_payment_factory`, `permanent_document_factory`,
   `signature_request_factory`, `notification_factory`, `reminder_factory`, `invoice_factory`,
@@ -35,6 +35,8 @@ Source of truth: mandatory
   boundary is part of the setup requirement.
 - Factories that need an actor reuse the function-scoped `actor_user` dependency. They must not
   create additional users implicitly.
+- Factory implementations are split by domain under `tests/factories/`; `tests/factories/__init__.py`
+  is the public assembly surface used by `tests/conftest.py`.
 - Use the fixture, never the factory class. Importing `tests.factories` inside a test module and
   instantiating a factory bypasses the fixture contract and its per-test sequencing.
 - Factories that own a required foreign key accept the parent as either object or id
