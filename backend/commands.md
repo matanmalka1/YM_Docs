@@ -31,6 +31,21 @@ Start the PostgreSQL test database (required before any pytest run):
 docker compose up -d db_test
 ```
 
+Apply the schema to the test database (required whenever it comes up empty):
+
+```bash
+APP_ENV=test DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5433/binder_crm_test" \
+  JWT_SECRET=test-secret ./.venv/bin/alembic upgrade head
+```
+
+The `db_test` service mounts its data directory on `tmpfs`, so the schema can be lost when the
+container is recreated. `conftest.py` does not create tables. Check before running pytest; the
+command above is a no-op when the schema is already at head:
+
+```bash
+docker compose exec db_test psql -U postgres -d binder_crm_test -c "\dt" | tail -3
+```
+
 Run backend tests (scoped, preferred):
 
 ```bash
