@@ -152,6 +152,7 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | POST /clients/{id}/advance-payments | ✓ | ✓ | |
 | POST /clients/{id}/advance-payments/generate | ✓ | ✓ | |
 | PATCH /clients/{id}/advance-payments/{payment_id} | ✓ | ✓ | |
+| POST /advance-payments/bulk-generate | ✓ | | |
 
 ### documents/permanent_documents (400 + 500 upload)
 | method path | 400 | 409 | 500 |
