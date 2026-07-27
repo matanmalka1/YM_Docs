@@ -25,6 +25,12 @@ Install backend dependencies:
 ./.venv/bin/pip install -r requirements.txt
 ```
 
+Start the PostgreSQL test database (required before any pytest run):
+
+```bash
+docker compose up -d db_test
+```
+
 Run backend tests (scoped, preferred):
 
 ```bash

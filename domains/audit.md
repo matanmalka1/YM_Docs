@@ -24,7 +24,7 @@ No per-domain legacy audit tables remain in the active schema. `vat_audit_logs`,
 
 **Actor snapshot convention (§5 of the plan).** Display names are immutable snapshots captured at **write time** from the route's `current_user.full_name` and threaded alongside the actor id — never joined from `users` at read time (a rename must not rewrite historical audit display). `EntityAuditLog.actor_type` is one of `user | system | external_signer`; for `system`/`external_signer` rows `performed_by` is `NULL` and `actor_display_name` carries the system label / signer name. As of Phase 1 every existing `EntityAuditLog` write passes `actor_type` (default `"user"`) + `actor_display_name`, and the `UserAuditLog` auth/admin writers capture `actor_display_name` (+ `target_display_name` where a target user exists).
 
-**JSON-object storage convention.** `old_value`/`new_value`/`metadata_json` are stored as JSON objects (PostgreSQL `JSONB`, SQLite `JSON`) using the portable `JSON().with_variant(JSONB, "postgresql")` column type. The writer persists dict/list values directly — it does **not** `json.dumps` them into strings — and readers/response schemas expose them as JSON objects (`dict | list | null`), not strings.
+**JSON-object storage convention.** `old_value`/`new_value`/`metadata_json` are stored as PostgreSQL `JSONB`. The writer persists dict/list values directly — it does **not** `json.dumps` them into strings — and readers/response schemas expose them as JSON objects (`dict | list | null`), not strings.
 
 ## Endpoints
 
@@ -49,13 +49,13 @@ The audit domain owns one persisted SQLAlchemy model:
 | `actor_type` | `String` | no | `user` \| `system` \| `external_signer` (model default `"user"`) |
 | `actor_display_name` | `String` | yes | immutable actor-name snapshot captured at write time |
 | `action` | `String` | no | free string action name |
-| `old_value` | `JSONB` (SQLite `JSON`) | yes | JSON-object snapshot before mutation |
-| `new_value` | `JSONB` (SQLite `JSON`) | yes | JSON-object snapshot after mutation |
-| `metadata_json` | `JSONB` (SQLite `JSON`) | yes | structured context (e.g. `client_record_id`) |
+| `old_value` | `JSONB` | yes | JSON-object snapshot before mutation |
+| `new_value` | `JSONB` | yes | JSON-object snapshot after mutation |
+| `metadata_json` | `JSONB` | yes | structured context (e.g. `client_record_id`) |
 | `note` | `Text` | yes | optional audit note |
 | `performed_at` | `datetime` | no | defaults to `utcnow` |
 
-Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the PostgreSQL expression index `idx_entity_audit_client_ctx` on `((metadata_json->>'client_record_id'), performed_at)` (created in migration; SQLite dev may table-scan). Source: `backend/app/audit/models/audit_entity_audit_log.py`; migrations `backend/alembic/versions/0002_audit_jsonb_actor.py`, `0003_audit_actor_type_notnull.py`, and `0004_drop_legacy_audit_tables.py`.
+Indexes: `(entity_type, entity_id, performed_at)`, `(action, performed_at)`, `(performed_by, performed_at)`, `(performed_at)`, plus the PostgreSQL expression index `idx_entity_audit_client_ctx` on `((metadata_json->>'client_record_id'), performed_at)`. Source: `backend/app/audit/models/audit_entity_audit_log.py` and the squashed initial migration.
 
 ### Response schema
 

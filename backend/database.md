@@ -10,8 +10,7 @@ Source of truth: mandatory
 
 # Database
 
-- PostgreSQL is the target database for development and production.
-- Production must not run on SQLite.
+- PostgreSQL is the only supported database for development, tests, and production.
 - SQLAlchemy ORM models define application persistence.
 - `app/model_registry.py` must import ORM model modules before SQLAlchemy mapper configuration and Alembic autogenerate.
 - ORM models inherit from `Base` in `app/database.py`, which subclasses SQLAlchemy `DeclarativeBase`.
@@ -20,7 +19,8 @@ Source of truth: mandatory
 - SQLAlchemy engines must use `pool_pre_ping=True`.
 - SQL echo must remain disabled; SQL visibility must go through configured logging.
 - Application schema must not be managed with `Base.metadata.create_all()`.
-- `Base.metadata.create_all()` is allowed only for isolated test databases.
+- Tests use the migrated PostgreSQL test database and must not manage the schema with
+  `Base.metadata.create_all()`.
 - Schema changes must go through Alembic; see `docs/backend/migrations.md`.
 - Derived UX state must be computed in services unless a specific ADR requires persistence.
 - Soft-delete behavior must be explicit and consistently filtered where applicable.
@@ -28,6 +28,6 @@ Source of truth: mandatory
 - Enum fields must remain synchronized with frontend Zod enum schemas.
 - Python database enums should use `str, Enum` values and `pg_enum()` from `app/utils/enum_utils.py`.
 - Timestamp defaults should use `utcnow` from `app/utils/time_utils.py`.
-- Indexes and uniqueness constraints belong in model `__table_args__`; partial indexes must account for supported database dialects.
+- Indexes and uniqueness constraints belong in model `__table_args__`.
 - Database access must stay in repositories.
 - Business decisions must not be hidden inside models or repositories.

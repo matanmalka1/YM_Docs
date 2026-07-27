@@ -24,7 +24,7 @@ This file is non-normative. The authoritative config is the `Settings` class in 
 |-----|---------|---------|
 | `APP_ENV` | `development` | Active environment. |
 | `PORT` | `8000` | HTTP port. |
-| `DATABASE_URL` | postgres local (sqlite in test) | DB connection string. Must not be localhost in staging/production. |
+| `DATABASE_URL` | local PostgreSQL | DB connection string. Tests point it at the dedicated `binder_crm_test` database. Must not be localhost in staging/production. |
 
 ## Auth / security
 

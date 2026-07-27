@@ -297,7 +297,7 @@ No baseline failure exists. No open blockers remain.
 
 ## 15. Risks (carried into implementation)
 
-Signature forensic/legal parity (embedded drawer + timeline); timeline duplicate events; JSON serializer/reader switch + portable `JSON().with_variant(JSONB)`; Phase-1 NOT NULL sequencing (1a→1b); fail-safe downgrade; shared `annualreportstatus` enum; layering (service owns scope/authz/redaction); frontend per-phase migration; raw action strings → constants; AR double-write collapse.
+Signature forensic/legal parity (embedded drawer + timeline); timeline duplicate events; JSON serializer/reader switch to JSONB; Phase-1 NOT NULL sequencing (1a→1b); fail-safe downgrade; shared `annualreportstatus` enum; layering (service owns scope/authz/redaction); frontend per-phase migration; raw action strings → constants; AR double-write collapse.
 
 ## 16. Recommendation
 

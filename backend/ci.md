@@ -23,7 +23,7 @@ Current mode: **run-but-don't-block** — results are reported but not yet enfor
 
 Before this, `YM_Backend` had no CI. Lint, tests, and migration validity depended on developer discipline.
 
-The migrations job in particular catches a class of bug that local SQLite testing hides: Postgres-only DDL (enum types, `JSONB`, `ALTER TYPE`, gin/partial indexes, server defaults, deferred constraints) and broken `downgrade()` functions.
+The migrations job validates PostgreSQL DDL and catches broken `downgrade()` functions.
 
 ---
 
@@ -38,22 +38,20 @@ push to main / pull_request
      │         │           │             │               │
   ruff      pyright     pytest      check_contract   Postgres 17 service
   check     (lenient)   + coverage   _sync.py        + alembic roundtrip
-  format                (SQLite)    (no DB)          + alembic check
+  format                (Postgres)  (no DB)          + alembic check
 ```
 
 | Job | Runs | Notes |
 |-----|------|-------|
 | **lint** | `ruff check .` + `ruff format --check .` | Installs only ruff (fast). `alembic/` is excluded per `pyproject.toml`. |
 | **typecheck** | `pyright` | Lenient — `[tool.pyright]` in `pyproject.toml` disables most `report*` checks, so it catches undefined names / bad imports / syntax, not strict typing. `--pythonpath` supplies the CI interpreter, since the config's `venvPath` has no `.venv` here. |
-| **test** | `pytest --cov=app` | In-memory SQLite; sets `APP_ENV=test` itself; `JWT_SECRET` is the only required env. Coverage is reported, not enforced. |
+| **test** | `alembic upgrade head` + `pytest --cov=app` | Dedicated PostgreSQL 16 service. Coverage is reported, not enforced. |
 | **openapi-sync** | `check_contract_sync.py` | Ensures committed `openapi.json` matches the app. No DB. See [Why openapi-sync matters](#why-openapi-sync-matters). |
 | **migrations** | head-divergence + Postgres roundtrip + `alembic check` | Real Postgres 17 service (matches Neon in production). |
 
 ---
 
-## Why the migrations job uses real Postgres
-
-SQLite has no enum types and silently accepts Postgres-only DDL, so a SQLite-only migration check passes code that breaks in production.
+## Migration roundtrip
 
 The job runs the migrations against a `postgres:17` service container and performs a full roundtrip:
 
@@ -70,9 +68,7 @@ in `alembic/versions/0001_initial.py`.
 
 The head-divergence check (`alembic heads` must show exactly one head) needs no database and runs first.
 
-After the roundtrip the job runs `alembic check`, which autogenerates against the live SQLAlchemy metadata and fails if a model was changed without a matching migration. `alembic/env.py` sets `compare_type=True`, so column-type changes are caught alongside added/dropped tables and columns.
-
-`compare_server_default` is intentionally **not** enabled: `client_records.office_client_number` carries a `nextval()` server default in the migration but not on the model — the model omits it so SQLite test DDL (`create_all`) does not emit `CREATE SEQUENCE`. Enabling the flag would flag that intentional asymmetry on every run.
+After the roundtrip the job runs `alembic check`, which autogenerates against the live SQLAlchemy metadata and fails if a model was changed without a matching migration. `alembic/env.py` sets `compare_type=True` and `compare_server_default=True`, so column types and server defaults are checked alongside added/dropped tables and columns.
 
 ---
 
@@ -99,9 +95,9 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 | `backend/.github/workflows/ci.yml` | the workflow |
 | `backend/pyproject.toml` | ruff config (`target-version = "py313"`, must not exceed 3.13; `alembic` excluded from lint) and pyright config under `[tool.pyright]`; most `report*` checks disabled. A local `pyrightconfig.json` would silently override the pyright section — do not reintroduce one |
 | `backend/scripts/tooling/check_contract_sync.py` | compares committed `openapi.json` to the live app |
-| `backend/pytest.ini` | pytest config (SQLite, `APP_ENV=test`) |
+| `backend/pytest.ini` | pytest discovery and warning configuration |
 | `backend/alembic/versions/*` | migrations validated by the roundtrip |
-| `backend/app/config.py` | `APP_ENV=test` bypasses the localhost `DATABASE_URL` guard so CI can point alembic at the Postgres service |
+| `backend/app/config.py` | application settings loaded by tests and Alembic |
 
 ---
 
@@ -109,9 +105,9 @@ APP_ENV=test JWT_SECRET=x ./.venv/bin/python -m scripts.tooling.export_openapi -
 
 | Var | Value in CI | Why |
 |-----|-------------|-----|
-| `APP_ENV` | `test` | Bypasses the production localhost guard in `app/config.py`; lets tests use SQLite. |
+| `APP_ENV` | `test` | Selects test-specific application behavior. |
 | `JWT_SECRET` | `ci-test-only` | Required for app import; value is throwaway. |
-| `DATABASE_URL` | `postgresql+psycopg2://postgres:postgres@localhost:5432/binder_crm` | Migrations job only — points alembic at the Postgres service. Scheme must be `+psycopg2` (the installed driver). |
+| `DATABASE_URL` | PostgreSQL service URL | Points pytest and Alembic at their job's dedicated PostgreSQL database. Scheme must be `+psycopg2` (the installed driver). |
 
 Python is pinned to `3.13.4` across all jobs, matching Render's production runtime and the frontend
 [api-drift](../frontend/api-drift-ci.md) job.
@@ -166,8 +162,7 @@ Any new migration that introduces a `sa.Enum(..., name='x')` column must drop th
 ```python
 def downgrade() -> None:
     op.drop_table('...')
-    if op.get_bind().dialect.name == 'postgresql':
-        op.execute("DROP TYPE IF EXISTS x")
+    op.execute("DROP TYPE IF EXISTS x")
 ```
 
 Postgres enum types are standalone objects; `drop_table` does not remove them.

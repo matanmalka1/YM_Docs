@@ -16,8 +16,8 @@ Source of truth: mandatory
 - `LOG_SQL` is auto-enabled in development unless overridden.
 - `LOG_LEVEL` defaults to `INFO`.
 - Backend API docs are available at `http://localhost:8000/docs` when the backend is running.
-- Backend development defaults to PostgreSQL, local filesystem storage under `./storage/`, and text logs.
-- Backend tests default to SQLite, local filesystem storage, and text logs.
+- Backend development uses the Docker Compose `db` PostgreSQL service on port 5432, local filesystem storage under `./storage/`, and text logs.
+- Backend tests use the Docker PostgreSQL `db_test` service, local filesystem storage, and text logs.
 - In development and test, local storage is exposed at `/local-storage/*`.
 - Production must not expose local filesystem storage; files are served from Cloudflare R2.
 - Frontend local development must use `npm run dev` from `frontend/`; see `docs/frontend/commands.md`.

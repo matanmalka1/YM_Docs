@@ -15,9 +15,10 @@ Source of truth: mandatory
 - See `docs/backend/commands.md` for the canonical backend test commands.
 - `JWT_SECRET=test-secret` is required because backend settings validate it at import time.
 - Backend tests set `APP_ENV=test` in test configuration.
-- Backend tests use SQLite in-memory with `StaticPool` and `check_same_thread=False`.
-- Backend tests do not require Postgres.
-- Backend test fixtures may use `Base.metadata.create_all()` for isolated test databases and must drop the schema after each test function.
+- Backend tests use the dedicated PostgreSQL database `binder_crm_test`.
+- Local tests require the Docker Compose `db_test` service on port 5433.
+- CI starts PostgreSQL and applies Alembic migrations before running pytest.
+- Each test runs inside an outer transaction that is rolled back by the `test_db` fixture.
 - The standard backend DB fixture is `test_db`.
 - Standard backend auth fixtures include `test_user`, `secretary_user`, `auth_token`, `secretary_token`, `advisor_headers`, and `secretary_headers`.
 - The standard HTTP integration fixture is `client`; it overrides `get_db` to use `test_db`.
