@@ -27,6 +27,9 @@ Source of truth: mandatory
 - Soft-deletable models use `deleted_at` and may use `deleted_by`; repositories must explicitly exclude deleted rows where relevant.
 - Enum fields must remain synchronized with frontend Zod enum schemas.
 - Python database enums should use `str, Enum` values and `pg_enum()` from `app/utils/enum_utils.py`.
+- JSON-object columns must use `JSONB` from `sqlalchemy.dialects.postgresql`; generic `sqlalchemy.JSON` and `with_variant(...)` are not allowed.
+- Values stored in a `JSONB` column must be persisted as dict/list objects, not `json.dumps` strings.
+- Server defaults that exist in a migration must also be declared on the model; `alembic/env.py` runs with `compare_server_default=True`, so any asymmetry fails `alembic check`.
 - Timestamp defaults should use `utcnow` from `app/utils/time_utils.py`.
 - Indexes and uniqueness constraints belong in model `__table_args__`.
 - Database access must stay in repositories.
