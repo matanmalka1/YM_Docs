@@ -139,7 +139,7 @@ Cite: `backend/app/tax_calendar/services/grouped_items_service.py:27-30`, `backe
 
 ## Known issues
 
-- **The annual deadline rule bypasses `tax_rules_config` and publishes an unsourced date.**
+- **The annual deadline rule still bypasses `tax_rules_config` in the entry itself.**
   `DefaultDeadlineRule(DeadlineRuleType.ANNUAL_REPORT, 31, 4)` is seeded in
   `tax_calendar_bootstrap_service.py:38` and resolves to 31/05 of `tax_year + 1` for every client.
   `backend/tax_rules_config` already defines four scoped annual rules with `source_ids`, versions,
@@ -153,18 +153,33 @@ Cite: `backend/app/tax_calendar/services/grouped_items_service.py:27-30`, `backe
   the package, hardcoded tax deadlines must not live in `backend/app/`, and every obligation rule
   must carry `source_ids`.
 
-  The entry's date is not internal — `tax_calendar_grouped_service.py:139` publishes it as
-  `regulatory_due_date`, a required non-nullable field on the grouped response
-  (`tax_calendar/schemas/tax_calendar_grouped.py:14`) consumed by the frontend
-  (`frontend/src/features/taxCalendar/api/contracts.ts:25`). Advisors are shown it as regulatory
-  fact. Empty annual groups also sort and display by it (`grouped_service.py:204-208`).
-
-  Suggested fix: stop publishing `regulatory_due_date` for annual obligations and re-key empty
-  annual groups; treat `AnnualReport.filing_deadline` as the only annual deadline. The seeded rule
-  row must keep existing regardless, because `TaxCalendarEntry.deadline_rule_id` is a non-null FK —
-  but its date must stop being treated as a deadline. Pointing the entry at the registry instead is
-  not possible without changing the `(obligation_type, tax_year)` uniqueness, since one shared row
+  **Contained (2026-07-27):** the entry's date no longer leaves the domain as a deadline — see
+  "Annual deadline authority" below. What remains is that the seeded rule is still an unsourced tax
+  constant in `backend/app/`. It now only anchors the FK and groups rows, so it is a hygiene issue
+  rather than a wrong date on a screen. Fully removing it is not possible while
+  `TaxCalendarEntry.deadline_rule_id` is a non-null FK, and pointing the entry at the registry
+  cannot work without changing the `(obligation_type, tax_year)` uniqueness, since one shared row
   cannot hold a per-entity-type date.
+
+## Annual deadline authority
+
+`AnnualReport.filing_deadline`, derived from `tax_rules_config`, is the **only** annual deadline.
+The shared `TaxCalendarEntry` for an annual obligation is a grouping anchor; its `due_date` is never
+presented as a deadline for any client.
+
+- `regulatory_due_date` is `null` for annual obligations. A shared regulatory date is published only
+  where one statutory date genuinely applies to every client — true for a VAT or advance period,
+  false for an annual report. (`tax_calendar_grouped_service.py` `_regulatory_due_date`)
+- An annual row never falls back to the entry's date. `filing_deadline` is `NULL` by design for
+  `FilingDeadlineType.CUSTOM`, and such a report genuinely has no computed deadline, so it
+  contributes no date. VAT and advance rows *do* fall back, because `due_date_effective` is a
+  snapshot of that very entry and is null only on legacy rows. (`_row_due_date`)
+- `effective_due_date_min` / `effective_due_date_max` are `null` when nothing linked has a known
+  deadline. That is distinct from having no work.
+- A row with no known deadline is never counted overdue — there is nothing to be late against.
+- Undated groups are excluded by the `due_after` filter and sort last under `order=due`.
+
+Regression tests: `backend/tests/tax_calendar/api/test_grouped_annual_deadline_authority.py`.
 
 ## Decisions (preserved)
 
