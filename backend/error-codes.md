@@ -101,7 +101,17 @@ Each domain owns its `DOMAIN.*` codes. Registered prefixes:
 | Code | HTTP | When raised |
 |------|------|-------------|
 | `CLIENT_RECORD.NOT_FOUND` | 404 | Client record is missing or soft-deleted when a client-scoped service validates its anchor |
-| `CLIENT_RECORD.CLOSED` | 409 | A downstream mutation is attempted for a frozen or closed client record |
+| `CLIENT_RECORD.CLOSED` | 409 | A downstream mutation is attempted for a client record that is not `ACTIVE` (closed or frozen) |
+
+This is the **single** client-eligibility code across every domain. It is raised only by the
+shared guard `assert_client_record_is_active` (`backend/app/clients/guards/client_record_guards.py`),
+which every domain calls instead of deciding eligibility itself. Two messages are emitted — closed
+versus frozen — because a frozen client can be thawed and a closed one generally cannot; the code and
+status stay uniform so a caller can detect "client not eligible" without knowing which domain it asked.
+
+409 rather than 403: the block is a fact about the resource's state, not about the caller's
+permissions. `CLIENT.CLOSED` and `CLIENT.FROZEN` (403) were the advance-payments-local predecessors
+and are no longer raised.
 
 ---
 

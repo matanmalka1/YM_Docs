@@ -116,7 +116,7 @@ Cite: `backend/app/advance_payments/models/advance_payment.py:83-171`.
 
 Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 
-- **Client status gate:** Creating a payment raises `ForbiddenError` if `ClientRecord.status` is `CLOSED` or `FROZEN`. (`advance_payment_service.py:48-53`)
+- **Client status gate:** Creating a payment goes through the shared client-eligibility guard `assert_client_record_is_active` (`backend/app/clients/guards/client_record_guards.py`), which raises `ConflictError` / `CLIENT_RECORD.CLOSED` (409) for any non-`ACTIVE` client. The guard is an allowlist, so a status added later fails closed. Its SQL twin, `eligible_client_status_expr` (`backend/app/clients/repositories/client_active_scope.py`), scopes office-wide generation and must change together with it. This domain previously re-derived the rule locally and raised 403 `CLIENT.CLOSED` / `CLIENT.FROZEN`.
 - **Frequency validation:** `period_months_count` must match the client's `LegalEntity.advance_payment_frequency`. Mismatch raises `ADVANCE_PAYMENT.FREQUENCY_MISMATCH`. (`advance_payment_service.py:130-135`)
 - **Bi-monthly start month:** Bi-monthly payments must start on an odd month (`1,3,5,7,9,11`). Violating raises `ADVANCE_PAYMENT.INVALID_PERIOD`. (`constants.py:23`, `advance_payment_service.py:68-71`)
 - **No duplicate active period:** `UNIQUE(client_record_id, period) WHERE deleted_at IS NULL`. Duplicate insert raises `ADVANCE_PAYMENT.CONFLICT`. (`advance_payment_service.py:137-141`)
@@ -177,8 +177,7 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 | `ADVANCE_PAYMENT.RATE_INVALID` | 400 | VAT rate is zero when attempting reverse calculation (`advance_payment_calculator.py`) |
 | `ADVANCE_PAYMENT.VAT_TURNOVER_NOT_FOUND` | 404 | Refresh found no VAT work item covering every month of the period |
 | `ADVANCE_PAYMENT.VAT_NOT_FILED` | 409 | Refresh found only unfiled VAT returns and the request did not pass `confirm_pending` |
-| `CLIENT.CLOSED` | 403 | Client is closed — cannot create payment |
-| `CLIENT.FROZEN` | 403 | Client is frozen — cannot create payment |
+| `CLIENT_RECORD.CLOSED` | 409 | Client record is closed or frozen — cannot create payment. Raised by the shared client-eligibility guard; the message distinguishes closed from frozen, the code does not |
 
 ## Known issues
 
