@@ -23,14 +23,14 @@ are no live clients and no data to preserve. Confirmed with the product owner 20
 
 Two consequences, and they point the same way:
 
-- **The structural phases are cheaper now than they will ever be again.** Phase 3's migrations need
-  no backfill and no maintenance window — `reset_dev_db` is sufficient. Phase 4 has no
+- **The structural phases are cheaper now than they will ever be again.** P5's migrations need
+  no backfill and no maintenance window — `reset_dev_db` is sufficient. P7 has no
   backward-compatibility surface. D-3's contract change has no consumers in the wild.
-- **Phase 5 is not urgent.** The missing VAT catch-up path (§3.3.2) is a *pre-launch gap*, not a
+- **P8 is not urgent.** The missing VAT catch-up path (§3.3.2) is a *pre-launch gap*, not a
   live defect: no client is currently missing periods, because no client exists.
 
 **Therefore: do the expensive-later work first, and defer the work that only matters at launch.**
-See §7.1 for the resulting order.
+See §7.2 for the resulting order.
 
 ---
 
@@ -203,7 +203,7 @@ closing the gaps in this table.
 ## 4.1 The unified lifecycle
 
 Established with the product owner on 2026-07-27. This section is the target the three domains
-converge on; §7 has not yet been rewritten against it (see §10).
+converge on. §7 was re-cut against it on 2026-07-27; §9.1 records what that changed.
 
 ### 4.1.1 One status set
 
@@ -690,7 +690,7 @@ because no human typed one.
 | VAT | **none** — `_sync_vat_work_items` only creates, and only at client creation | full reconciliation |
 | Annual | **none** — the orchestrator only creates | full reconciliation |
 
-One service reconciles all three (Phase 5's `ObligationGenerationService`), driven by one trigger set,
+One service reconciles all three (P8's `ObligationGenerationService`), driven by one trigger set,
 returning one report of what was created, what was removed, and what could not be touched.
 
 ### 4.2.6 Two shapes, because the obligations are not shaped alike
@@ -879,151 +879,224 @@ nothing maintains is a liability, not a feature.
 
 | # | Question | Why it blocks | Blocks |
 |---|---|---|---|
-| O-1 | **Rollover policy.** Should next year's obligations be opened by a scheduled job, by an advisor-triggered office-wide generate, or both? Today it is neither reliably — see §3.3.2. | Determines whether Phase 5 needs scheduler infrastructure that does not exist today, and what happens to a client whose frequency is configured mid-year. | Phase 5 |
+| O-1 | **Rollover policy.** Should next year's obligations be opened by a scheduled job, by an advisor-triggered office-wide generate, or both? Today it is neither reliably — see §3.3.2. | Determines whether P8 needs scheduler infrastructure that does not exist today, and what happens to a client whose frequency is configured mid-year. | P8 |
 | ~~O-2~~ | ~~Where does the shared contract live?~~ **Closed 2026-07-27 by D-41:** a new `docs/domains/tax-lifecycle.md`, `Source of truth: mandatory`, written after implementation. | — | closed |
 | ~~O-3~~ | ~~Does the "unsupported `period_months_count`" condition also move to `TAX_CALENDAR`?~~ **Closed 2026-07-27 by D-42:** both conditions move; `ADVANCE_PAYMENT.INVALID_PERIOD` retires entirely. | — | closed |
 | ~~O-5~~ | ~~Which stage does a new amendment record start in?~~ **Closed 2026-07-27 by D-21:** a full copy of the original, opening at `in_progress`. | — | closed |
 | ~~O-6~~ | ~~Can a cancelled obligation be revived?~~ **Closed 2026-07-27 by D-23:** terminal, and excluded from the uniqueness rule so a returning client's period can be created fresh. | — | closed |
 | ~~O-8~~ | ~~The six stages have no canonical identifiers.~~ **Closed 2026-07-27 by D-39:** `ObligationStatus` in `app/common/enums.py`, values and migration mapping in §4.1.1. | — | closed |
 | ~~O-9~~ | ~~Does `ReportStage` + `POST /{id}/transition` survive?~~ **Closed 2026-07-27 by D-40:** it retires. Not a product judgement — the layer is dead and lossy. | — | closed |
-| O-7 | Under D-24, what removes an obligation created for a span the client was not yet liable in — e.g. a VAT period for 2026-01 on a client registered in 2026-06? The frequency is correct, so reconciliation will not touch it, and the direct delete is gone. Either reconciliation must also consider the client's liability start date, or one narrow removal path must survive. | Leaves a class of wrong obligations with no removal route. | §4.1.12 |
+| O-7 | Under D-24, what removes an obligation created for a span the client was not yet liable in — e.g. a VAT period for 2026-01 on a client registered in 2026-06? The frequency is correct, so reconciliation will not touch it, and the direct delete is gone. Either reconciliation must also consider the client's liability start date, or one narrow removal path must survive. | Leaves a class of wrong obligations with no removal route. | P4, P8 |
 | ~~O-4~~ | ~~Should advance payments keep a money-derived status or gain an explicit lifecycle?~~ **Closed 2026-07-27 by D-7 and D-8:** explicit lifecycle, explicit lock, `partial` retired as a status. | — | closed |
 
 ## 7. Phases
 
-Phase 0 gates everything. Beyond that, ordering is driven by §0: structural work lands while it is
-still free, launch-gated work waits.
+Re-cut 2026-07-27 against §4.1 – §4.3 (D-4 … D-42). The previous cut was written for a consolidation
+refactor and is superseded; §9.1 recorded why it had to be redone.
 
-### 7.1 Execution order
+### 7.1 What the specification did to the size of the work
 
-| Order | Phase | Why here |
+The original plan was five cleanup phases and one structural phase. The specification turned it into
+a lifecycle replacement — and §4.1.1's migration mapping sizes each domain honestly, which the
+earlier estimate could not:
+
+| Domain | Scale | Why |
 |---|---|---|
-| 1 | **0** — freeze the contract | gates all code work |
-| 2 | **1** — delete duplication | safe, independent, shrinks the surface every later phase touches |
-| 3 | **3** — unify the deadline shape | migrations are free pre-production; this is the phase that gets most expensive after launch |
-| 4 | **4** — fix coupling directions | no backward-compatibility surface to preserve |
-| 5 | **2** — align lateness / work queue | the only visible product change; cheaper to land once §3 has settled the field names it reads |
-| 6 | **6** — fix the liability arithmetic | small, independent, any time after Phase 0 |
-| 7 | **5** — generation + rollover | **launch-gated, not urgent.** See §7.2 |
+| **VAT** | a rename, plus two bug fixes | every stage it needs already exists; the mapping is 1:1 |
+| **Annual** | loses a layer, gains a stage | the signature flow, `pending_client`, post-submit `closed`, and `ReportStage` all retire; stage 2 is new |
+| **Advance** | deepest | two new stages, an explicit lock, an amendment mechanism, and its status stops being arithmetic |
 
-Phase 6 can run in parallel with anything. Phase 5.3a (§7.2) can run in parallel with Phase 1 — it
-shares no files.
+The work is therefore **not** evenly spread, and the domain that looked simplest at the start —
+advance payments, three statuses and no graph — is the one that changes most.
 
-### 7.2 Phase 5 is split
+### 7.2 Ordering
 
-Phase 5 mixes two unrelated things, and only one of them is a launch blocker:
+Two constraints drive it. **§0**: structural work is cheap only while there is no production data.
+**Dependency**: everything reads the status enum, so it lands first.
 
-- **5.3a — VAT office-wide generation (launch blocker, small).** VAT has no catch-up path of any
-  kind: `_sync_vat_work_items` runs only from `client_create_service.py:222`, i.e. at client
-  creation. Advance payments have `bulk-generate`; annual reports are re-created on client update;
-  VAT has nothing. This must exist before real clients are onboarded, or a client onboarded in one
-  year silently has no VAT periods in the next. The fix is to copy the proven advance-payments
-  mechanism (keyset chunks, per-chunk idempotency key, non-atomic with reported failures) — not to
-  design anything new. Independent of **O-1**.
-- **5.1 / 5.2 / 5.4 — consolidation and rollover (deferred).** Merging the three creation paths into
-  one service is a genuine refactor of onboarding + orchestrator, and it is the phase most helped by
-  Phase 4 having already cleaned the dependency directions. The three paths are ugly but correct.
-  Blocked on **O-1** in any case.
-
-### Phase 0 — Freeze the contract (documentation only)
-
-No code. Deliverable: `docs/domains/tax-lifecycle.md`, owning:
-
-- The five questions of §4 and the canonical answer to each.
-- The obligation vocabulary: owed / open / resolved / late, and what each means per domain.
-- The allowed coupling directions (see Phase 4).
-- The generation and rollover policy (blocked on **O-1**).
-
-Then: each of the three domain docs links to it and **stops restating** the shared rules. Fix the
-two drift items in §3.4 in the same pass.
-
-Nothing in Phases 1–6 starts before this file is agreed.
-
-### Phase 1 — Delete provable duplication (no behavior change except D-3's error code)
-
-| Item | Change | Files |
+| # | Phase | Gates on |
 |---|---|---|
-| 1.1 | One period-alignment gate. Delete the VAT and advance-payment local checks; the calendar materializer becomes the only gate, raising the single `TAX_CALENDAR` code per **D-3**. Resolve **O-3** first. | `vat_intake_service.py:33-45`, `advance_payment_service.py` `_validate_period_months_count`, `tax_calendar_materialization_service.py:190` |
-| 1.2 | Delete `bimonthly_advance_payment_period`; rename the survivor to `bimonthly_period` and repoint callers. | `common/period_utils.py:43-66` |
-| 1.3 | Replace hand-rolled period parsing with `parse_period_year` / `parse_period_month`. | ~12 sites listed in §3.2.3 |
-| 1.4 | One implementation of "advances paid for client + year" — the SQL aggregate. Delete the Python sum. Then one definition of `final_balance`. | `annual_report_advances_summary_service.py:41-52`, `annual_report_query_service.py:150`, `annual_report_tax_service.py:127` |
-| 1.5 | Add `*_resolved_expr()` SQL twins beside each `is_*_resolved`, documented as required-to-change-together. Use the VAT twin in place of the hardcoded status list. | three enum modules, `vat_compliance_repository.py:88` |
+| **P0** | The status enum and the transition graph | — |
+| **P1** | Delete provable duplication | — (runs alongside P0) |
+| **P2** | Closing and locking | P0 |
+| **P3** | Amendment and the uniqueness rule | P0, P2 |
+| **P4** | Removal and reconciliation | P0, P3 |
+| **P5** | The deadline shape | P3 |
+| **P6** | Domain surgery | P0 – P5 |
+| **P7** | Coupling and arithmetic | P2 |
+| **P8** | Generation and rollover | P4 · blocked on **O-1**, **O-7** |
+| **P9** | Documentation | all |
 
-Frontend follow-up for 1.1: both VAT and advance-payments message catalogs plus the regenerated
-contract (`openapi.json` → `generated.ts`).
+P1 shares no files with P0. P7 is independent of P3 – P6 and may land any time after P2.
 
-**Done when:** each rule in §3.2 has exactly one implementation (or one Python + one SQL twin), and
-`final_balance` returns the same number from every endpoint that publishes it.
+### 7.3 What no phase owns yet
 
-### Phase 2 — Align lateness and the work queue (per D-1)
+Three bodies of work are dragged along by P0 and are not written into any phase above. They are not
+optional, and two of them are larger than several of the phases.
 
-| Item | Change | Files |
+| Area | Size today | Why it moves |
 |---|---|---|
-| 2.1 | VAT work-queue entry moves from `period < now` to `due_date_effective` with the shared `UPCOMING_WINDOW_DAYS` cutoff, matching the other two. | `vat_compliance_repository.py` `get_overdue_unfiled`, `work_queue/items/tax_items.py` |
-| 2.2 | Move `advance_payment_items` from `billing_items.py` to `tax_items.py`. | `work_queue/items/billing_items.py`, `work_queue/items/tax_items.py` |
-| 2.3 | One urgency derivation shared by all three obligation types. | `work_queue/items/common.py` |
+| **Frontend** | 13 files hold the old status literals | status maps, labels, colours, filters, URL params and message catalogs across three features. Plus the retired endpoints (`/transition`, the `DELETE`s, the refresh commands) and every contract regen |
+| **Backend tests** | 57 files reference the three status enums | a lifecycle replacement invalidates a large part of the suite; some tests encode behaviour that D-4 … D-42 deliberately removes |
+| **Seed builders** | 3 files set statuses directly | **this one gates P0 itself**: the seed is the only source of data in the system (§0), so nothing else can be verified until it runs again |
 
-**Done when:** the three obligation types enter the work queue on one rule, and no work-queue module
-re-derives a domain's resolved set or lateness.
+The seed is the one to notice. It is not "one more caller" — it is the precondition for testing every
+other phase, which makes it part of P0 rather than a consequence of it.
 
-### Phase 3 — Unify the deadline shape
+---
 
-Annual reports adopt `due_date_original` / `due_date_effective` / `due_date_override_reason`.
-`filing_deadline` becomes `due_date_effective`; `deadline_type` stays, because standard/extended/
-custom is a genuine annual-only regulatory choice, not a shape difference.
+### P0 — The status enum and the transition graph
 
-Same phase: drop the legacy `AdvancePayment.due_date` column — already on the advance-payments
-roadmap — after auditing every consumer onto `due_date_effective`. Note that
-`advance_payment_aggregation_repository.py` still coalesces to it in several expressions.
+The foundation every other phase reads.
 
-Payoff: the long-planned due-date-override endpoint (currently listed as future work in **both**
-`docs/domains/vat.md` and `docs/domains/advance-payments.md`) gets built once for all three instead
-of three times.
+- `ObligationStatus` in `app/common/enums.py` beside `ObligationType`, six values (D-39).
+- One shared transition graph: forward one stage at a time, events may perform consecutive
+  transitions but never skip one (D-35); backward strictly one stage and **always with a reason**
+  (D-11, D-33); `submitted` has no outgoing transition; cancel from any unlocked stage (D-23).
+- Three enum migrations. VAT is 1:1. Annual merges `not_started`+`collecting_docs` and
+  `submitted`+`closed`, and gains an empty stage 2. Advance is a **derivation**, not a mapping —
+  `pending` resolves to stage 1 or 2 by whether the turnover is known — and gains stage 4 and
+  `canceled`.
+- `partial` disappears as a status; a part-paid advance is stage 3 with an outstanding balance (D-7).
 
-Status unification is settled by D-4 … D-8 and D-11 (§4.1); this phase carries the deadline-shape
-half of that work.
+**Done when:** one enum, one graph, three domains reading both, and no domain-local status enum left.
 
-**Done when:** one overdue rule reads one field name across all three, and two Alembic migrations
-(annual adopt, advance drop) have landed with the enum-downgrade convention applied.
+### P1 — Delete provable duplication
 
-### Phase 4 — Fix the coupling directions (per D-2)
+Unchanged in substance from the pre-re-cut phase of the same name, widened by D-42. Independent of the lifecycle work.
 
-Rule to write into Phase 0's document and then enforce:
+| Item | Change |
+|---|---|
+| 1.1 | One period-alignment gate. **Both** conditions of `ADVANCE_PAYMENT.INVALID_PERIOD` move to `TAX_CALENDAR` and the code retires (D-3, D-42). The VAT `EXEMPT` check is **not** part of this and stays in VAT — the calendar has no equivalent |
+| 1.2 | Delete `bimonthly_advance_payment_period`; rename the survivor `bimonthly_period` |
+| 1.3 | Hand-rolled period parsing → `parse_period_year` / `parse_period_month`; the calendar's regex-validating parser becomes the shared implementation |
+| 1.4 | One "advances paid for client+year" (the SQL aggregate), one `final_balance` definition |
+| 1.5 | `*_resolved_expr()` SQL twins beside each predicate — **and fix the VAT bug**: `_RESOLVED_STATUSES` omits `CANCELED` while `vat_compliance_repository.py:88` excludes it, so a cancelled period reads open on one screen and closed on another |
 
-> Annual reports read from VAT and advance payments. VAT and advance payments never read or write
-> annual reports.
+**Done when:** each rule has one implementation (or one Python + one SQL twin), and `final_balance`
+returns the same number from every endpoint that publishes it.
 
-| Item | Change | Files |
-|---|---|---|
-| 4.1 | Replace the deferred function-body import with an explicit port: an interface `advance_payments` depends on and `annual_reports` implements at composition time. | `advance_payment_service.py:243`, `annual_report_tax_service.py` `invalidate_tax_if_open` |
-| 4.2 | Make VAT auto-populate invalidate persisted `tax_due` / `refund_due` exactly as manual line mutations do. Closes the still-real half of the annual-reports known issue. | `annual_report_vat_import_service.py` |
+### P2 — Closing and locking
 
-**Done when:** no module-level or function-level import crosses from `advance_payments` into
-`annual_reports`, and every write path that changes a tax-calculation input invalidates the
-persisted result.
+- Closing is a **full lock** in all three: figures, metadata, assignee, notes (D-13). Only VAT
+  behaves this way today.
+- The closing act records **who** — missing on annual reports and advances (D-13).
+- Closing gates generalise into one "what is missing" shape; **assignee required in all three**
+  (D-15). Per-domain gates in §4.1.8. Payment in full is not a gate on an advance (D-16).
+- "Closed late" recorded at the close; **null**, never `false`, where there is no due date
+  (D-20, D-32).
+- Annual-report financial lines stop being editable after submission — today the guard checks the
+  *client's* status and never the *report's*.
 
-### Phase 5 — One generation and rollover story
+**Done when:** nothing on a closed record can be changed in any of the three, and every closed record
+names its author.
 
-Split per §7.2. Only 5.3a is launch-gated; the rest is deferred and blocked on **O-1**.
+### P3 — Amendment and the uniqueness rule
 
-| Item | Change | When |
-|---|---|---|
-| 5.3a | Office-wide VAT generation, copying the advance-payments mechanism (keyset chunks, per-chunk idempotency key, non-atomic with reported failures). Closes the only obligation type with no catch-up path. | **before onboarding real clients**; may run parallel to Phase 1 |
-| 5.1 | Add `annual_obligation_plan(year)` to `common/obligation_plan.py` so annual reports answer question #1 the same way. | deferred |
-| 5.2 | One `ObligationGenerationService` covering all three for a client + year. Collapses `_sync_vat_work_items`, `_sync_advance_payments`, and `obligation_orchestrator`, and removes the private `_years_to_generate` cross-domain import. | deferred — easier after Phase 4 |
-| 5.3b | Extend office-wide generation to annual reports so one command covers all three. | deferred |
-| 5.4 | Implement the rollover policy chosen in **O-1**. | blocked on O-1 |
+- The compound uniqueness predicate, stated once in §4.1.13: at most one row per client+period that
+  is **not deleted, not an amendment, and not cancelled** (D-10, D-22, D-23). Three index changes.
+- An explicit "create amendment" action from a closed record — **this does not exist anywhere today**;
+  VAT's version is unreachable (§4.1.6).
+- An amendment is a full copy of its original, opening at `in_progress` (D-21).
+- **A chain is one row everywhere** (D-12). This is the risk item: `sum_net_vat_by_client_record_year`,
+  the annual report's VAT import, and the advance turnover lookup would otherwise sum the original
+  *and* its amendment. It reaches outside VAT.
+- The chain presents the **original's** lateness (D-34).
+- An amendment has no due date (D-14) → `due_date_effective` becomes genuinely nullable, every
+  overdue query reads NULL as "not late", and `tax_items.py` `_vat_due_date` stops raising on None.
 
-**Done when:** one service creates all three obligation types, one office-wide command covers all
-three, and the rollover policy is implemented rather than incidental.
+**Done when:** a period can be amended in all three, and no aggregate double-counts a chain.
 
-### Phase 6 — Fix the liability arithmetic
+### P4 — Removal and reconciliation
 
-Drop `vat_balance` from `total_liability`; expose it as a separate informational field. Fix the PDF
-label. Small and independent — can land any time after Phase 0.
+- Closed obligations become undeletable — today only VAT enforces it; a submitted annual report and a
+  paid advance can both be soft-deleted (D-22). This also closes the missing
+  `_invalidate_annual_report_tax` on the advance delete path.
+- The direct `DELETE` endpoints retire in all three (D-24).
+- One reconciliation service, both shapes (§4.2.6): set replacement for VAT and advances, record
+  replacement for annual reports. Safety rules from §4.2.4 — past-due rows are debts and are never
+  removed, settled rows are reported, removal needs confirmation and is all-or-nothing per year,
+  removal is resolved before the creation loop.
+- Every "are they all closed?" gate evaluates against the **obligation plan**, not existing rows
+  (D-30).
+- Removing a worked annual report destroys its lines and the confirmation must say so (D-28).
+- Obligation trigger fields become advisor-only (D-36) — `PATCH /clients/{id}` has no role guard at
+  all today, and D-24 makes it the only removal path.
 
-Files: `annual_report_tax_service.py:127-129`, `annual_report_pdf_builder.py:265`, and the
-`AnnualReportTaxCalculationResponse` schema (contract change → regenerate).
+**Done when:** an obligation can only disappear as a consequence of correcting a client's
+configuration, and only an advisor can cause it.
+
+### P5 — The deadline shape
+
+- Annual reports adopt `due_date_original` / `due_date_effective` / `due_date_override_reason`;
+  `filing_deadline` becomes `due_date_effective`. `deadline_type` stays — standard/extended/custom is
+  a real annual-only regulatory choice, not a shape difference.
+- Drop the legacy `AdvancePayment.due_date` after auditing every consumer, including the several
+  `coalesce` expressions in `advance_payment_aggregation_repository.py`.
+- One overdue rule over one field name. VAT's work-queue entry moves from `period < now` to
+  `due_date_effective` with the shared upcoming window (D-1) — **the one visible product change**:
+  VAT periods start appearing before they are late.
+- `advance_payment_items` moves from `work_queue/items/billing_items.py` to `tax_items.py`.
+
+**Payoff:** the due-date-override endpoint listed as future work in *both* `docs/domains/vat.md` and
+`docs/domains/advance-payments.md` gets built once.
+
+**Done when:** one overdue rule reads one field across all three, and two migrations have landed with
+the enum-downgrade convention applied.
+
+### P6 — Domain surgery
+
+The per-domain work that the shared phases do not cover.
+
+**Annual reports** — the signature flow disconnects: `pending_client`, the signature request created
+on entering it, the `client_approved_at` gate, and the startup reconciliation (D-5). Readiness drops
+4 → 3. `ANNUAL_REPORT_APPROVAL` and the never-referenced `VAT_RETURN_APPROVAL` retire; the
+`signature_requests` module stays for engagement agreements, powers of attorney, and custom
+documents. `ReportStage` and `POST /{id}/transition` retire (D-40). The forked client-eligibility
+check in `annual_report_financial_line_helpers.py` — 403 with `CLIENT.CLOSED`/`CLIENT.FROZEN`, the
+codes the shared 409 guard replaced — is removed.
+
+**Advance payments** — turnover gets one source chosen by the client (D-9): the VAT return for VAT
+filers, manual entry for those with none, and manual entry is that client's **input event** (D-31).
+Retire the refresh commands, `turnover_source`, `turnover_snapshot_at`, `available_turnover`,
+`missing_turnover`, and the mismatch filter. `vat_turnover_mismatch_expr` is **narrowed to locked
+rows** rather than deleted, becoming the post-lock divergence detector (D-37). A secretary may record
+a payment and move stages (D-17). `annual_report_id` is cleared by reconciliation and recorded as a
+removal candidate (D-38).
+
+**VAT** — the secretary-can-delete permission is corrected to match D-17.
+
+### P7 — Coupling and arithmetic
+
+- The advance→annual dependency inverts behind an **explicit port** (D-2); no import, at module or
+  function level, crosses from `advance_payments` into `annual_reports`.
+- VAT auto-populate invalidates persisted `tax_due`/`refund_due` exactly as manual line mutations do.
+- `vat_balance` leaves `total_liability` and becomes a separate informational field; the PDF label is
+  corrected.
+
+Independent of P3 – P6; may land any time after P2.
+
+### P8 — Generation and rollover
+
+Blocked on **O-1** (rollover policy) and **O-7** (an obligation created for a span the client was not
+liable in has no removal route under D-24).
+
+- `annual_obligation_plan(year)` so annual reports answer "is it owed?" the same way.
+- One `ObligationGenerationService` covering all three — collapsing `_sync_vat_work_items`,
+  `_sync_advance_payments`, and `obligation_orchestrator`, and removing the private
+  `_years_to_generate` cross-domain import. This is the same service that reconciles (§4.2.5).
+- Office-wide generation covers all three, **reusing** the existing keyset-chunk, per-chunk
+  idempotency-key, non-atomic-with-reported-failures design. VAT has no catch-up path of any kind
+  today and must have one before real clients are onboarded.
+- Implement the rollover policy chosen in O-1.
+
+### P9 — Documentation
+
+Written **from the finished code**, not before it — the order the product owner chose.
+
+- New `docs/domains/tax-lifecycle.md`, `Source of truth: mandatory` (D-41).
+- The three domain docs rewritten against the implementation, and their stale claims fixed (§3.4).
+- This plan moves to `docs/archive/`.
 
 ## 8. Risk summary
 
@@ -1032,33 +1105,47 @@ gets materially more expensive once real clients exist.
 
 | Phase | Risk now | Risk after launch | Nature |
 |---|---|---|---|
-| 0 | none | none | documentation |
-| 1 | low | low-medium | internal, plus D-3's contract + frontend catalog change (no consumers yet) |
-| 2 | medium | medium | **visible product change** — VAT appears in the queue earlier |
-| 3 | medium-low | **high** | two schema migrations; no backfill or maintenance window while §0 holds |
-| 4 | medium | medium-high | architectural; touches transaction boundaries; no compat surface yet |
-| 5.3a | low | — | copies a proven mechanism; **must exist before real onboarding** |
-| 5 (rest) | medium | medium | consolidates three creation paths; needs O-1 |
-| 6 | low | low-medium | one arithmetic change + one label + contract regen |
+| **P0** | medium-low | **very high** | one enum replacing three, across DB, API and frontend. Free of data migration only while §0 holds |
+| **P1** | low | low-medium | internal, plus D-42's contract change and both frontend catalogs. Includes one live bug (VAT `CANCELED`) |
+| **P2** | low | medium | tightening — three domains gain guards they lack. Nothing loosens |
+| **P3** | **high** | high | three index changes, a mechanism that exists nowhere today, and an aggregate correctness risk that reaches outside VAT |
+| **P4** | medium | high | retires public endpoints and moves removal onto a reconciliation path; closes a permission leak |
+| **P5** | medium-low | **high** | two schema migrations; no backfill or window while §0 holds |
+| **P6** | medium | medium | subtractive in the main — a whole signature layer and a whole turnover layer leave |
+| **P7** | medium | medium-high | architectural; touches transaction boundaries; no compat surface yet |
+| **P8** | medium | medium | consolidates three creation paths; needs O-1 and O-7 |
+| **P9** | none | none | documentation |
 
-## 9.1 Scope change — §7 needs rewriting
+**P3 is the phase to be careful with.** It is the only one that introduces a mechanism the codebase
+has never had, and its failure mode is silent: an aggregate that counts an original and its amendment
+produces a wrong number rather than an error — in VAT totals, in the annual report's import, and in
+the turnover an advance draws.
 
-The plan in §7 was written for a **consolidation** refactor: same behaviour, fewer implementations.
-The 2026-07-27 session (§4.1, D-4 … D-9) turned it into a **lifecycle redesign**. Phases 0–6 are no
-longer sized correctly, and the ordering in §7.1 predates D-4.
+## 9. Scope, and what is parked
 
-What is now known to change beyond the original scope:
+### 9.1 Scope change — recorded, and resolved
 
-- One status enum replacing three, across DB, API, and frontend — cheap only while §0 holds.
-- Advance payments gain a lock action, an amendment mechanism, and three stages.
-- Annual reports lose the client-signature flow and one readiness gate.
-- A large, mostly subtractive change to the advance-payments turnover layer (D-9).
+The plan began as a **consolidation** refactor: same behaviour, fewer implementations. The 2026-07-27
+specification session turned it into a **lifecycle replacement**, which invalidated the original
+phase cut.
 
-The earlier phases stay valid as work — the duplication in §3.2 still has to go — but §7 should be
-re-cut against §4.1 before anything is scheduled. Phase 1 (§7, "delete provable duplication") is the
-one part unaffected by D-4 … D-9 and can still proceed as written.
+**Resolved:** §7 was re-cut on 2026-07-27 against §4.1 – §4.3. Ten phases (P0 – P9) replace the
+original seven, and §8's risk table was rewritten with them. The record of the change is kept here
+because the two cuts differ in kind, not just in detail — anything written against the old Phase
+numbers predates D-4 … D-42.
 
-## 9.2 Parked — client status
+What grew beyond the original scope, and where it now lives:
+
+| Growth | Phase |
+|---|---|
+| One status enum replacing three, across DB, API and frontend | P0 |
+| Advance payments gain a lock, an amendment mechanism, and two stages | P0, P2, P3 |
+| Annual reports lose the signature flow, `ReportStage`, and one readiness gate | P6 |
+| A large, mostly subtractive change to the advance-payments turnover layer | P6 |
+| Amendment as a real mechanism — it exists nowhere today | P3 |
+| Reconciliation as the only removal path | P4 |
+
+### 9.2 Parked — client status
 
 Raised during the same session and deliberately deferred: freezing a client and closing a client are
 **byte-identical** today (`client_update_service.py:177-180`), both cancel VAT work items and annual
@@ -1076,6 +1163,84 @@ Recorded so they are not silently absorbed:
 
 - Unverified external tax constants (2026 NI ceiling, 2026 brackets, donation minimum) —
   `docs/domains/annual-reports.md` known issues. Needs the authority's circulars, not a refactor.
-- Signature creation running inside the annual-report status-transition transaction — separate
-  known issue.
+- ~~Signature creation running inside the annual-report status-transition transaction.~~
+  **Dissolved by D-5**: the annual-report signature flow retires entirely, so the transaction
+  boundary it was about ceases to exist. Nothing to fix — the mechanism leaves with P6.
 - `AnnualReportDetail.updated_at` nullability — separate known issue.
+
+## 11. What remains — consolidated register
+
+Everything still outstanding, in one place. The detail lives in the sections referenced; this is the
+list to read when picking up the work.
+
+### 11.1 Open decisions — 2
+
+| # | Question | Blocks |
+|---|---|---|
+| **O-1** | **Rollover policy.** Scheduled job, advisor-triggered office-wide generate, or both? Today it is neither reliably: `generate_client_obligations` runs only on client creation and on an obligation-field edit, and there is no scheduler. | P8 |
+| **O-7** | **An obligation created for a span the client was not liable in** — a VAT period for 2026-01 on a client registered in 2026-06. The frequency is correct so reconciliation will not touch it, and D-24 removed the direct delete. Either reconciliation also reads a liability start date, or one narrow removal path survives. | P4, P8 |
+
+Nothing else is undecided. O-2 … O-6, O-8 and O-9 closed as D-39 … D-42, D-21, D-23, D-7/D-8.
+
+### 11.2 The frontend — measured, not estimated
+
+No phase in §7 owns this. It is larger than several of them.
+
+**Status literals — 14 files hold the old values as strings** (plus `types/generated.ts`, which
+regenerates):
+
+| Feature | Files |
+|---|---|
+| `vatReports` | `constants/vatConstants.ts` · `utils/vatHelpers.ts` · `schemas/workItem.schema.ts` · `api/contracts.ts` · `components/form/VatWorkItemsCreateModal.tsx` · `components/list/VatWorkItemSummaryBar.tsx` |
+| `advancedPayments` | `constants.ts` · `api/contracts.ts` · `api/queryKeys.test.ts` |
+| `annualReports` | `constants/display.ts` · `api/contracts.ts` · `components/season/seasonProgressConfig.ts` · `utils/panelHelpers.test.ts` |
+| **outside the three** | `features/audit/constants.ts` · `features/dashboard/hooks/useSeasonSummary.test.ts` |
+
+The last row is the one to notice: **the status change leaks outside the three features.** Audit and
+dashboard both hold the literals, so P0 is not contained by the domains it is about.
+
+**Endpoints that disappear from `endpoints.ts`:**
+
+- `advancedPayments`: `refresh-turnover` (single and bulk) — D-9
+- `annualReports`: `amend` — replaced by create-amendment, D-10
+- the three `DELETE`s — D-24
+- `annual-reports/{id}/transition` — D-40 (not currently wired, so it costs nothing to drop)
+
+**UI that disappears:**
+
+- the turnover refresh control, and the **VAT-mismatch filter with its batch count**
+  (`advancedPayments/constants.ts:172`, `messages.ts:327`) — D-9, except the narrowed detector D-37
+- the annual-report client-approval surface — D-5
+- `partial` as an advance-payment status — D-7
+
+**UI that is new:**
+
+- a create-amendment action, in all three — D-10
+- an explicit lock action for advance payments — D-7
+- a **reason prompt on every backward transition** — D-33
+- a verification stage for advance payments, which has no equivalent today — D-4
+- the reconciliation confirmation, including D-28's explicit warning that a worked annual report's
+  income and expense lines will be destroyed
+
+**Message catalogs:** 833 lines across the three features (`vatReports` 223, `advancedPayments` 331,
+`annualReports` 279), keyed by status and action — the two things this refactor replaces.
+
+### 11.3 Work no phase owns — see §7.3
+
+| Area | Size | Note |
+|---|---|---|
+| Seed builders | 3 files | **part of P0, not a consequence of it** — the seed is the only source of data (§0), so nothing else can be verified until it runs again |
+| Backend tests | 57 files reference the three status enums | some encode behaviour D-4 … D-42 deliberately removes |
+| Frontend | §11.2 | unowned |
+
+### 11.4 Parked — separate track
+
+Client status: freezing and closing are byte-identical today, both destroy items, advance payments
+are excluded from the cascade entirely, and `scope_to_active_clients_stmt` filters only on
+soft-delete despite its name. See §9.2.
+
+### 11.5 Out of scope — 2
+
+Unverified external tax constants (2026 NI ceiling, 2026 brackets, donation minimum) and
+`AnnualReportDetail.updated_at` nullability. See §10. A third item — signature creation inside the
+status-transition transaction — dissolved with D-5.
