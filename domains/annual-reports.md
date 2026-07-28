@@ -120,7 +120,8 @@ Source: `backend/app/annual_reports/services/constants.py:24`.
 - `amend_report` is allowed only from `submitted`, transitions back to `in_preparation`, and stores the amendment reason in detail metadata. See `backend/app/annual_reports/services/status_service.py:265`.
 - Financial summary totals income and recognized expenses; `taxable_income = total_income - recognized_expenses`. The detail response (`AnnualReportDetailResponse`) groups every computed financial/tax output under a nested `tax_calculation` object (`AnnualReportTaxCalculationResponse`): `total_income`, `total_expenses` (gross), `recognized_expenses`, `taxable_income`, `profit`, `tax_after_credits`, `final_balance` (after subtracting paid advances), and the aggregated credit-point breakdown (`credit_points`, `pension_credit_points`, `life_insurance_credit_points`, `tuition_credit_points`). User-entered deduction inputs (`pension_contribution`, `donation_amount`, `other_credits`) and the persisted outcome columns (`assessment_amount`, `refund_due`, `tax_due`) stay flat on the detail response. See `backend/app/annual_reports/services/financial_summary_service.py` and `backend/app/annual_reports/services/query_service.py`.
 - List endpoints (`GET /annual-reports`, `/overdue`, season and client report lists) return the thin `AnnualReportListItem` row DTO (identity, status, deadlines, and the persisted outcome amounts only); they intentionally omit detail/calculation/action/transition fields. Only `GET /annual-reports/{id}` returns the full `AnnualReportDetailResponse`. See `backend/app/annual_reports/services/base.py` (`_to_list_items`).
-- Tax calculation is read-only. It uses financial summary, detail deductions/credits, credit-point rows/default resident points, income-tax engine, national-insurance engine, VAT net balance, and paid advances. `tax_after_credits` is the computed tax before advances; `final_balance = tax_after_credits - advances_paid` (negative = refund expected). Public tax calculation amounts, rates, bracket rates, and credit-point totals are serialized as `ApiDecimal` strings; frontend code parses them only for display/math. See `backend/app/annual_reports/services/tax_service.py`.
+- Tax calculation is read-only. It uses financial summary, detail deductions/credits, credit-point rows/default resident points, income-tax engine, national-insurance engine, VAT net balance, and paid advances. `tax_after_credits` is the computed tax before advances; `final_balance = tax_after_credits - advances_paid` (negative = refund expected).
+- **`advances_paid` and `final_balance` have one definition, published by `AnnualReportTaxService`** on `TaxCalculationResponse`. Both consumers — the detail response's `tax_calculation` and the advances summary — read those fields; neither recomputes the subtraction, and neither reads advances from anywhere but `AdvancePaymentAggregationRepository.sum_paid_by_client_year`. The advances summary previously summed `paid_amount` in Python over a `page_size=10000` read, which silently undercounted past the cap and could disagree with the detail response for the same report. Public tax calculation amounts, rates, bracket rates, and credit-point totals are serialized as `ApiDecimal` strings; frontend code parses them only for display/math. See `backend/app/annual_reports/services/tax_service.py`.
 - Persisting a tax calculation rejects requests with both `tax_due` and `refund_due`. See `backend/app/annual_reports/services/tax_service.py`.
 - Income and expense line create/update/delete are financial mutations. A missing or soft-deleted related `ClientRecord` raises `CLIENT_RECORD.NOT_FOUND`; a frozen or closed client raises `CLIENT_RECORD.CLOSED` before creating, updating, or deleting annual-report income/expense lines. Successful manual income/expense mutations clear saved `tax_due` and `refund_due` while the report is still pre-submission (`not_started`, `collecting_docs`, `in_preparation`, or `pending_client`). See `backend/app/annual_reports/services/financial_line_helpers.py:55`, `backend/app/clients/guards/client_record_guards.py`, and `backend/app/annual_reports/services/financial_line_service.py`.
 - Income/expense source/category values are validated against enum values; audit entries are written for manual line mutations. See `backend/app/annual_reports/services/financial_line_service.py`.
@@ -177,23 +178,16 @@ moved to Resolved issues rather than carried over.
   `backend/app/annual_reports/annual_report_pdf_builder.py:265`.
 
 - **Persisted `tax_due` / `refund_due` can be stale, and readiness reads them.** Manual
-  income/expense mutations invalidate the persisted result, but two sibling write paths that change
-  the same inputs do not: `VatImportService.auto_populate` creates and deletes financial lines
-  through repositories directly, and `AdvancePaymentService.bulk_mark_paid` sets `status = paid`
-  without invalidating. The readiness gate then reads the stale persisted value. Violates
-  "persisted tax results reflect current financial lines and current advances". Suggested fix: move
-  invalidation into the owning services so every path that changes an input triggers it. Cite:
+  income/expense mutations invalidate the persisted result, but `VatImportService.auto_populate`
+  creates and deletes financial lines through repositories directly and does not. The readiness gate
+  then reads the stale persisted value. Violates "persisted tax results reflect current financial
+  lines and current advances". Suggested fix: move invalidation into the owning services so every
+  path that changes an input triggers it. Cite:
   `backend/app/annual_reports/services/annual_report_vat_import_service.py`,
-  `backend/app/advance_payments/services/advance_payment_service.py` (`bulk_mark_paid`),
   `backend/app/annual_reports/services/annual_report_tax_service.py:179`.
 
-- **`final_balance` is computed twice from different data sources.**
-  `annual_report_query_service.py:150` derives it from the SQL aggregate
-  `AdvancePaymentAggregationRepository.sum_paid_by_client_year`, while
-  `annual_report_advances_summary_service.py:48-63` sums `paid_amount` in Python over a list fetched
-  with `page_size=10000` and rounds the result. The two can disagree whenever the aggregate and the
-  paginated read apply different scoping, and the summary silently undercounts past the page cap.
-  Suggested fix: consolidate onto one aggregate.
+  The `AdvancePaymentService.bulk_mark_paid` half of this issue is **resolved** — it invalidates at
+  `advance_payment_service.py:508`.
 
 - **Signature creation runs inside the status-transition transaction.** A signature-request failure
   rolls back the status change it was meant to accompany. Suggested fix: decouple, or isolate in a

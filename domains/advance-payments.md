@@ -118,7 +118,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 
 - **Client status gate:** Creating a payment goes through the shared client-eligibility guard `assert_client_record_is_active` (`backend/app/clients/guards/client_record_guards.py`), which raises `ConflictError` / `CLIENT_RECORD.CLOSED` (409) for any non-`ACTIVE` client. The guard is an allowlist, so a status added later fails closed. Its SQL twin, `eligible_client_status_expr` (`backend/app/clients/repositories/client_active_scope.py`), scopes office-wide generation and must change together with it. This domain previously re-derived the rule locally and raised 403 `CLIENT.CLOSED` / `CLIENT.FROZEN`.
 - **Frequency validation:** `period_months_count` must match the client's `LegalEntity.advance_payment_frequency`. Mismatch raises `ADVANCE_PAYMENT.FREQUENCY_MISMATCH`. (`advance_payment_service.py:130-135`)
-- **Bi-monthly start month:** Bi-monthly payments must start on an odd month (`1,3,5,7,9,11`). Violating raises `ADVANCE_PAYMENT.INVALID_PERIOD`. (`constants.py:23`, `advance_payment_service.py:68-71`)
+- **Bi-monthly start month and supported frequency:** neither rule is this domain's. Both are enforced once by `TaxCalendarMaterializationService` during materialization — `_validate_period_alignment` raises `TAX_CALENDAR.INVALID_PERIOD_ALIGNMENT` for an even bi-monthly start month, and `_periodic_rule_type` raises `TAX_CALENDAR.INVALID_PERIOD_FREQUENCY` for a `period_months_count` outside `{1, 2}`. This domain's local copies and its `ADVANCE_PAYMENT.INVALID_PERIOD` code were retired, along with the duplicate Pydantic validator on `AdvancePaymentCreateRequest` that shadowed them with a 422. See `docs/domains/tax-calendar.md`.
 - **No duplicate active period:** `UNIQUE(client_record_id, period) WHERE deleted_at IS NULL`. Duplicate insert raises `ADVANCE_PAYMENT.CONFLICT`. (`advance_payment_service.py:137-141`)
 - **Frequency independence:** `advance_payment_frequency` must never be derived from `vat_reporting_frequency`. These are independent. (`domain_decisions_v3.md` §2, INV-07)
 - **advance_rate snapshot frozen:** `advance_rate` is a snapshot at creation time. Changes to `LegalEntity.advance_rate` do not backfill existing records. (INV-06)
@@ -170,7 +170,6 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 |------|------|-------------|
 | `ADVANCE_PAYMENT.CLIENT_RECORD_NOT_FOUND` | 404 | `client_record_id` does not exist |
 | `ADVANCE_PAYMENT.FREQUENCY_NOT_SET` | 404 | Client has no configured `advance_payment_frequency` |
-| `ADVANCE_PAYMENT.INVALID_PERIOD` | 409 | `period_months_count` unsupported, or bi-monthly period starts on even month |
 | `ADVANCE_PAYMENT.FREQUENCY_MISMATCH` | 409 | Request `period_months_count` does not match client's configured frequency |
 | `ADVANCE_PAYMENT.CONFLICT` | 409 | Active payment already exists for `(client_record_id, period)` |
 | `ADVANCE_PAYMENT.NOT_FOUND` | 404 | Payment ID not found for the given client |

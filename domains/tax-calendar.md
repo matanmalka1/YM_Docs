@@ -124,6 +124,15 @@ There is no dedicated status enum in this domain. Grouped status is derived from
 
 Registry: `docs/backend/error-codes.md`.
 
+**This domain is the sole gate for period shape, alignment, and supported frequency.** VAT and
+advance payments each used to re-derive the bi-monthly odd-start-month rule and answer with a
+domain-local code; `VAT.INVALID_PERIOD_FOR_FREQUENCY` and `ADVANCE_PAYMENT.INVALID_PERIOD` are
+retired. Every caller reaches `TaxCalendarMaterializationService` during materialization, so a
+domain-local pre-check could only change which code the caller saw, never whether the write
+succeeded. `app/common/period_utils.parse_period` owns the `YYYY-MM` shape check and raises
+`TAX_CALENDAR.INVALID_PERIOD` — it is the only parser, and `PERIOD_PATTERN` is exported from it so
+`TaxCalendarEntry`'s model validators reuse the same regex under their own `ValueError` contract.
+
 | Code | HTTP | Raised when |
 |------|------|-------------|
 | `TAX_CALENDAR.NOT_FOUND` | 404 | Requested `tax_calendar_entry_id` does not exist in grouped item lookup |

@@ -80,6 +80,18 @@ Indexes include active unique `(client_record_id, period) WHERE deleted_at IS NU
 | `filed` |
 | `canceled` |
 
+**Resolved statuses.** `RESOLVED_VAT_WORK_ITEM_STATUSES = {filed, canceled}` is VAT's single answer
+to "does this period need further work?" — the question the tax calendar asks of every obligation.
+`is_vat_work_item_resolved` reads it, and so does every SQL query that asks the same thing
+(`vat_compliance_repository`, `vat_work_item_grouped_repository`, `vat_work_item_query_repository`).
+One published set is the Python/SQL twin: SQL reads the same object, so the two forms cannot drift.
+
+`canceled` belongs in the set — a cancelled period is not outstanding work, matching
+`is_annual_report_resolved`. It was previously omitted from the Python set while the SQL side
+excluded it, so a cancelled period read **open** on the grouped tax calendar and **closed** on the
+compliance list. Do not confuse this with `ANNUAL_REPORT_FILED_STATUSES` or VAT's filed-only checks
+(`VAT.FILED_IMMUTABLE`), which answer the different question "was it actually filed?".
+
 Other VAT enums:
 
 | Enum | Values | Source |
@@ -100,7 +112,12 @@ Other VAT enums:
 - Page-level selected-client filters use `client_record_id` for exact `ClientRecord` matching on list, grouped, group-items, and status-summary endpoints. `client_name` is retained only as a free-text/fuzzy API filter.
 - Closed or frozen clients cannot create new VAT work items. Cite: `backend/app/vat/services/intake.py:65-68`.
 - Effective VAT frequency is derived from legal entity type and `vat_reporting_frequency`: `OSEK_PATUR` and `EMPLOYEE` resolve to `exempt`; otherwise the configured VAT frequency is used, falling back to `monthly`. Cite: `backend/app/vat/services/vat_type_resolver.py:6-18`.
-- Exempt clients cannot create periodic VAT work items. Bi-monthly clients cannot create work items for even start months. Cite: `backend/app/vat/services/intake.py:36-48`.
+- Exempt clients cannot create periodic VAT work items. Cite:
+  `backend/app/vat/services/vat_intake_service.py` (`_assert_client_reports_vat`).
+- Bi-monthly clients cannot create work items for even start months. This rule is **not** VAT's:
+  it is enforced once by `TaxCalendarMaterializationService._validate_period_alignment` and raises
+  `TAX_CALENDAR.INVALID_PERIOD_ALIGNMENT`. VAT's own copy and its
+  `VAT.INVALID_PERIOD_FOR_FREQUENCY` code were retired — see `docs/domains/tax-calendar.md`.
 - Active duplicates are blocked by service check and partial unique index on `(client_record_id, period) WHERE deleted_at IS NULL`. Cite: `backend/app/vat/services/intake.py:72-80`, `backend/app/vat/models/vat_work_item.py:134-142`.
 - Creating a work item materializes or reuses a `TaxCalendarEntry`, stores its FK, and snapshots `due_date_original` and `due_date_effective` from the calendar due date. Cite: `backend/app/vat/services/intake.py:92-111`.
 - Creating with `mark_pending=True` requires `pending_materials_note`; otherwise initial status is `material_received`. Cite: `backend/app/vat/services/intake.py:82-90`.
@@ -133,10 +150,8 @@ The `VAT.REASON` codes this domain raises. Registry: `docs/backend/error-codes.m
 |------|----------------|-------------|
 | `VAT.NOT_FOUND` | 404 via `NotFoundError` | Work item, client, period option, or export target is not found |
 | `VAT.CLIENT_RECORD_NOT_FOUND` | 404 via `NotFoundError` | Work item's client record is missing during invoice create |
-| `VAT.CLIENT_CLOSED` | 400 via `AppError` | Client is closed for work-item create or invoice create |
-| `VAT.CLIENT_FROZEN` | 400 via `AppError` | Client is frozen for work-item create |
+| `VAT.CLIENT_CLOSED` | 400 via `AppError` | Client is closed for **invoice** create (`vat_data_entry_invoices_service.py`). Work-item create answers from the shared client guard with 409 `CLIENT_RECORD.CLOSED` |
 | `VAT.CLIENT_EXEMPT` | 400 via `AppError` | Exempt client is used for periodic VAT work item or period options |
-| `VAT.INVALID_PERIOD_FOR_FREQUENCY` | 400 via `AppError` | Bi-monthly work item uses an even start month |
 | `VAT.CONFLICT` | 409 via `ConflictError` | Duplicate active work item or duplicate invoice number |
 | `VAT.PENDING_NOTE_REQUIRED` | 400 via `AppError` | `mark_pending=True` without `pending_materials_note` |
 | `VAT.INVALID_TRANSITION` | 400 via `AppError` | Illegal status transition |
