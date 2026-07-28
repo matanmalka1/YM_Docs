@@ -108,6 +108,8 @@ Other VAT enums:
 
 ## Domain rules & invariants
 
+**Which periods are owed.** `app/common/obligation_plan.py` is the single answer. It is narrowed by the client's configured frequency **and** by that obligation type's liability range on `LegalEntity` — per type, because the types move independently. A period is owed when it *intersects* the range, so a period the client was liable for on any of its days is created in full. NULL on either side is unbounded. See `docs/domains/clients.md` § Liability ranges.
+
 - Work items are anchored to `client_record_id`, not directly to `legal_entity_id`. The service resolves the active client and legal entity through `VatClientContextService`. Cite: `backend/app/vat/services/intake.py:62-70`.
 - Page-level selected-client filters use `client_record_id` for exact `ClientRecord` matching on list, grouped, group-items, and status-summary endpoints. `client_name` is retained only as a free-text/fuzzy API filter.
 - Closed or frozen clients cannot create new VAT work items. Cite: `backend/app/vat/services/intake.py:65-68`.

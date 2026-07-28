@@ -68,10 +68,24 @@ The stable tax/legal identity. Globally unique by `(id_number_type, id_number)`.
 | advance_rate | Numeric(5,2) | yes | default rate for obligation generation |
 | advance_rate_updated_at | date | yes | |
 | annual_revenue | Numeric(15,0) | yes | |
+| vat_liable_from / vat_liable_to | date | yes | when the entity became / stopped being liable for VAT |
+| advance_liable_from / advance_liable_to | date | yes | same, for advance payments |
+| annual_liable_from / annual_liable_to | date | yes | same, for annual reports |
 | created_at | datetime | no | |
 | updated_at | datetime | yes | |
 
-Constraints: `UniqueConstraint("id_number_type", "id_number")` — global, not soft-delete-aware. Index on `official_name`.
+Constraints: `UniqueConstraint("id_number_type", "id_number")` — global, not soft-delete-aware. Index on `official_name`. Three CheckConstraints (`ck_legal_entity_{vat,advance,annual}_liability_range`) guarantee each liability range is orderable; the request schemas reject an inverted range earlier with a readable 422, but they are not the only writer.
+
+### Liability ranges
+
+Each obligation type carries **its own** liability range. Not one client-wide date: an entity can register for VAT in June, receive an ITA advance rate in September, and still owe a **full-year** annual report for the same year, and a single date cannot express that.
+
+- NULL on either side is unbounded, so a client with no range configured owes every period its frequency implies. The range narrows; it never gates.
+- A period is owed when it **intersects** the range, not when it is contained by it. A bi-monthly period covering May–June on a client liable from 20 June **is** owed — the authority does not prorate a return.
+- The ranges are consumed only by `app/common/obligation_plan.py`, which is the single answer to "is this period owed?". Generation creates what the plan lists, and (from W4) reconciliation classifies existing rows against the same list.
+- A VAT range is rejected for a client that reports no VAT, and an advance range for a client with no advance frequency. On a partial update the check runs only when the request states the frequency, because a request that does not resend it cannot know the effective value.
+
+This closes the case where an obligation existed for a span the client was never liable in — the frequency was correct, so reconciliation would keep the row, and there is no direct delete.
 
 ### ClientRecord (`backend/app/clients/models/client_record.py`)
 
@@ -193,12 +207,16 @@ Only `osek_patur`, `osek_murshe`, and `company_ltd` are supported for client cre
 **Onboarding side-effects** (`backend/app/clients/services/client_onboarding_orchestrator.py`): On client creation, the orchestrator automatically:
 1. Creates an initial binder.
 2. Generates tax obligations.
-3. Creates pending VAT work items for future periods (based on `vat_reporting_frequency`).
-4. Creates advance payment records for future periods (based on `advance_payment_frequency`).
+3. Creates pending VAT work items for every period the obligation plan lists (`vat_reporting_frequency` narrowed by the VAT liability range).
+4. Creates advance payment records the same way, from `advance_payment_frequency` and the advance liability range.
+
+Steps 3 and 4 used to skip any period whose due date had already passed. That was a *calendar* guard standing in for a *liability* guard and it was wrong in both directions: it created a period the client was not yet liable for whenever that period's due date had not arrived, and it dropped genuinely owed past-due periods for a client onboarded late. The liability range replaced it, so **a late-onboarded client now receives its past-due obligations** — those are debts, not leftovers, and reconciliation never removes them.
+
+`POST /clients/preview-impact` counts exactly what onboarding creates, from the same plan. It takes the same liability ranges, holds no DB session, and materializes nothing — a preview must not write.
 
 **Status transitions** (`backend/app/clients/services/client_update_service.py:76`): When status transitions to `frozen` or `closed`, open VAT work items, open annual reports, and in-office binders are cancelled via their respective domain services.
 
-**Entity type changes** (`backend/app/clients/services/client_update_service.py:43`): Only `ADVISOR` role may change `entity_type`. The change is audit-logged with `ACTION_ENTITY_TYPE_CHANGED`. Obligation regeneration is triggered on any change to `entity_type`, `vat_reporting_frequency`, or `advance_payment_frequency` (`constants.py:46`).
+**Entity type changes** (`backend/app/clients/services/client_update_service.py:43`): Only `ADVISOR` role may change `entity_type`. The change is audit-logged with `ACTION_ENTITY_TYPE_CHANGED`. Obligation regeneration is triggered on any change to `entity_type`, `vat_reporting_frequency`, `advance_payment_frequency`, or any of the six liability-range fields — all of them change what the client owes. The set is `CLIENT_OBLIGATION_TRIGGER_FIELDS` (`client_constants.py`), built from `CLIENT_LIABILITY_RANGE_FIELDS` so the pairs are named once.
 
 **Guard** (`backend/app/clients/guards/client_record_guards.py`): `assert_client_record_is_active` raises `CLIENT_RECORD.CLOSED` if status is `frozen` or `closed`. Used by downstream domains before creating work items.
 
