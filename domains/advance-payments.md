@@ -112,6 +112,36 @@ Cite: `backend/app/advance_payments/models/advance_payment.py:83-171`.
 | `cash` | Rare; exists at post office bank |
 | `other` | |
 
+
+## Lifecycle
+
+**This domain runs the shared obligation lifecycle.** VAT, advance payments and
+annual reports are three views of one thing — a client owes an obligation for a
+period, works it through, and settles it by a deadline — and they now share one
+status enum and one transition graph:
+
+| # | `ObligationStatus` | Label |
+|---|---|---|
+| 1 | `awaiting_input` | ממתין לחומר |
+| 2 | `input_received` | החומר התקבל |
+| 3 | `in_progress` | בעבודה |
+| 4 | `awaiting_verification` | ממתין לאימות |
+| 5 | `submitted` | הוגש |
+| — | `canceled` | בוטל (off-ladder, reachable from any unlocked stage) |
+
+Rules, enforced once in `app/common/obligation_lifecycle.py`:
+
+- **Forward one stage at a time.** An event may perform consecutive transitions and
+  records each; it never skips a stage's meaning.
+- **Backward one stage at a time, always with a reason** (`OBLIGATION.TRANSITION_REASON_REQUIRED`).
+- **`submitted` has no outgoing transition** (`OBLIGATION.LOCKED`). Correcting a
+  submitted obligation takes an amendment, which arrives in a later wave.
+- **Cancel from any unlocked stage**, and `canceled` is terminal.
+
+`RESOLVED_OBLIGATION_STATUSES` = `{submitted, canceled}` is the single answer to
+"does this need further work?", read by both the Python predicate and every SQL
+query. `OBLIGATION_STATUS_LABELS` is the single Hebrew vocabulary.
+
 ## Domain rules & invariants
 
 **Which periods are owed.** `app/common/obligation_plan.py` is the single answer. It is narrowed by the client's configured frequency **and** by that obligation type's liability range on `LegalEntity` — per type, because the types move independently. A period is owed when it *intersects* the range, so a period the client was liable for on any of its days is created in full. NULL on either side is unbounded. See `docs/domains/clients.md` § Liability ranges.

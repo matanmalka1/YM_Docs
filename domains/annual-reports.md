@@ -42,7 +42,6 @@ All paths below exist in `backend/openapi.json`. The `annual_reports` router is 
 | `GET` | `/api/v1/annual-reports/overdue` | List open reports past filing deadline, returned as `AnnualReportListResponse` (`items`, `page`, `page_size`, `total`). |
 | `GET` | `/api/v1/annual-reports/{report_id}` | Get full report detail. |
 | `DELETE` | `/api/v1/annual-reports/{report_id}` | Soft-delete a report. |
-| `POST` | `/api/v1/annual-reports/{report_id}/amend` | Reopen a submitted report for amendment. |
 | `POST` | `/api/v1/annual-reports/{report_id}/schedules` | Add a schedule to a report. |
 | `GET` | `/api/v1/annual-reports/{report_id}/schedules` | List schedules for a report. |
 | `POST` | `/api/v1/annual-reports/{report_id}/schedules/complete` | Mark a schedule complete. |
@@ -102,6 +101,36 @@ Implemented status transitions are:
 | `canceled` | none |
 
 Source: `backend/app/annual_reports/services/constants.py:24`.
+
+
+## Lifecycle
+
+**This domain runs the shared obligation lifecycle.** VAT, advance payments and
+annual reports are three views of one thing — a client owes an obligation for a
+period, works it through, and settles it by a deadline — and they now share one
+status enum and one transition graph:
+
+| # | `ObligationStatus` | Label |
+|---|---|---|
+| 1 | `awaiting_input` | ממתין לחומר |
+| 2 | `input_received` | החומר התקבל |
+| 3 | `in_progress` | בעבודה |
+| 4 | `awaiting_verification` | ממתין לאימות |
+| 5 | `submitted` | הוגש |
+| — | `canceled` | בוטל (off-ladder, reachable from any unlocked stage) |
+
+Rules, enforced once in `app/common/obligation_lifecycle.py`:
+
+- **Forward one stage at a time.** An event may perform consecutive transitions and
+  records each; it never skips a stage's meaning.
+- **Backward one stage at a time, always with a reason** (`OBLIGATION.TRANSITION_REASON_REQUIRED`).
+- **`submitted` has no outgoing transition** (`OBLIGATION.LOCKED`). Correcting a
+  submitted obligation takes an amendment, which arrives in a later wave.
+- **Cancel from any unlocked stage**, and `canceled` is terminal.
+
+`RESOLVED_OBLIGATION_STATUSES` = `{submitted, canceled}` is the single answer to
+"does this need further work?", read by both the Python predicate and every SQL
+query. `OBLIGATION_STATUS_LABELS` is the single Hebrew vocabulary.
 
 ## Domain rules & invariants
 
