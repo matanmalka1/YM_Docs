@@ -58,8 +58,8 @@ Top-level: `year`, `total_clients`, `items: list[VatComplianceReportItemResponse
 | periods_expected | int | |
 | periods_filed | int | |
 | periods_open | int | Computed: periods_expected − periods_filed |
-| on_time_count | int | Filed items where filed_at.date() ≤ due_date_effective |
-| late_count | int | Filed items where filed_at.date() > due_date_effective |
+| on_time_count | int | Filed items where closed_at.date() ≤ due_date_effective |
+| late_count | int | Filed items where closed_at.date() > due_date_effective |
 | compliance_rate | ApiDecimal | Percentage: periods_filed / periods_expected × 100 |
 
 **VatComplianceStalePendingResponse** (`schemas.py:26`): `client_record_id`, `client_name`, `period`, `days_pending`. Stale threshold: `VAT_STALE_PENDING_DAYS = 30` (`constants.py:7`).
@@ -124,7 +124,7 @@ VAT period type values come from `VatWorkItem.period_type` (vat-reports domain).
 - `GET /api/v1/reports/aging` supports `page` and `page_size`; totals and summary fields reflect the full filtered report, not just the current page.
 
 **VAT compliance report** (`backend/app/reports/services/vat_compliance_report.py`):
-- On-time vs. late counts compare `filed_at.date()` against `due_date_effective` (the effective deadline, not legacy `due_date`).
+- On-time vs. late counts compare `closed_at.date()` against `due_date_effective` (the effective deadline, not legacy `due_date`).
 - Stale-pending items are fetched for the full year and filtered in Python: only items with `days_pending ≥ VAT_STALE_PENDING_DAYS` (30) are included in the response (`vat_compliance_report.py:77`).
 - Clients missing from the name map are silently skipped from `items` (`vat_compliance_report.py:40–41`).
 

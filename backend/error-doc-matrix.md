@@ -93,6 +93,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | method path | 400 | 409 | 500 |
 |---|---|---|---|
 | POST /annual-reports | ✓ | ✓ | |
+| PATCH /annual-reports/{id} | ✓ | | |
+| DELETE /annual-reports/{id} | ✓ | | |
 | POST /annual-reports/{id}/status | ✓ | ✓ | |
 | POST /annual-reports/{id}/transition | ✓ | ✓ | |
 | POST /annual-reports/{id}/submit | ✓ | ✓ | |
@@ -152,6 +154,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | POST /clients/{id}/advance-payments | ✓ | ✓ | |
 | POST /clients/{id}/advance-payments/generate | ✓ | ✓ | |
 | PATCH /clients/{id}/advance-payments/{payment_id} | ✓ | ✓ | |
+| DELETE /clients/{id}/advance-payments/{payment_id} | ✓ | | |
+| POST /clients/{id}/advance-payments/{payment_id}/status | ✓ | | |
 | POST /advance-payments/bulk-generate | ✓ | | |
 
 ### documents/permanent_documents (400 + 500 upload)

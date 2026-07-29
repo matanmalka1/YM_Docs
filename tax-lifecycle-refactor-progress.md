@@ -14,12 +14,12 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-29.
+Last updated: 2026-07-29 (W3 shipped).
 
 # Tax Lifecycle Refactor — Progress
 
 Executes `docs/tax-lifecycle-refactor-plan.md` (decisions D-1 … D-44). The plan was
-re-cut into eleven waves W0–W10; **W0, W1 and W2 have shipped.**
+re-cut into eleven waves W0–W10; **W0, W1, W2 and W3 have shipped.**
 
 Each wave is a vertical slice: backend + `openapi.json` + `generated.ts` + frontend +
 seed + tests land together, so the app runs at every wave boundary. Schema changes
@@ -34,15 +34,16 @@ One branch per wave, stacked, in each of the three repos. **Nothing is pushed.**
 main → tax-lifecycle/w0-delete-duplication
      → tax-lifecycle/w1-liability-range
      → tax-lifecycle/w2-obligation-status
+     → tax-lifecycle/w3-closing-locking
 ```
 
-| Repo | W0 | W1 | W2 |
-|---|---|---|---|
-| `backend` | 6 commits | 3 | 8 |
-| `frontend` | 1 | 1 | 4 |
-| `docs` | 1 | 1 | 1 |
+| Repo | W0 | W1 | W2 | W3 |
+|---|---|---|---|---|
+| `backend` | 6 commits | 3 | 8 | 1 |
+| `frontend` | 1 | 1 | 4 | 1 |
+| `docs` | 1 | 1 | 1 | 1 |
 
-Current migration: `dc5f03405059_initial`. **The Render database must be reset
+Current migration: `6a293b5c0932_initial`. **The Render database must be reset
 manually before the next deploy** — that is true after every squashed wave.
 
 ## Verification at the W2 boundary
@@ -180,6 +181,127 @@ Three status enums · both `VALID_TRANSITIONS` tables · `_derive_status` · `Re
 three Hebrew label maps · two byte-identical frontend variant maps · the tax calendar's
 routing table over three per-domain resolved predicates.
 
+
+---
+
+## W3 — Closing and locking (D-13, D-15, D-16, D-20, D-32)
+
+### The closing facts are one vocabulary
+
+`closed_at` · `closed_by` · `closed_late` now exist on all three domains. VAT renamed
+`filed_at`/`filed_by`; annual reports renamed `submitted_at` and gained `closed_by`;
+advance payments gained all three **plus `assigned_to`, which it never had** — D-15
+requires an assignee before closing and there was nothing to require.
+
+**Decision taken in-session (approved):** the plan's §4.1.7 table kept per-domain
+names and only added the missing "by whom". Full unification was chosen instead,
+because W3 builds shared closing machinery (one gate, one `closed_late` write, one
+audit shape) and the no-alias rule forbids adding `closed_by` beside a live
+`filed_by`. The "how" and "reference" facts (`submission_method` /
+`submission_reference` / `ita_reference` / `payment_reference`) stay per-domain —
+their semantics genuinely differ.
+
+`closed_late` is written once, at the close: the **Israel-local date** of `closed_at`
+(new `time_utils.israel_date`, closing the UTC-midnight trap) against the domain's due
+date — VAT `due_date_effective`, advance `due_date_effective or due_date`, annual the
+`filing_deadline` *as recalculated by the submission itself* (the submission method may
+move it). NULL means "no due date at close" (D-32), never False. The advance contract's
+computed `paid_late` was **deleted**, not kept as an alias — the stored fact answers
+D-20's question ("was it closed late"), and paid-vs-closed diverge under D-16.
+
+### One gate shape
+
+`app/common/obligation_closing.py`: `ClosingReadiness {is_ready, issues}` +
+`compute_closed_late` + the shared assignee issue string. All three domains publish it:
+
+- annual `GET /{id}/readiness` — now **five** gates (assignee added; completion /5)
+- VAT `GET /work-items/{id}/readiness` — new; assignee + final amount, mirroring the
+  file gates exactly
+- advance `GET /clients/{cid}/advance-payments/{id}/readiness` — new; assignee +
+  turnover known + expected amount computable (rate, override, or hand-entered
+  expected). **Payment in full is not a gate** (D-16) — a part-paid period closes.
+
+### Advances can finally be closed
+
+`POST /clients/{cid}/advance-payments/{id}/status` — the advisor route that did not
+exist. Single-step through the shared graph (forward, backward-with-reason, cancel);
+closing asserts the gate (`ADVANCE_PAYMENT.NOT_READY` with the issue list) and writes
+the closing facts. Money still advances stages; only a person closes.
+
+### Full lock (D-13)
+
+- **Annual** — `assert_report_unlocked` on every mutation path: financial lines
+  (which previously checked only the *client's* status — the plan's named defect),
+  detail, schedules, annexes, credit points, deadline, tax-calculation save,
+  reassignment, and soft delete (a closed record is never removed, D-22).
+- **Advance** — PATCH, delete, turnover refresh, and transitions out are rejected;
+  bulk mark-paid and bulk refresh **skip** closed rows (`"closed"` /
+  `skipped_closed`) rather than failing a mixed sweep.
+- **VAT** — already behaved this way; unchanged.
+- All reuse `ErrorCode.OBLIGATION_LOCKED` + `LOCKED_MESSAGE` from the lifecycle module.
+
+**The notes lock is N/A, not missing:** the survey claimed notes attach to closed
+obligations; in fact the entity-notes API serves only `client` entities. The
+obligations' own `notes` columns are covered by the domain locks.
+
+### Executing-decisions and gaps closed on the way
+
+- **Annual `assigned_to` was settable only at create** — the new gate would have
+  bricked every unassigned report. Added `PATCH /annual-reports/{id}`
+  (`assigned_to` only) + an assignee selector in the status panel.
+- **System auto-submit records `closed_by = NULL`.** The signature reconciliation
+  closes with `changed_by=None` and a system actor on the audit row; the assignee
+  gate still guarantees a named owner. Inventing authorship was rejected.
+- **The audit write policy was the integration seam:** per-action allowlists rejected
+  the new fields (`advance_payment.created`), and the new annual reassign needed an
+  `annual_report.updated` policy. The seed run caught both.
+
+### Frontend
+
+Rename sweep (`filed_*`/`submitted_at`/`paid_late` → `closed_*`); shared
+`isObligationLocked` + stage helpers beside the W2 vocabulary; annual financial lines
+hide add/edit/delete when locked; advance detail locks edit/delete and gains a status
+panel (stage forward · close gated on the readiness list · send back with required
+note · cancel); annual status panel gains the assignee selector.
+
+### Defects found
+
+1. **Annual demo seed** carried a `status in (SUBMITTED, SUBMITTED)` leftover from the
+   W2 merge (was `(SUBMITTED, CLOSED)`).
+2. **Seeded submitted rows could lack an assignee**, violating the new invariant —
+   seeds now always name one.
+3. **`docs/domains/annual-reports.md` still describes pre-W2 statuses** in several
+   lifecycle paragraphs (`pending_client`, `in_preparation`, `amend_report`). W3
+   updated only the closing/locking content; the rest is recorded doc debt for W10.
+
+### Mistakes made during execution, and their cost
+
+- **The first full suite run failed 601 tests** — the squashed migration added columns
+  the shared test database didn't have. Recovery is the documented one (drop schema +
+  `alembic upgrade head`), cost one 14-minute run.
+- **The W2 pipe mistake was repeated once**: `npm run check … | tail` read the pipe's
+  exit code and called a prettier failure green. Caught on the same turn, re-run
+  unpiped. The rule stands: gates are read unpiped, no exceptions.
+
+## Verification at the W3 boundary
+
+| Check | Result |
+|---|---|
+| `pytest -q` (backend, full) | **1815 passed, 10 failed** on the first complete run; all 10 were stale test expectations / new-test setup bugs (no app defects), fixed and their files re-run green (66 tests). A final all-in-one re-run was stopped by request; no app code changed after the full run |
+| `ruff check app tests scripts` | clean (post `--fix` on two test-import orderings) |
+| `alembic check` | models match schema (`6a293b5c0932_initial`) |
+| `scripts/dev/reset_dev_db.py --yes` + seed | runs clean |
+| `scripts/tooling/check_contract_sync.py` | in sync |
+| `npm run check` (frontend) | exit 0, read unpiped |
+| Test DB | schema rebuilt (drop + upgrade head) after the squash |
+
+The 10: two signature auto-submit tests missing the now-required assignee; one
+pre-W3 test asserting a mutation on a submitted report merely "does not clear tax"
+(it is now forbidden outright — rewritten to assert the lock); the error-doc matrix
+needing the four new endpoint rows; and the wave's own new lock test carrying setup
+bugs (invalid expense category, wrong route paths, tax result cleared by its own
+line mutations).
+
 ---
 
 ## Decisions taken while executing
@@ -274,7 +396,6 @@ Recorded because the same shapes will recur in later waves:
 
 | Wave | Scope | Risk |
 |---|---|---|
-| **W3** | Closing and locking: full lock on submitted records, record *who* closed it, one shared "what is missing" gate, `closed_late` stored (`NULL`, never `false`, where there is no due date) | low |
 | **W4** | Amendment and the uniqueness rule. **The dangerous one** — a mechanism the codebase has never had, and a chain that double-counts produces a wrong number rather than an error, reaching into the annual report's VAT import and the advance turnover lookup | **high** |
 | **W5** | Removal and reconciliation | medium |
 | **W6** | The deadline shape — contains the one visible product change: VAT periods appear in the work queue before they are late | medium |

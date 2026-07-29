@@ -185,9 +185,15 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - **The cleanup sweep is future-only and PENDING-only:** it covers rows in the generated year whose `period_months_count` differs from the configured one and whose effective due date is still ahead. Past-due unpaid rows are never removed — an overdue period is a debt, not a leftover. Paid and part-paid rows are never removed either, and are reported as `stale_cadence.settled`: that period keeps the old shape until someone resolves it by hand. Deletions are soft and audited as `advance_payment.deleted` with a system-written `reason`.
 - **Bulk-created schedules are marked in the audit trail:** rows created by the office-wide run carry `source = "bulk_generate"` in the `advance_payment.created` audit metadata, reusing the existing action rather than adding a new one.
 
+**Closing facts** (stored, written once when an advisor closes the period — W3, D-13/D-15/D-20/D-32):
+- `closed_at` / `closed_by`: when and by whom the period was closed (status → `submitted`). `paid_at` stays the *payment* event; the two differ when an advisor settles a part-paid or unpaid period (D-16).
+- `closed_late`: the Israel-local date of `closed_at` compared to `due_date_effective or due_date`, recorded at the close. NULL is reserved for "no due date at close" (D-32) — advances always have a due date today, so it is a real boolean until amendments (W4) arrive.
+- `assigned_to`: nullable FK to `users.id` — required by the closing gate (D-15), editable via PATCH until the close.
+- The close is advisor-only via `POST /clients/{client_record_id}/advance-payments/{payment_id}/status` (single-step transition through the shared graph: forward one stage, back one with a required note, cancel, or close). Closing asserts the shared readiness gate first. `GET .../{payment_id}/readiness` publishes the same gate as `{is_ready, issues}` — assignee set, turnover known, expected amount computable. **Payment in full is not a gate** (D-16).
+- A submitted advance is fully locked (D-13): PATCH, delete, turnover refresh, and transitions out are rejected with `OBLIGATION.LOCKED`; bulk mark-paid and bulk refresh skip closed rows (`reason: "closed"` / `skipped_closed`).
+
 **Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):
-- `timing_status`: `"overdue"` if `status != paid AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
-- `paid_late`: `True` if `status == paid AND paid_at.date() > due_date_effective`. Falls back to `due_date` when `due_date_effective` is NULL.
+- `timing_status`: `"overdue"` if `status != submitted AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
 - `delta`: `expected_amount - paid_amount`.
 - `available_turnover`: `{amount, source}` or `null`. Populated by the router from `TurnoverLookupRepository` only when `turnover_amount is None`. It is what the period *could* be snapshotted from — never the payment's turnover — and feeds no amount on the record. `source` is `vat_filed | vat_pending`; `manual` cannot appear. Clients must not render it in the same slot as `turnover_amount`.
 - `missing_turnover`: `True` when `turnover_amount is None AND available_turnover is None`.
@@ -208,6 +214,8 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 | `ADVANCE_PAYMENT.RATE_INVALID` | 400 | VAT rate is zero when attempting reverse calculation (`advance_payment_calculator.py`) |
 | `ADVANCE_PAYMENT.VAT_TURNOVER_NOT_FOUND` | 404 | Refresh found no VAT work item covering every month of the period |
 | `ADVANCE_PAYMENT.VAT_NOT_FILED` | 409 | Refresh found only unfiled VAT returns and the request did not pass `confirm_pending` |
+| `ADVANCE_PAYMENT.NOT_READY` | 400 | Close attempted while the readiness gate lists blocking issues |
+| `OBLIGATION.LOCKED` | 400 | Any mutation on a submitted (closed) advance |
 | `CLIENT_RECORD.CLOSED` | 409 | Client record is closed or frozen — cannot create payment. Raised by the shared client-eligibility guard; the message distinguishes closed from frozen, the code does not |
 
 ## Known issues
@@ -222,7 +230,7 @@ No open known issues.
 
 From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived legacy spec at `docs/archive/advance-payments-legacy.md`:
 
-1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. `paid_late` is similarly computed from `paid_at` versus the effective due date. Decision confirmed in advance_payments_spec.md §Closed Decisions and current schemas.
+1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. ~~`paid_late` is similarly computed~~ — superseded in W3: lateness of the *close* is the stored `closed_late` fact, written once at the close (D-20); the computed `paid_late` field was removed from the contract.
 
 2. **Turnover snapshot vs. live.** `turnover_amount` is a snapshot frozen on write. For pending/partial payments, `live_turnover` is fetched from `VatWorkItem` at read time via `TurnoverLookupRepository` when `turnover_amount is None`. No hard dependency on VAT report existing before advance payment.
 
