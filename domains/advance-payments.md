@@ -40,7 +40,7 @@ All paths confirmed present in `backend/openapi.json`.
 | `GET` | `/api/v1/annual-reports/{report_id}/advances-summary` | Advances summary scoped to an annual report (owned by annual_reports domain) |
 | `GET` | `/api/v1/reports/advance-payments` | Reporting export (owned by reports domain) |
 
-**Auth:** All advance-payments routes require `ADVISOR` or `SECRETARY` role; write operations (POST, PATCH, DELETE, generate) require `ADVISOR`.
+**Auth:** All advance-payments routes require `ADVISOR` or `SECRETARY` role; every write (POST, PATCH, DELETE, generate) requires `ADVISOR`. **This is the pre-D-17 state, not the target one** — see Known issues.
 Cite: `backend/app/advance_payments/api/advance_payment_routes.py`, `advance_payment_routes_overview.py`, `advance_payment_routes_generate.py`.
 
 ## Model & fields
@@ -189,7 +189,7 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - `closed_at` / `closed_by`: when and by whom the period was closed (status → `submitted`). `paid_at` stays the *payment* event; the two differ when an advisor settles a part-paid or unpaid period (D-16).
 - `closed_late`: the Israel-local date of `closed_at` compared to `due_date_effective or due_date`, recorded at the close. NULL is reserved for "no due date at close" (D-32) — advances always have a due date today, so it is a real boolean until amendments (W4) arrive.
 - `assigned_to`: nullable FK to `users.id` — required by the closing gate (D-15), editable via PATCH until the close.
-- The close is advisor-only via `POST /clients/{client_record_id}/advance-payments/{payment_id}/status` (single-step transition through the shared graph: forward one stage, back one with a required note, cancel, or close). Closing asserts the shared readiness gate first. `GET .../{payment_id}/readiness` publishes the same gate as `{is_ready, issues}` — assignee set, turnover known, expected amount computable. **Payment in full is not a gate** (D-16).
+- The close is advisor-only via `POST /clients/{client_record_id}/advance-payments/{payment_id}/status` (single-step transition through the shared graph: forward one stage, back one with a required note, cancel, or close). **The close being advisor-only is D-17's rule; the *forward step* being advisor-only is not** — that endpoint currently guards all four acts with one role check, and W7 splits it. Closing asserts the shared readiness gate first. `GET .../{payment_id}/readiness` publishes the same gate as `{is_ready, issues}` — assignee set, turnover known, expected amount computable. **Payment in full is not a gate** (D-16).
 - A submitted advance is fully locked (D-13): PATCH, delete, turnover refresh, and transitions out are rejected with `OBLIGATION.LOCKED`; bulk mark-paid and bulk refresh skip closed rows (`reason: "closed"` / `skipped_closed`).
 
 **Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):
@@ -220,7 +220,29 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 
 ## Known issues
 
-No open known issues.
+- **Every advance write is advisor-only, and two of them should not be (D-17, W7).**
+  §4.1.9 gives the secretary the working stages and reserves close / send back / cancel
+  / amend / delete for the advisor, and it names advance payments as **the** outlier
+  whose blanket restriction retires: "recording a payment that arrived is clerical work,
+  not a judgement." Still wrong today:
+
+  | Route | Today | Under D-17 |
+  |---|---|---|
+  | `POST /clients/{cid}/advance-payments/{id}/status` | ADVISOR | secretary **for forward steps**; advisor for back / cancel / close |
+  | `POST /advance-payments/bulk-mark-paid` | ADVISOR | secretary |
+
+  `DELETE` and `PATCH` (amend) correctly stay advisor-only; both `refresh-turnover`
+  routes retire in the same wave (D-9/D-31) so their guards are moot; `generate` and
+  `bulk-rate-update` are unclassified by §4.1.9 and are a W7 decision.
+
+  **Not a `require_role` swap.** `POST /status` multiplexes forward, backward, cancel
+  and close behind one endpoint and the service takes `actor_id` without a role, so
+  authorisation has to become per-transition. VAT is the model: separate routes per act,
+  `ready-for-review` open to both roles, `send-back` advisor only.
+
+  Two tests pin the interim 403 and must be **deleted, not adapted**, when this lands —
+  `test_transitions_still_carry_the_blanket_advisor_restriction_pending_d17` and
+  `test_bulk_mark_paid_still_advisor_only_pending_d17`.
 
 ## Resolved issues
 

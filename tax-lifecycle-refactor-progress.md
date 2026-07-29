@@ -45,7 +45,7 @@ main → tax-lifecycle/w0-delete-duplication
 | `frontend` | 1 | 1 | 4 | 1 | 1 |
 | `docs` | 1 | 1 | 1 | 1 | 1 |
 
-Current migration: `6a293b5c0932_initial`. **The Render database must be reset
+Current migration: `0945ac3465e0_initial`. **The Render database must be reset
 manually before the next deploy** — that is true after every squashed wave.
 
 ## Verification at the W2 boundary
@@ -495,7 +495,55 @@ Recorded because the same shapes will recur in later waves:
 | **W4** | Amendment and the uniqueness rule. **The dangerous one** — a mechanism the codebase has never had, and a chain that double-counts produces a wrong number rather than an error, reaching into the annual report's VAT import and the advance turnover lookup | **high** |
 | **W5** | Removal and reconciliation | medium |
 | **W6** | The deadline shape — contains the one visible product change: VAT periods appear in the work queue before they are late | medium |
-| **W7** | Domain surgery — **turnover layer only**; the signature half shipped early as W4-pre | medium |
+| **W7** | Domain surgery — **turnover layer + the D-17 permission split** (the signature half shipped early as W4-pre) | medium |
 | **W8** | Coupling and arithmetic — invert advance→annual behind a port | medium |
 | **W9** | Generation and rollover — VAT has no office-wide generation today | medium |
 | **W10** | Documentation — new `docs/domains/tax-lifecycle.md` (D-41), archive the plan | none |
+
+### Explicitly carried into W7 — D-17, the advance-payments permission split
+
+Recorded here as its own item because in the plan it is **one sentence buried in P6's
+turnover paragraph** (§P6, "A secretary may record a payment and move stages (D-17)"),
+and nothing else would surface it when W7 opens. Its co-location with the turnover
+rework is incidental — the two are unrelated changes that share a paragraph.
+
+**The rule (D-17 / §4.1.9).** A secretary moves an obligation through the working
+stages. Advisor-only, in all three domains: **close · send back · cancel · amend ·
+delete**. Advance payments are the named outlier — "the advance-payments restriction is
+the outlier and retires. Recording a payment that arrived is clerical work, not a
+judgement; the judgement is the close, and that stays with the advisor."
+
+**What is still wrong, and where.** Every advance write is advisor-only. Two of them
+contradict D-17:
+
+| Route | Today | Under D-17 |
+|---|---|---|
+| `POST /clients/{cid}/advance-payments/{id}/status` | advisor only | secretary **for forward steps**; advisor for back / cancel / close |
+| `POST /advance-payments/bulk-mark-paid` | advisor only | secretary — recording a payment that arrived |
+
+`DELETE /{id}` and `PATCH /{id}` (amend) correctly stay advisor-only. The two
+`refresh-turnover` routes retire in the same wave under D-9/D-31, so their role guards
+are moot. `POST /generate` and `/bulk-rate-update` are **not classified** by §4.1.9
+either way — decide them in W7 rather than assuming.
+
+**It is not a `require_role` swap.** W3 built `POST /status` as one endpoint
+multiplexing forward, backward, cancel and close, and the service takes `actor_id` with
+no notion of role. D-17 splits authorisation *per transition*, so the route-level guard
+cannot express it. **VAT is the model** — separate routes per act, `ready-for-review`
+open to advisor **and** secretary, `send-back` advisor only. Recommended: split the
+advance endpoint the same way, so the permission is readable from the contract instead
+of hidden in a branch.
+
+**Two tests pin the interim state** and must be deleted, not adapted, when this lands.
+Both were renamed on 2026-07-29 to say so in their name and docstring, after the
+original names (`test_forward_is_advisor_only`,
+`test_bulk_mark_paid_forbidden_for_secretary`) were found to assert the target model's
+opposite as though it were intended:
+
+- `tests/advance_payments/api/test_advance_payment_status_transitions.py::test_transitions_still_carry_the_blanket_advisor_restriction_pending_d17`
+- `tests/advance_payments/api/test_advance_payment_bulk_mark_paid.py::test_bulk_mark_paid_still_advisor_only_pending_d17`
+
+**This is the second instance of the same failure mode** — after W3 recorded
+`closed_by = NULL` as correct-by-design when D-5 had already condemned the path. Both
+times an interim state was written down as intent. The general rule: **when a wave
+leaves something unmigrated, name it as unmigrated in the artefact that asserts it.**
