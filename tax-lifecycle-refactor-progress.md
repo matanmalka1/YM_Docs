@@ -14,12 +14,13 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-29 (W3 shipped).
+Last updated: 2026-07-29 (W4-pre shipped).
 
 # Tax Lifecycle Refactor — Progress
 
 Executes `docs/tax-lifecycle-refactor-plan.md` (decisions D-1 … D-44). The plan was
-re-cut into eleven waves W0–W10; **W0, W1, W2 and W3 have shipped.**
+re-cut into eleven waves W0–W10; **W0, W1, W2 and W3 have shipped, plus W4-pre —
+ an out-of-order slice pulled forward from W7 (see its section for why).**
 
 Each wave is a vertical slice: backend + `openapi.json` + `generated.ts` + frontend +
 seed + tests land together, so the app runs at every wave boundary. Schema changes
@@ -35,13 +36,14 @@ main → tax-lifecycle/w0-delete-duplication
      → tax-lifecycle/w1-liability-range
      → tax-lifecycle/w2-obligation-status
      → tax-lifecycle/w3-closing-locking
+     → tax-lifecycle/w4-pre-signature-removal
 ```
 
-| Repo | W0 | W1 | W2 | W3 |
-|---|---|---|---|---|
-| `backend` | 6 commits | 3 | 8 | 1 |
-| `frontend` | 1 | 1 | 4 | 1 |
-| `docs` | 1 | 1 | 1 | 1 |
+| Repo | W0 | W1 | W2 | W3 | W4-pre |
+|---|---|---|---|---|---|
+| `backend` | 6 commits | 3 | 8 | 1 | 1 |
+| `frontend` | 1 | 1 | 4 | 1 | 1 |
+| `docs` | 1 | 1 | 1 | 1 | 1 |
 
 Current migration: `6a293b5c0932_initial`. **The Render database must be reset
 manually before the next deploy** — that is true after every squashed wave.
@@ -250,8 +252,13 @@ obligations' own `notes` columns are covered by the domain locks.
   bricked every unassigned report. Added `PATCH /annual-reports/{id}`
   (`assigned_to` only) + an assignee selector in the status panel.
 - **System auto-submit records `closed_by = NULL`.** The signature reconciliation
-  closes with `changed_by=None` and a system actor on the audit row; the assignee
-  gate still guarantees a named owner. Inventing authorship was rejected.
+  closes with `changed_by=None` and a system actor on the audit row. **Corrected
+  2026-07-29:** this was recorded here as correct-by-design, reasoning that the
+  assignee gate still guarantees a named owner. That reasoning does not hold —
+  `assigned_to` is *who is responsible*, `closed_by` is *who acted*, and D-13 asks
+  for the second. It also re-litigated a question D-5 had already closed: the whole
+  auto-submit path was condemned. Resolved by deleting it in **W4-pre**, not by
+  amending D-13.
 - **The audit write policy was the integration seam:** per-action allowlists rejected
   the new fields (`advance_payment.created`), and the new annual reassign needed an
   `annual_report.updated` policy. The seed run caught both.
@@ -301,6 +308,95 @@ pre-W3 test asserting a mutation on a submitted report merely "does not clear ta
 needing the four new endpoint rows; and the wave's own new lock test carrying setup
 bugs (invalid expense category, wrong route paths, tax result cleared by its own
 line mutations).
+
+---
+
+## W4-pre — The annual-report signature flow leaves (D-5)
+
+**Pulled forward out of order, from W7.** Recorded plainly because it breaks the
+phase↔wave 1:1 the plan set up.
+
+### Why it moved
+
+W3 shipped one exception to D-13 ("every closed record names its author"): the signature
+auto-submit closed a report with `changed_by=None`, so `closed_by` was NULL. The W3 record
+justified that as correct-by-design because the assignee gate still guarantees a named
+owner. **That justification was wrong** — `assigned_to` answers *who is responsible*,
+`closed_by` answers *who acted*; they are different facts. It also missed that D-5 had
+already condemned the entire path two days earlier.
+
+So the real choice was never "amend D-13 or not". It was: carry a documented exception for
+four waves, or delete the condemned code now. Three things decided it:
+
+1. **W4 is next and is the high-risk wave.** Amendments work directly on the annual status
+   transition path — the same code that held the signature branches. Deleting first means
+   W4 is written against one less layer instead of routing around machinery due for demolition.
+2. **No open design question.** The worry was that `awaiting_verification` would lose its
+   meaning for annual reports. It does not: §4.1.1 defines stage 4 generically as
+   "ready, awaiting verification", which is exactly VAT's `ready_for_review`. The status is
+   shared with VAT and advances and does not move; only the client-signature machinery
+   hanging off it goes.
+3. **Purely subtractive**, which the plan already rates as P6's lowest-risk half.
+
+### What left
+
+**Annual side** — `annual_report_status_signature_helper.py` (whole file); the
+`AWAITING_VERIFICATION` branches in the status service (signature creation, cancel-on-leave,
+and the `changed_by is None` guard); `AnnualReportDetail.client_approved_at` (column, DTOs,
+meta-column allowlist, audit value-field policy); the readiness gate that read it; and
+`ClientRecordRepository.get_signer_name_by_legal_entity_id`, dead once nothing resolves a
+signer. Readiness drops **5 → 4** gates and completion is now `passed / 4`.
+
+**Signature side** — `_auto_advance_annual_report`, `reconcile_signed_annual_report_approvals`,
+the `sign_request` cross-domain hook (`sign_request` now returns the request, not a tuple),
+`list_pending_by_annual_report`, `list_signed_annual_report_approvals_pending_submission`,
+the `annual_report_id` FK + its index + relationship, the `signature_request.annual_report_signed`
+audit action and its write policy, and the startup + daily reconciliation jobs with their
+`lifespan.py` wiring. Two enum values retired: `ANNUAL_REPORT_APPROVAL`, and
+`VAT_RETURN_APPROVAL` which was defined and referenced by nothing.
+
+The module itself stays — engagement agreements, powers of attorney, custom documents.
+
+**Frontend** — the signature request type union and label map lose both values; the annual
+detail form loses its client-approval date field and becomes notes-only.
+
+### What this buys
+
+`closed_by` on an annual report is **never NULL**. Only an advisor can transition to
+`submitted`, so D-13 is an invariant with no exceptions rather than a rule with a documented
+hole. The savepoint in the transition path is gone too — it existed only because a signature
+in an outer transaction had to survive a failed report transition.
+
+### What it does NOT fix
+
+**Stage 2 (`input_received`) is still empty for annual reports.** Its gate (D-18: VAT periods
+all closed **and** documents received) is W7's other half, which this slice deliberately did
+not touch. Since the shared graph forbids skipping a stage, reports still step through a stage
+that nothing defines. Unchanged by this wave, neither better nor worse.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `ruff check app tests scripts` | clean (after `--fix` on unused imports in the six test files this wave touched) |
+| `ruff format` | clean; scoped to touched files only, per the standing rule |
+| `alembic check` | models match schema (`0945ac3465e0_initial`) |
+| `scripts/dev/reset_dev_db.py --yes` + seed | runs clean |
+| `scripts/tooling/check_contract_sync.py` | in sync (`openapi.json` −104 lines) |
+| frontend `typecheck` / `lint` / `format:check` / `arch:check` / `unused` | all exit 0, each read unpiped |
+| **`pytest` / `vitest`** | **NOT RUN — the operator asked for tests to be skipped this wave.** Test *sources* were updated (four dead tests removed, helpers and fixtures rewired) but never executed. This is the one gate W4-pre did not clear. |
+
+Dead tests removed: the signature auto-submit/reconcile pair, the `pending_client`
+signature-creation and missing-client-record pair, and the background-job reconciliation test.
+
+### Doc debt closed on the way
+
+`flows/02-annual-report-status-transition.md` was a full wave stale — it documented the
+`POST /transition` endpoint and `ReportStage` (both retired in W2 by D-40) and the pre-W2
+status names. Rewritten against the shared graph. `docs/domains/annual-reports.md` had the
+same pre-W2 staleness flagged in the W3 record; the closing/locking and signature paragraphs
+are now correct, but **the remaining pre-W2 status names elsewhere in that file are still
+open, still for W10.**
 
 ---
 
@@ -399,7 +495,7 @@ Recorded because the same shapes will recur in later waves:
 | **W4** | Amendment and the uniqueness rule. **The dangerous one** — a mechanism the codebase has never had, and a chain that double-counts produces a wrong number rather than an error, reaching into the annual report's VAT import and the advance turnover lookup | **high** |
 | **W5** | Removal and reconciliation | medium |
 | **W6** | The deadline shape — contains the one visible product change: VAT periods appear in the work queue before they are late | medium |
-| **W7** | Domain surgery — signature flow and turnover layer leave | medium |
+| **W7** | Domain surgery — **turnover layer only**; the signature half shipped early as W4-pre | medium |
 | **W8** | Coupling and arithmetic — invert advance→annual behind a port | medium |
 | **W9** | Generation and rollover — VAT has no office-wide generation today | medium |
 | **W10** | Documentation — new `docs/domains/tax-lifecycle.md` (D-41), archive the plan | none |

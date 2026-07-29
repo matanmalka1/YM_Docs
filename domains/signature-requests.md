@@ -50,7 +50,6 @@ Source: `backend/app/signature_requests/models/signature_request.py:56`
 | `client_record_id` | FK → `client_records.id` | no | primary anchor; indexed |
 | `business_id` | FK → `businesses.id` | yes | optional scope context; indexed |
 | `created_by` | FK → `users.id` | no | advisor who created |
-| `annual_report_id` | FK → `annual_reports.id` | yes | cross-domain link; indexed |
 | `document_id` | FK → `permanent_documents.id` | yes | cross-domain link |
 | `request_type` | pg_enum(`SignatureRequestType`) | no | |
 | `title` | String | no | |
@@ -78,7 +77,7 @@ Source: `backend/app/signature_requests/models/signature_request.py:56`
 | `deleted_at` | datetime | yes | soft delete |
 | `deleted_by` | FK → `users.id` | yes | soft delete actor |
 
-Indexes: `(client_record_id)`, `(business_id)`, `(annual_report_id)`, `(status)`, partial `(status, sent_at) WHERE deleted_at IS NULL`.
+Indexes: `(client_record_id)`, `(business_id)`, `(status)`, partial `(status, sent_at) WHERE deleted_at IS NULL`.
 
 ### Signature audit — `EntityAuditLog`
 
@@ -86,7 +85,7 @@ Source: `backend/app/signature_requests/signature_request_audit.py`, `backend/ap
 
 Phase 6 moved production signature audit writes/reads from the legacy `signature_audit_events` table to generic `EntityAuditLog` rows with `entity_type = "signature_request"`. Phase 9 dropped the legacy `SignatureAuditEvent` model/table and kept demo signature audit history on the same `EntityAuditLog` writer path.
 
-Embedded advisor details (`GET /api/v1/signature-requests/{request_id}`) still return `SignatureRequestWithAuditResponse.audit_trail`, but each item is now `SignatureRequestAuditItemResponse`: `action`, `actor_type`, `actor_display_name`, `performed_at`, `note`, plus surfaced forensic metadata fields (`client_record_id`, `signer_name`, `signer_email`, `business_id`, `annual_report_id`, `document_id`, `ip_address`, `user_agent`, `content_hash`, `content_hash_missing`, `signed_document_key`, `reason`).
+Embedded advisor details (`GET /api/v1/signature-requests/{request_id}`) still return `SignatureRequestWithAuditResponse.audit_trail`, but each item is now `SignatureRequestAuditItemResponse`: `action`, `actor_type`, `actor_display_name`, `performed_at`, `note`, plus surfaced forensic metadata fields (`client_record_id`, `signer_name`, `signer_email`, `business_id`, `document_id`, `ip_address`, `user_agent`, `content_hash`, `content_hash_missing`, `signed_document_key`, `reason`).
 
 ## Enums / statuses
 
@@ -111,14 +110,12 @@ Source: `backend/app/signature_requests/models/signature_request.py:48`
 | Value | Hebrew label |
 |-------|-------------|
 | `engagement_agreement` | הסכם התקשרות |
-| `annual_report_approval` | אישור דוח שנתי |
 | `power_of_attorney` | ייפוי כוח |
-| `vat_return_approval` | אישור דוח מע"מ |
 | `custom` | חתימה כללית |
 
 ### Audit action values
 
-Signature audit actions are namespaced strings owned by `backend/app/audit/audit_constants.py`: `signature_request.created`, `.sent`, `.viewed`, `.signed`, `.declined`, `.canceled`, `.expired`, and `.annual_report_signed`.
+Signature audit actions are namespaced strings owned by `backend/app/audit/audit_constants.py`: `signature_request.created`, `.sent`, `.viewed`, `.signed`, `.declined`, `.canceled`, and `.expired`.
 
 `actor_type` is the generic audit value: `user` for advisor/internal user actions, `external_signer` for public signer actions, and `system` for automatic/system evidence rows.
 
@@ -148,7 +145,7 @@ Source: `backend/app/signature_requests/services/`
 
 11. **Batch expiry job.** `expire_overdue_requests()` scans all `pending_signature` rows past `expires_at`, transitions them to `EXPIRED`, and appends `signature_request.expired` audit rows. Intended for a periodic scheduler. (`admin_actions.py`)
 
-12. **Annual-report approval is durable and reconciled.** When an annual-report approval is signed, `SignatureRequestService.sign_request` writes `signature_request.annual_report_signed` and persists `client_approved_at` from the external signing timestamp before running submission readiness. The signed request and approval evidence remain in the outer transaction. The `pending_client → submitted` transition, its annual-report audit row, and cancellation of sibling pending requests run atomically inside a savepoint. If readiness or another transition side effect fails, the signer still receives a successful signed response and the report remains `pending_client`; startup and daily reconciliation lock signed annual-report approvals whose report still awaits the client and retry idempotently. A successful retry creates one submission transition and cancels sibling requests once. (`signature_request_service.py`, `signature_request_crud.py`, `core/background_jobs.py`)
+12. **Signing has no cross-domain side effects (D-5, W4-pre).** `sign_request` records the signature and returns. The module previously auto-submitted a linked annual report — that entire path (the savepoint, the startup/daily reconciliation job, and the `annual_report_id` link) retired with the annual-report signature flow. This module now serves engagement agreements, powers of attorney, and custom documents only.
 
 13. **Audit trail is append-only.** Signature lifecycle evidence is written through `EntityAuditWriter`; invalid audit payloads fail closed and roll back the same transaction. Events for `signature_request.created` and `.sent` are always appended together at creation.
 
@@ -178,7 +175,7 @@ No open known issues.
 
 ## Resolved issues
 
-- **MAT-54** (2026-07-23): Annual-report approval was marked `signed` before `client_approved_at` was written, while submission readiness required that timestamp; the broad exception handler could therefore leave a terminal signature request attached to a `pending_client` report with no retry path. Fixed by writing approval evidence before readiness, isolating the submission transition in a savepoint, and adding locked startup/daily reconciliation for failed auto-submission attempts.
+- **MAT-54** (2026-07-23, **dissolved 2026-07-29**): Annual-report approval was marked `signed` before `client_approved_at` was written, while submission readiness required that timestamp, leaving a terminal request attached to an unsubmitted report. Fixed at the time with evidence-first writes, a savepoint, and reconciliation. The whole mechanism retired with D-5 (W4-pre).
 - **SignatureRequests-001** (2026-06-15): `signature_request_service.py:list_by_client_record` called `ClientRecordRepository` inline. Replaced with `get_client_or_raise`; removed unused `NotFoundError` import. No error-code change (was already `CLIENT_RECORD.NOT_FOUND`).
 - **F-029** (2026-06-05): Detail lookup raised the generic `not_found` code via raw `HTTPException`. Fixed: now raises `SIGNATURE_REQUEST.NOT_FOUND` through `NotFoundError`.
 - **F-030** (2026-06-05): Cancellation route was bare and used an unscoped lookup. Fixed: `POST /api/v1/clients/{client_record_id}/signature-requests/{request_id}/cancel` with locked client-and-request-scoped pending lookup.
@@ -198,7 +195,7 @@ From `backend/app/signature_requests/README.md` (audited 2026-03-22) and model d
 
 5. **Content hash is SHA-256 of caller-supplied text.** The service does not hash the stored file — it hashes `content_to_hash` provided at creation time. This allows hashing of a canonical serialization without streaming from S3/R2.
 
-6. **The external signature is evidence independent of report submission.** A valid signer action remains `signed` even if the linked annual report cannot yet transition. `client_approved_at` records the signing time, the report transition is rolled back independently on failure, and reconciliation retries while the report remains `pending_client`. This prevents loss of signing evidence without treating a failed side effect as successful submission.
+6. **A signature is evidence, not a workflow trigger.** A signer action stands on its own; no obligation advances because of it. This used to be a balancing act against the annual-report auto-submit — that coupling is gone (D-5, W4-pre), so the property now holds trivially.
 
 7. **Israeli Electronic Signature Law 5761-2001 compliance intent.** The model captures: who was asked (signer identity), when asked (sent_at), what they approved (content_hash), and how they confirmed (signed_at + signer_ip_address + signer_user_agent). These four elements satisfy the audit-trail requirement.
 

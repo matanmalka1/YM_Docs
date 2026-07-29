@@ -9,141 +9,138 @@ Source of truth: reference
 
 ## 1. Trigger
 
-`POST /annual-reports/{report_id}/status` or `POST /annual-reports/{report_id}/transition`.
+`POST /annual-reports/{report_id}/status` (advisor only).
 
-Stage transitions map to status via `STAGE_TO_STATUS` (see §3).
+`POST /annual-reports/{report_id}/transition` and the `ReportStage` layer **retired in W2** (D-40) —
+a lossy alias over statuses that no longer had anything to abstract once all three domains shared one
+six-value enum.
 
 ## 2. Entry Point in Code
 
 ```
-backend/app/annual_reports/services/status_service.py
+backend/app/annual_reports/services/annual_report_status_service.py
   AnnualReportStatusService.transition_status()
     → repo.get_by_id_for_update()      # row-level lock
+    → assert_transition_allowed()      # the shared graph owns the rule
     → _assert_filing_readiness()       # only on → SUBMITTED
-    → repo.update()
+    → repo.update()                    # status + closing facts
     → EntityAuditWriter.record_status_change()
-    → _cancel_pending_signature_requests()   # conditional
-    → _trigger_signature_request()           # conditional
 ```
 
-Stage shortcut: `transition_stage()` → maps stage to status → calls `transition_status()`.
+There are no cross-domain side effects. The signature flow that used to hang off stage 4 retired
+with D-5 (W4-pre).
 
 ## 3. Valid Transitions
 
-Defined in `backend/app/annual_reports/services/constants.py`.
+Owned by the shared graph in `backend/app/common/obligation_lifecycle.py`, not by this domain.
+
+The ladder, in order:
 
 ```
-NOT_STARTED     → COLLECTING_DOCS
-COLLECTING_DOCS → IN_PREPARATION | NOT_STARTED
-IN_PREPARATION  → PENDING_CLIENT | COLLECTING_DOCS
-PENDING_CLIENT  → IN_PREPARATION | SUBMITTED
-SUBMITTED       → IN_PREPARATION | CLOSED
-CLOSED          → (terminal, no transitions)
-CANCELED        → (terminal, no transitions)
+awaiting_input → input_received → in_progress → awaiting_verification → submitted
 ```
 
-Stage shortcut map:
-```
-material_collection → collecting_docs
-in_progress         → in_preparation
-final_review        → in_preparation
-client_signature    → pending_client
-transmitted         → submitted
-```
+`canceled` sits **off** the ladder — reachable from any unlocked stage, and terminal.
+
+Rules the graph enforces:
+
+- **One step at a time.** Skipping a stage raises; a caller that must advance several stages on one
+  event calls the graph once per step so each transition is validated and audited on its own.
+- **Backward moves require a reason.** Forward moves do not.
+- **`submitted` is locked** — no outgoing transitions at all. Correcting a submitted report goes
+  through an amendment (W4), not a transition.
+- **`canceled` is terminal.**
+
+For an annual report, `awaiting_verification` means *ready, awaiting internal review* — the same
+meaning it carries in VAT. No client sees the report; the office reviews and files alone (D-5).
+
+**Stage 2 (`input_received`) has no gate for annual reports yet.** The intended rule — the tax year's
+VAT periods all closed **and** the year's documents marked received (D-18) — lands in W7. Until then
+the stage is stepped through manually.
 
 ## 4. Sequence
 
 1. `repo.get_by_id_for_update(report_id)` — row-level lock (`SELECT FOR UPDATE`).
-2. Validate `new_status` is a known enum value.
-3. Validate transition is allowed via `VALID_TRANSITIONS[current_status]`.
-4. **Only on `→ SUBMITTED`**: run `_assert_filing_readiness()`.
-   - Delegates to `AnnualReportReadinessService.get_readiness_check()`.
-   - Raises `AppError` listing all blocking issues if not ready.
-5. Build update fields dict:
-   - `→ SUBMITTED`: set `submitted_at` (now if not provided), optionally `ita_reference`, `submission_method`. If deadline type is STANDARD and `submission_method` given: recalculate `filing_deadline`.
-   - `→ CLOSED`: set `assessment_amount`, `refund_due`, `tax_due` if provided.
-6. `repo.update(report_id, report=report, **update_fields)` — update row.
-7. `EntityAuditWriter.record_status_change(ENTITY_ANNUAL_REPORT, ...)` — insert `EntityAuditLog` row with `annual_report.status_changed`, old/new status, note, `client_record_id`, `tax_year`, actor id, and actor display-name snapshot.
-9. **If leaving `PENDING_CLIENT`** (old == PENDING_CLIENT, new != PENDING_CLIENT):
-   - `_cancel_pending_signature_requests()` — cancel all pending SRs linked to this report.
-10. **If entering `PENDING_CLIENT`** (new == PENDING_CLIENT):
-    - `_cancel_pending_signature_requests()` — cancel any existing pending SRs first (re-entry case).
-    - `_trigger_signature_request()`:
-      - Read `ClientRecord` via `ClientRecordRepository.get_by_id()` — raises `CLIENT_RECORD.NOT_FOUND` if missing (blocks transition before DB write).
-      - Resolve `signer_name` via `ClientRecordRepository.get_signer_name_by_legal_entity_id()`: returns `Person.full_name` (OWNER link) or `LegalEntity.official_name`. Raises `ANNUAL_REPORT.SIGNER_NAME_MISSING` if neither exists.
-      - Create `SignatureRequest` (type: `ANNUAL_REPORT_APPROVAL`, `business_id=None`, 14-day expiry, linked to report).
+2. Validate `new_status` is a known `ObligationStatus` value.
+3. `assert_transition_allowed(current, target, reason=note)` — the shared graph (see §3).
+4. **Only on `→ SUBMITTED`**: `_assert_filing_readiness()` delegates to
+   `AnnualReportReadinessService.get_readiness_check()` and raises listing every blocking issue.
+5. Build the update dict. **On `→ SUBMITTED`** this is the closing act and writes all of it:
+   - `closed_at` (the supplied time, else now) and `closed_by` (the acting user — never NULL, since
+     only an advisor can perform this transition).
+   - Optionally `ita_reference` and `submission_method`; if the deadline type is `STANDARD` and a
+     submission method is given, `filing_deadline` is recalculated.
+   - `closed_late` — the **Israel-local** date of `closed_at` against the deadline *as recalculated
+     by this very submission*, NULL when there is no deadline (D-20, D-32).
+   - `assessment_amount`, `refund_due`, `tax_due` when provided. These used to require a separate
+     `closed` status after `submitted`; the two were one act, so they merged.
+6. `repo.update(report_id, report=report, **update_fields)`.
+7. `EntityAuditWriter.record_status_change(ENTITY_ANNUAL_REPORT, ...)` — an `EntityAuditLog` row with
+   old/new status, note, `client_record_id`, `tax_year`, actor id, actor display-name snapshot, and
+   on a close also `closed_by` and `closed_late`.
 
 ## 5. Domains Involved
 
 | Domain | Role |
 |--------|------|
 | `annual_reports` | Updates AnnualReport |
-| `signature_requests` | Creates or cancels SignatureRequest |
-| `clients` | Reads ClientRecord and resolves signer name from LegalEntity/Person |
+| `common` | Owns the transition graph and the closing-fact helpers |
 | `audit` | Writes generic EntityAuditLog |
 
 ## 6. Side Effects
 
-- Updates: `AnnualReport` row (status, optionally submitted_at, ita_reference, submission_method, filing_deadline, assessment_amount, refund_due, tax_due).
-- Creates: `EntityAuditLog` row with `annual_report.status_changed` on every successful status transition.
-- **On `PENDING_CLIENT` entry**: creates 1 `SignatureRequest`.
-- **On `PENDING_CLIENT` exit** (to any state): cancels all pending `SignatureRequest` rows linked to this report.
-- **On re-entry to `PENDING_CLIENT`**: cancels old SRs, then creates a new one.
+- Updates the `AnnualReport` row: status, and on a close the full set of closing facts (§4 step 5).
+- Creates one `EntityAuditLog` row per successful transition.
+
+No signature requests, no notifications, no cross-domain writes.
 
 ## 7. Transaction Boundaries
 
-All operations run in one DB transaction (caller session via `get_db()`).
-The row-level lock (`SELECT FOR UPDATE`) is held until the transaction commits.
-No savepoints used in this flow.
+All operations run in one DB transaction (caller session via `get_db()`). The row-level lock is held
+until commit. **No savepoints** — the savepoint that used to isolate this transition existed only
+because a client signature in an outer transaction had to survive a failed report transition.
 
 ## 8. Idempotency / Duplicate Protection
 
-Not idempotent.
-Each successful transition appends a new `EntityAuditLog` row; invalid or failed audit writes roll back the status mutation.
-
-Re-entering `PENDING_CLIENT` is safe: old pending SRs are cancelled before a new SR is created.
+Not idempotent. Each successful transition appends a new `EntityAuditLog` row; an invalid or failed
+audit write rolls back the status mutation.
 
 ## 9. Locks / Concurrency
 
-`repo.get_by_id_for_update()` issues `SELECT FOR UPDATE` on the `annual_reports` row.
-Prevents concurrent transitions on the same report.
-All other accessed rows (audit, history, SR) are inserted without explicit lock.
+`repo.get_by_id_for_update()` issues `SELECT FOR UPDATE` on the `annual_reports` row, preventing
+concurrent transitions on the same report. Audit rows are inserted without an explicit lock.
 
 ## 10. Preconditions
 
 - Report must exist.
-- Transition must be in `VALID_TRANSITIONS[current_status]`.
-- `→ SUBMITTED`: all readiness checks must pass (delegated to `AnnualReportReadinessService`).
-- `→ PENDING_CLIENT`: client record must exist and must have a resolvable signer name (Person.full_name or LegalEntity.official_name).
+- Transition must satisfy the shared graph (§3).
+- `→ SUBMITTED`: all four readiness gates must pass — assignee set, required schedules complete,
+  total income greater than zero, and either `tax_due` or `refund_due` persisted.
 
 ## 11. Blockers / Validation Failures
 
 | Condition | Error Code | HTTP |
 |-----------|-----------|------|
 | Report not found | `ANNUAL_REPORT.NOT_FOUND` | 404 |
-| Invalid status value | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
-| Transition not in VALID_TRANSITIONS | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
+| Unknown status value | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
+| Same-status, skipped stage, or move out of `canceled` | `OBLIGATION.INVALID_TRANSITION` | 409 |
+| Any transition out of `submitted` | `OBLIGATION.LOCKED` | 409 |
+| Backward move without a reason | `OBLIGATION.TRANSITION_REASON_REQUIRED` | 400 |
 | `→ SUBMITTED` when not ready | `ANNUAL_REPORT.INVALID_STATUS` | 409 |
-| `→ PENDING_CLIENT` — client record missing | `CLIENT_RECORD.NOT_FOUND` | 404 |
-| `→ PENDING_CLIENT` — no resolvable signer name | `ANNUAL_REPORT.SIGNER_NAME_MISSING` | 400 |
-| Invalid stage name | `ANNUAL_REPORT.INVALID_STAGE` | 409 |
-| Amend on non-SUBMITTED report | `ANNUAL_REPORT.INVALID_STATUS_FOR_AMEND` | 409 |
 
 ## 12. Derived State
 
-None. All state changes are written to the DB immediately.
+None. All state changes are written to the DB immediately. `closed_late` is recorded **at the close**
+and is not recomputed afterwards (D-20).
 
 ## 13. Tests
 
-- `tests/annual_reports/api/test_annual_report_stage_transition.py`
 - `tests/annual_reports/service/test_status_service_additional.py`
+- `tests/annual_reports/api/test_annual_report_closing_and_lock.py`
 - `tests/annual_reports/service/test_annual_report_delete_report.py`
-- `tests/signature_requests/` (covers SR creation/cancellation on status transition)
 - `tests/notifications/service/test_notification_policy_annual_report.py`
-
-Tests added covering: `pending_client` with no business succeeds, signer name resolved from Person, missing client record blocks before DB write.
 
 ## 14. Documentation Target
 
-- `docs/domains/annual-reports.md` — status machine, filing readiness, SR lifecycle
-- `docs/domains/signature-requests.md` — SR creation and cancellation triggers
+- `docs/domains/annual-reports.md` — status machine, filing readiness, closing and locking
+- `docs/tax-lifecycle-refactor-progress.md` — the wave record for the shared lifecycle
