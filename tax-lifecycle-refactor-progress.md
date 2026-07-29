@@ -14,7 +14,7 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-28.
+Last updated: 2026-07-29.
 
 # Tax Lifecycle Refactor — Progress
 
@@ -54,8 +54,44 @@ manually before the next deploy** — that is true after every squashed wave.
 | `alembic check` | models match schema |
 | `scripts/dev/reset_dev_db.py` + seed | runs clean |
 | `scripts/tooling/check_contract_sync.py` | in sync |
-| `npm run check` (frontend) | 173 tests, typecheck, lint, format, arch, knip |
+| `npm run check` (frontend) | **FAILED at knip** — masked at the time by reading the result through a pipe; tests/typecheck/lint/format/arch passed. Fixed in the post-W2 review below |
 | Worktrees | 0 uncommitted across all three repos |
+
+An earlier revision of this table claimed the frontend check was green. It was not:
+`npm run check 2>&1 | grep …` reads the pipe's exit code, not the gate's. Gates are
+now read unpiped.
+
+## Post-W2 review (2026-07-28/29)
+
+A user code-review against the plan found six items the wave's own verification
+missed. Resolutions, applied on the W2 branch before W3:
+
+1. **`ClientUpdateRequest` validated PATCH fragments without the persisted record** —
+   a one-sided range edit that inverted a persisted range surfaced as the DB
+   CheckConstraint's 500, and a VAT range could land on an `osek_patur`.
+   `ClientUpdateService` now merges the request over the persisted record and runs
+   the same `validate_liability_ranges` on the result, raising
+   `CLIENT.LIABILITY_RANGE_INVALID` (400). The check runs only when the PATCH touches
+   a range or frequency field.
+2. **Advance status bypassed the shared graph** — `_status_after_payment` computed the
+   target directly; no `assert_transition_allowed`, no per-step audit. Replaced by
+   `_payment_status_steps`, which derives the target, walks `stages_between`, asserts
+   each step, and each money write records one `advance_payment.status_changed` audit
+   row per stage crossed (new action + write policy). D-8's "turnover becomes known →
+   `input_received`" stays unwired until the W6/W7 turnover rework.
+3. **DEFECT: annual overdue list had `AWAITING_INPUT` twice and omitted
+   `INPUT_RECEIVED`** — mechanical-rename leftover in `_overdue_stmt`; now
+   `notin_(RESOLVED_OBLIGATION_STATUSES)` like its sibling methods.
+4. **`obligation_resolved_expr()` was never created** — intent already met by the
+   shared `RESOLVED_OBLIGATION_STATUSES` frozenset feeding both the Python and SQL
+   sides; the named helper is judged unnecessary. No change.
+5. **DEFECT: `VatProgressBar` checked the deleted `'filed'` literal** — survived the
+   sweep because the prop was `string`-typed. Prop is now `VatWorkItemStatus` and the
+   check is `'submitted'`. A stale `collecting_docs` in `json_examples.py` fell to the
+   same literal-grep.
+6. **`npm run check` failed at knip** on nine dead exports. The dead code was deleted
+   (`Divider` primitive, `TAX_CALENDAR_OBLIGATION_TYPES`, `AmendReportModalProps`) and
+   types used only in-file were un-exported; knip now exits 0.
 
 ---
 
@@ -165,10 +201,10 @@ Every site was therefore classified rather than renamed:
 **No published number changed.** Preserving today's meaning exactly was chosen over
 "improving" the semantics mid-conversion.
 
-**Money advances but never locks or rewinds.** `_status_after_payment`: a recorded
-payment moves a period to `in_progress`, paid in full moves it to
-`awaiting_verification`, only a person moves it to `submitted`, and a terminal record
-is untouched.
+**Money advances but never locks or rewinds.** `_payment_status_steps` (named
+`_status_after_payment` until the post-W2 review): a recorded payment moves a period
+to `in_progress`, paid in full moves it to `awaiting_verification`, only a person
+moves it to `submitted`, and a terminal record is untouched.
 
 **`/amend` and `/transition` were removed in W2, not in W4/W7 as planned.** Both became
 unreachable under the shared graph — reopening a submitted report is forbidden, and
