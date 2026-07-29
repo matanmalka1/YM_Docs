@@ -14,13 +14,14 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-29 (W4-pre shipped).
+Last updated: 2026-07-29 (W4 in progress — backend landed, frontend open).
 
 # Tax Lifecycle Refactor — Progress
 
 Executes `docs/tax-lifecycle-refactor-plan.md` (decisions D-1 … D-44). The plan was
 re-cut into eleven waves W0–W10; **W0, W1, W2 and W3 have shipped, plus W4-pre —
- an out-of-order slice pulled forward from W7 (see its section for why).**
+ an out-of-order slice pulled forward from W7 (see its section for why). W4's backend
+ has landed; its frontend is open.**
 
 Each wave is a vertical slice: backend + `openapi.json` + `generated.ts` + frontend +
 seed + tests land together, so the app runs at every wave boundary. Schema changes
@@ -37,16 +38,16 @@ main → tax-lifecycle/w0-delete-duplication
      → tax-lifecycle/w2-obligation-status
      → tax-lifecycle/w3-closing-locking
      → tax-lifecycle/w4-pre-signature-removal
+     → tax-lifecycle/w4-amendment
 ```
 
-| Repo | W0 | W1 | W2 | W3 | W4-pre |
-|---|---|---|---|---|---|
-| `backend` | 6 commits | 3 | 8 | 1 | 1 |
-| `frontend` | 1 | 1 | 4 | 1 | 1 |
-| `docs` | 1 | 1 | 1 | 1 | 1 |
+| Repo | W0 | W1 | W2 | W3 | W4-pre | W4 |
+|---|---|---|---|---|---|---|
+| `backend` | 6 commits | 3 | 8 | 1 | 1 | in progress |
+| `frontend` | 1 | 1 | 4 | 1 | 1 | in progress |
+| `docs` | 1 | 1 | 1 | 1 | 1 | in progress |
 
-Current migration: `0945ac3465e0_initial`. **The Render database must be reset
-manually before the next deploy** — that is true after every squashed wave.
+Current migration: `40acbddf6584_initial` (re-squashed in W4).
 
 ## Verification at the W2 boundary
 
@@ -400,6 +401,238 @@ open, still for W10.**
 
 ---
 
+---
+
+## W4 — Amendment and the uniqueness rule (D-10, D-12, D-14, D-21, D-22, D-23, D-32)
+
+The wave the plan rates **high** risk, and the reason it does is worth restating:
+every other wave's failure mode is an error. This one's is a **wrong number**. An
+aggregate that forgets a chain sums the original *and* its correction, reports a
+total that is too large, and raises nothing. No test goes red on a number merely
+being wrong.
+
+### The model — two facts, deliberately not one
+
+`app/common/obligation_chain.py`, shared by all three domains:
+
+| | |
+|---|---|
+| `amends_id` | Points **backwards**, at the row this one corrects. It is the chain, and it is what the uniqueness rule excludes (§4.1.13) |
+| `superseded_at` | Stamped **on the row being corrected**, when its amendment is born. It points forwards, and it is the only thing every read filters on |
+
+The second exists purely so that "am I the latest?" is one indexable predicate
+rather than a correlated subquery repeated at forty call sites.
+
+**There is no `is_amendment` column, against the plan's own §4.1.6 wording.** It
+would be exactly `amends_id IS NOT NULL` — one truth stored twice, which is the
+duplication W0 spent a wave deleting (ADR-0001/0003). A derived
+`AmendableMixin.is_amendment` property replaces it. Recorded here as a
+deviation from the plan text, decided in-session and approved.
+
+### The uniqueness rule (§4.1.13)
+
+All three partial unique indexes became "not deleted **and** not an amendment
+**and** not cancelled". Each exclusion frees the period slot for its own reason:
+D-22, D-10, D-23. A second index per table, unique on `amends_id`, makes a chain
+a **line rather than a tree** — two corrections of one record would give the
+period two tips and put every aggregate back where D-12 found it.
+
+### One way to write the query, and a test that enforces it
+
+`select_obligations(model, *entities, include_deleted=False, include_superseded=False)`
+applies both scopes. **44 hand-built `select()` sites** across 16 files were
+migrated onto it; 0 remain outside `seed`.
+
+`tests/core/test_obligation_chain_conventions.py` parses every file under `app/`
+and fails any `select()` naming an obligation model. Two carve-outs, documented
+in the test itself with their reasons: `base_repository` (builds `select(self.model)`
+generically for every model, and every call it serves is primary-key qualified,
+so the predicate could not change an answer) and `seed`.
+
+Two things the test earned immediately:
+- it caught **two sites `grep` missed**, where `select(` was spread over several lines;
+- writing it surfaced that a naive AST walk reports **compliant** code as the
+  violation — `select(exists(select_obligations(...).where(...)))` names the model
+  through the wrapper. Left unfixed, the test would have pushed readers to "fix"
+  working code. It now follows the method chain back to its root.
+
+### Amendment is an act, not a flag
+
+VAT already had the fields and could never reach them: `is_amendment` was set **at
+filing time on a row that already existed**, and a second row for the period could
+not be created — the index blocked it and a filed row could not be soft-deleted to
+free the slot. The mechanism was unreachable, not merely unused (§4.1.6).
+
+That whole path was **deleted, not adapted**: the request fields, the route
+arguments, five error codes and five messages. So was VAT's **amendment cycle
+detection** — under the new model it cannot be needed. `amends_id` is written once,
+at birth, pointing at a row that already exists, so the chain only ever grows
+forward and a cycle cannot form.
+
+Three endpoints replace it, one per domain, all advisor-only, all returning the
+amendment rather than the original:
+
+```
+POST /vat/work-items/{id}/amend
+POST /annual-reports/{id}/amend
+POST /clients/{cid}/advance-payments/{id}/amend
+```
+
+Each locks the original for update before the gate. Two advisors pressing "amend"
+on the same period would otherwise both pass and both insert, and only the unique
+index would stop the second — as a 500, after copying every invoice.
+
+### What an amendment inherits
+
+`copy_for_amendment` is **mapper-driven, not a hand-written field list**: an
+amendment is "the same record with different figures", so a column added later
+should be carried by default. A hand-written list silently drops it, and what it
+drops is a figure nobody notices is missing.
+
+Never inherited, in any domain: identity, the chain columns, soft-delete state,
+timestamps, `created_by`, `status`, the **closing facts** (an amendment is born
+open, so nobody has closed it) and the **due dates** (D-14). It keeps the
+original's `tax_calendar_entry_id` — the regulatory period is shared; only the
+per-record snapshot is absent.
+
+Per-domain, decided rather than derived:
+- **VAT** drops the submission method, reference, final amount and override. Every
+  invoice is copied.
+- **Annual** drops the same, plus `filing_deadline` (D-14) — and **the tax result**.
+  `tax_due`/`refund_due` are the answer computed from the lines, and the whole
+  reason an amendment exists is that the answer was wrong. Carrying it would also
+  satisfy the closing gate, which requires a persisted tax result, so a correction
+  could be closed on the very figures it was opened to correct. The copy is deep:
+  detail, income and expense lines, credit points, schedule entries and their annex lines.
+- **Advance** drops **nothing extra**. The payment facts — amount, date, method,
+  reference — describe money that actually reached the authority for this period.
+  They are the advance's material, in the same sense invoices are a VAT period's.
+
+### D-14 in practice: `due_date_effective` is now routinely NULL
+
+Nullable in the model, always populated in practice, until this wave. Three sites
+**crashed** and two answered **wrongly**:
+
+| Site | Was |
+|---|---|
+| `vat_report_queries.py` | `raise ValueError` — the one the plan named |
+| `work_queue/items/tax_items.py` | the same `raise`, and it sits behind the dashboard attention widget — the *first* page anyone opens after creating an amendment |
+| `reports/vat_compliance_report.py` | `filed_date > deadline` → `TypeError` |
+| `tax_calendar_grouped_service.py` | fell back to the shared calendar entry's due date, so every open amendment counted as overdue — contradicting the function's own comment two lines above. Its annual branch was already correct; the VAT/advance path was the inconsistent one |
+| `annual_report_report_repository.list_due_for_work_queue` | filtered `filing_deadline IS NOT NULL`, so an open amendment — live work someone must finish — never appeared in the work queue. The advance equivalent had the same shape |
+
+A record with no due date is **neither on time nor late**; the compliance report now
+excludes it from both counts rather than bucketing it as on-time.
+
+### `AdvancePayment.due_date` became nullable
+
+It was the only NOT NULL deadline column of the three, so an advance amendment could
+not be undated. Worse, `advance_payment_due_date_snapshot_events.py` — a
+`before_insert` mapper event living entirely outside `obligation_chain`'s view —
+**resurrected `due_date_effective` from `due_date` at write time**, defeating the
+exclusion after the copy had already dropped it. The event now returns early for an
+amendment.
+
+Recorded because the shape will recur: a shared contract expressed as an exclusion
+list is only as strong as the write paths that cannot bypass it.
+
+### Decisions taken while executing
+
+- **The copy lives in the repositories, not the services.** A deep copy spans six
+  tables in the annual case; putting `db.add` in a service would have broken the
+  standing "no raw `self.db` in services" rule. The split is: the service owns the
+  lock, the gate, *what* is copied (a domain question) and the audit; the repository
+  owns that the whole act is one flush. A half-copied amendment is worse than none —
+  it presents as a corrected period whose figures are missing.
+- **A record asked for by id stays reachable even when superseded.** D-12 is a rule
+  about lists, counts and sums. The advance detail lookup was the only one that had
+  narrowed, and a chain whose earlier links could not be opened would make the
+  history unreadable — the thing amendments exist to preserve. VAT and annual were
+  never affected: their detail lookups go through `Session.get`.
+- **Three reads opt out explicitly** with `include_superseded=True`: the client
+  timeline (twice — a timeline that dropped superseded reports loses the original's
+  own closing) and the calendar-link integrity check (a superseded row with a missing
+  regulatory link is just as broken, and hiding it would shrink the defect count every
+  time someone files an amendment).
+
+### Published numbers that visibly change
+
+Once the chain-tip filter applies, an amended-but-not-yet-refiled period stops
+counting as filed, because the tip sits at `in_progress`. **This is D-21 working, not
+a regression** — but it reads as one to anyone reviewing the diff who was not told to
+expect it. Affected: the VAT compliance aggregates, the annual season summary,
+`sum_financials_by_year`, and every `count_by_*`.
+
+Three double-counts were also live bugs waiting to happen rather than merely
+theoretical:
+1. `sum_net_vat_by_client_record_year` → the annual report's tax figure.
+2. The advance turnover lookup, which broke **two different ways**: its Python half
+   kept whichever same-period row the database returned last, with no ordering
+   guarantee; its SQL half counts rows against `months_count`, so an amended month
+   would make a fully covered span report as *not* covered.
+3. **The invoice aggregations, which no named risk site anticipated.** An amendment is
+   born holding a copy of every invoice, so an amended period's invoices exist under
+   two work items — double-counting the osek-patur ceiling check and the annual
+   report's expense auto-population.
+
+Three lookups by (client, period/year) were **non-deterministic** post-amendment:
+`.first()` with no `order_by` on a key that is no longer unique. One of them,
+`get_by_client_record_year`, is live in `AnnualReportTaxService.invalidate_tax_if_open`.
+
+### D-34, and the one read that wants the whole chain
+
+**D-34 shipped, and it needed storage rather than a lookup.** "Was this period
+late" and "was this row's closing act late" are two different questions, and the
+row only answers the second. An amendment has no due date, so its own
+`closed_late` is NULL and correctly so — but it is the chain tip, the record
+every screen shows. Left there, **amending a period would hide that it was
+late**, which is EC-2 and the exact fact D-20 exists to preserve.
+
+`chain_closed_late` joins the mixin: one column, three tables. It is written at
+**every close**, not only at an amendment's birth — a record that was never
+corrected would otherwise be NULL, forcing every display site to coalesce two
+columns, and the one that forgot would report a late period as on time.
+`link_amendment` overwrites it from the original, reading the original's own
+chain answer first so a chain three links long still carries the first link's.
+
+**`GET .../chain`, on all three domains.** It does not walk `amends_id`: the
+uniqueness rule already guarantees a period holds at most one original and the
+chain cannot fork, so the rows for a client and period *are* the chain — one
+query rather than one per link. It resolves from the record asked for, not from
+the tip, so a link followed from an old audit entry answers with the same
+history. This is the only business read in the system that passes
+`include_superseded=True`.
+
+### Still open in W4
+
+- The 11 `select()` sites under `app/seed` — carved out of the arch test
+  deliberately, but not audited one by one.
+
+### A defect the frontend work surfaced
+
+The chain modal was built for all three domains, and building it found that only
+`VatWorkItemResponse` actually published `amends_id` and `superseded_at`. The
+annual and advance DTOs had `chain_closed_late` but not the two columns the modal
+reads — added in the same pass as D-34 and simply missed on two of three.
+
+The failure would not have been a blank field. Both are read with `== null`, which
+is true for `undefined`, so **every row would have rendered as "original" and every
+row would have carried the "current" badge** — a history view asserting that a
+period has several live records. Visibly wrong rather than visibly missing, which
+is the harder kind to notice in review.
+
+### Mistakes made during execution, and their cost
+
+- **A global `ruff check app --fix` run while an agent was editing deleted an import
+  it had added but not yet used**, breaking its file mid-flight. Formatter runs are
+  scoped to one's own files when work is concurrent.
+- The `.first()`-without-`order_by` class of bug was **not** on the plan's risk list
+  and was found only by auditing every call site. The plan named three aggregates;
+  the audit found the aggregates *and* a different bug shape the plan had not
+  anticipated at all.
+
+---
+
 ## Decisions taken while executing
 
 **`status == PAID` was two questions.** They looked like one only because the status was
@@ -483,16 +716,14 @@ Recorded because the same shapes will recur in later waves:
 
 | Item | Closed by |
 |---|---|
-| Annual reports have **no amendment path** — the reopen is forbidden by the shared graph and create-amendment does not exist yet | W4 |
+| 11 `select()` sites under `app/seed` still bypass `select_obligations` — carved out of the arch test deliberately, but not audited | W4 (open) |
 | `input_received` is **empty for annual reports** — the gate needs "VAT periods all closed **and** documents received" | W7 |
 | `VAT.CLIENT_CLOSED` is a **fourth fork** of the client-eligibility rule, answering 400 where the shared guard answers 409 | W7 |
-| The **Render database needs a manual reset** before the next deploy | before deploy |
 
 ## Remaining waves
 
 | Wave | Scope | Risk |
 |---|---|---|
-| **W4** | Amendment and the uniqueness rule. **The dangerous one** — a mechanism the codebase has never had, and a chain that double-counts produces a wrong number rather than an error, reaching into the annual report's VAT import and the advance turnover lookup | **high** |
 | **W5** | Removal and reconciliation | medium |
 | **W6** | The deadline shape — contains the one visible product change: VAT periods appear in the work queue before they are late | medium |
 | **W7** | Domain surgery — **turnover layer + the D-17 permission split** (the signature half shipped early as W4-pre) | medium |
