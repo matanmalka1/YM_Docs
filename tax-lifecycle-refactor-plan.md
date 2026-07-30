@@ -1186,6 +1186,13 @@ Nothing else is undecided. O-2 … O-6, O-8 and O-9 closed as D-39 … D-42, D-2
 
 No phase in §7 owns this. It is larger than several of them.
 
+> **Partly historical since 2026-07-30.** W2 did this sweep, and the status literals are gone
+> from the three feature `contracts.ts` files below — with them the three domain status aliases
+> (`VatWorkItemStatus`, `AnnualReportStatus`, `AdvancePaymentStatus`), which every call site now
+> replaces with `ObligationStatus` imported bare. Two defects the sweep itself introduced were
+> found from the running app rather than from any gate; see the W4 section of the progress doc,
+> "an action key is not a status name". The rest of this subsection stands as written.
+
 **Status literals — 14 files hold the old values as strings** (plus `types/generated.ts`, which
 regenerates):
 

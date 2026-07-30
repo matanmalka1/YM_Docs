@@ -621,6 +621,51 @@ row would have carried the "current" badge** — a history view asserting that a
 period has several live records. Visibly wrong rather than visibly missing, which
 is the harder kind to notice in review.
 
+### Two W2 defects the frontend still carried — an action key is not a status name
+
+Found from the running app: a VAT period sat at stage 3 with an **empty action row**
+under its progress bar and no way forward. W2 renamed the status *values* across 19
+frontend files by string, and `vatHelpers.canMarkReadyForReview` was matching the
+action key `'awaiting_verification'` — the stage the action moves *to*, not the key
+the backend emits, which is `ready_for_review` (`app/actions/services/vat_report_actions.py`).
+So the "שלח לבדיקה" button was hidden for **every** `in_progress` item, on the detail
+panel and in the row-action menu both.
+
+Beside it, `AnnualReportStatus` listed `awaiting_input` and `submitted` twice and had
+no `input_received` at all — so no annual-report type ever admitted stage 2, the stage
+W7 still has to wire.
+
+Neither would have failed a test, and neither is visible in a diff of the wave that
+caused it: one is a string that reads correct, the other a union whose duplicate
+members TypeScript accepts in silence.
+
+**The fix removed the category.** All three domain status aliases — `VatWorkItemStatus`,
+`AnnualReportStatus`, `AdvancePaymentStatus`, each of them `= ObligationStatus` — are
+deleted; the 45 call sites import `ObligationStatus` from
+`src/constants/obligationStatus.constants.ts` bare, and neither `api/index.ts` barrel
+re-exports a status type any more. Three names for one type is what let one of them
+drift without anything noticing. The single survivor is
+`AdvancePaymentStatusFilterValue = ObligationStatus | 'overdue'`, which is a widening
+rather than a rename: `overdue` is a server-computed `timing_status`, never a stored
+stage.
+
+23 frontend files, landed on the W4 branch rather than as its own wave — plan §11.3
+lists the frontend as unowned by any phase, and leaving it unowned is how it got here.
+Plan §11.2's file list is now partly historical: the status literals are gone from the
+three feature `contracts.ts` files it names.
+
+**Rule:** an action key is not a status name. Backend keys live in
+`app/actions/services/*_actions.py` — grep there before trusting a frontend
+`hasAction(...)` string, and never let a status-value rename sweep action keys.
+
+Chasing it also found `docs/domains/vat.md` a wave and a half stale: it still documented a
+`VatWorkItemStatus` enum in `vat_enums.py` that W2 deleted. Its "Enums / statuses" section was
+rewritten against the shared ladder and now carries the action-key table above — the fact the
+doc could have prevented the defect and didn't. **The rest of that file is unfixed**: pre-W2
+status names in the business-rules and error-code sections, pre-W4 amendment fields
+(`is_amendment`, `amends_item_id`), and citations to backend files since renamed. Recorded doc
+debt for W10, same as `docs/domains/annual-reports.md`, and flagged in the file itself.
+
 ### Mistakes made during execution, and their cost
 
 - **A global `ruff check app --fix` run while an agent was editing deleted an import

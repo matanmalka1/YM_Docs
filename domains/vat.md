@@ -70,28 +70,61 @@ Indexes include active unique `(client_record_id, period) WHERE deleted_at IS NU
 
 ## Enums / statuses
 
-`VatWorkItemStatus` values (`backend/app/vat/models/vat_enums.py:6-12`):
+> **Sections below this heading still carry pre-W2 status names** (`pending_materials`,
+> `material_received`, `data_entry_in_progress`, `filed`) and pre-W4 amendment fields
+> (`is_amendment`, `amends_item_id`), plus file citations from before the backend renames.
+> Statuses and actions were corrected here in 2026-07-30; the rest is recorded doc debt for W10,
+> like `docs/domains/annual-reports.md`. Code is the source of truth where they disagree.
 
-| Value |
-|-------|
-| `pending_materials` |
-| `material_received` |
-| `data_entry_in_progress` |
-| `ready_for_review` |
-| `filed` |
-| `canceled` |
+**VAT has no status enum of its own.** It runs the shared six-stage `ObligationStatus`
+(`backend/app/common/enums.py`), and the transition rules live once in
+`backend/app/common/obligation_lifecycle.py` — forward one stage at a time, backward one stage
+with a reason, `submitted` has no outgoing transition. See `docs/tax-lifecycle-refactor-plan.md`
+§4.1.
 
-**Resolved statuses.** `RESOLVED_VAT_WORK_ITEM_STATUSES = {filed, canceled}` is VAT's single answer
-to "does this period need further work?" — the question the tax calendar asks of every obligation.
-`is_vat_work_item_resolved` reads it, and so does every SQL query that asks the same thing
-(`vat_compliance_repository`, `vat_work_item_grouped_repository`, `vat_work_item_query_repository`).
-One published set is the Python/SQL twin: SQL reads the same object, so the two forms cannot drift.
+| Stage | Value | Label | What it means for VAT |
+|---|---|---|---|
+| 1 | `awaiting_input` | ממתין לחומר | waiting on the client's documents |
+| 2 | `input_received` | החומר התקבל | documents in hand, no invoice entered yet |
+| 3 | `in_progress` | בעבודה | data entry under way |
+| 4 | `awaiting_verification` | ממתין לאימות | entered and ready, waiting on an advisor |
+| 5 | `submitted` | הוגש | filed; locked, correctable only by an amendment |
+| — | `canceled` | בוטל | off-ladder, terminal |
 
-`canceled` belongs in the set — a cancelled period is not outstanding work, matching
-`is_annual_report_resolved`. It was previously omitted from the Python set while the SQL side
-excluded it, so a cancelled period read **open** on the grouped tax calendar and **closed** on the
-compliance list. Do not confuse this with `ANNUAL_REPORT_FILED_STATUSES` or VAT's filed-only checks
-(`VAT.FILED_IMMUTABLE`), which answer the different question "was it actually filed?".
+### Action keys are not status names
+
+`available_actions` publishes **action keys**, built by
+`backend/app/actions/services/vat_report_actions.py`. A key names the act, not the stage it lands
+on, and the two deliberately differ — `ready_for_review` moves an item *to*
+`awaiting_verification`. The frontend must match on the key. Matching on the target stage name is
+exactly the defect that hid the "שלח לבדיקה" button for every `in_progress` period until
+2026-07-30.
+
+| Key | Offered when | Role |
+|---|---|---|
+| `materials_complete` | stage 1 | any |
+| `add_invoice` | stages 2, 3, 4 | any |
+| `ready_for_review` | stage 3 | any |
+| `file_vat_return` | stage 4 | advisor only |
+| `send_back` | stage 4 | advisor only |
+| `create_amendment` | stage 5, and only on the tip of the chain (`superseded_at IS NULL`) | advisor only |
+
+Role filtering happens **in the builder**, so a secretary genuinely receives a shorter list and an
+empty action row is a legitimate state. The frontend must not re-check the role — that would be a
+second source, free to drift.
+
+**Resolved statuses.** `RESOLVED_OBLIGATION_STATUSES = {submitted, canceled}`
+(`backend/app/common/enums.py`) is the single answer to "does this obligation need further work?"
+for all three domains — the question the tax calendar asks. `is_obligation_resolved` reads it, and
+so does every SQL query asking the same thing (`vat_compliance_repository`,
+`vat_work_item_grouped_repository`, `vat_work_item_query_repository`). One published set is the
+Python/SQL twin, so the two forms cannot drift.
+
+`canceled` belongs in the set — a cancelled period is not outstanding work. It was previously
+omitted from the Python set while the SQL side excluded it, so a cancelled period read **open** on
+the grouped tax calendar and **closed** on the compliance list. Do not confuse this with the
+closed-only checks (`OBLIGATION_LOCKED`), which answer the different question "was it actually
+filed?".
 
 Other VAT enums:
 
