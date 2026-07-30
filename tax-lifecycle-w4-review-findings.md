@@ -20,9 +20,11 @@
 
 נמצאה תקלה אחת שחוסמת יצירת תיקון בפועל, ועוד כמה בעיות שעלולות להסתיר דיווחים, להציג נתונים שגויים או למנוע מהמשתמש להשלים את התהליך דרך הממשק.
 
+**מצב נכון ל-30 ביולי 2026:** ממצאים 1, 2 ו-3 תוקנו ונכנסו לענף. ממצא 4 נחקר לעומק והתברר כשני באגים — פירוט בסעיף עצמו. ממצאים 5, 6 ו-7 פתוחים.
+
 ## 1. העתקת פרטי דוח שנתי נכשלת בזמן יצירת תיקון
 
-**חומרה: חוסם**
+**חומרה: חוסם — תוקן ב-30 ביולי 2026** (`3e787146`)
 
 ### מה קורה?
 
@@ -34,15 +36,17 @@
 
 יצירת תיקון לדוח שנתי שיש בו פרטי דוח תיכשל בשגיאת שרת. המשתמש לא יוכל להתחיל את התיקון.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-- לשנות את שם שדה הקישור בהעתקה מ-`annual_report_id` ל-`report_id`.
-- להוסיף בדיקה שיוצרת דוח עם פרטים, שורות ונספחים, יוצרת לו תיקון, ומוודאת שכל המידע הועתק לרשומה החדשה.
+- שם שדה הקישור בהעתקת ה-detail שונה ל-`report_id`. רק ה-detail חורג: `income_line`, `expense_line`, `credit_point` ו-`schedule_entry` משתמשים כולם ב-`annual_report_id`, ו-`annex_data` ב-`schedule_entry_id` — כולם נבדקו ותקינים.
+- הכשל לא היה שקט: `copy_child` מעביר את מפתח האב כ-keyword דרך ה-mapper, ולכן השם השגוי הפיל את הבנייה ב-`TypeError: 'annual_report_id' is an invalid keyword argument for AnnualReportDetail` — 500 לפני שהועתקה ולו שורה אחת. כל דוח שיש בו detail (כלומר כל דוח שהוזנו בו ניכויים או הערות) לא היה ניתן לתיקון כלל.
+- נוספה בדיקה אחת שמכסה את כל טבלאות הילדים יחד — `test_amendment_copies_the_whole_material`: דוח עם detail, שורת הכנסה, שורת הוצאה, נקודת זיכוי ונספח `schedule_b` מוגש, נוצר לו תיקון, וכל ילד מאומת על התיקון בזמן שהמקור שומר את שלו. אומת שהבדיקה נופלת כשמחזירים את השם השגוי.
 
 ### מיקום בקוד
 
-- `backend/app/annual_reports/repositories/annual_report_report_repository.py:56`
-- `backend/app/annual_reports/models/annual_report_detail.py:30`
+- `backend/app/annual_reports/repositories/annual_report_report_repository.py:62`
+- `backend/app/annual_reports/models/annual_report_detail.py:33`
+- `backend/tests/annual_reports/api/test_annual_report_amendment.py` — `test_amendment_copies_the_whole_material`
 
 ## 2. מחיקת תיקון פתוח מסתירה את החיוב מכל התצוגות ומשאירה את השרשרת תקועה
 
@@ -107,7 +111,7 @@
 
 ## 3. ביטול רשומה לא באמת משחרר את התקופה
 
-**חומרה: גבוהה**
+**חומרה: גבוהה — תוקן ב-30 ביולי 2026** (`6b15bc04`)
 
 ### מה קורה?
 
@@ -121,49 +125,88 @@
 
 לאחר ביטול רשומה, המשתמש עדיין לא יכול ליצור רשומה חדשה לאותה תקופה או שנה. מבחינתו הביטול לא באמת שחרר את המקום.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-בדיקת הקיום בשירות צריכה להשתמש בדיוק באותו כלל כמו האינדקס במסד הנתונים:
+השאלה "האם התקופה תפוסה?" הופרדה מהשאלה "איזו שורה התקופה מציגה?", ושתיהן קיבלו שאילתה בשם ב-`obligation_chain.py`:
 
-- הרשומה לא מחוקה.
-- הרשומה היא רשומה מקורית ולא תיקון.
-- הסטטוס אינו `canceled`.
+- `select_slot_occupant` — ה-predicate של האינדקס החלקי, מילה במילה: לא מחוקה, לא תיקון, לא `canceled`. **השאילתה היחידה ששער יצירה רשאי לשאול.** נבנית עם `include_superseded=True` במכוון, כי מקור שהוחלף כן ממשיך להחזיק את הסלוט שלו.
+- `select_current_obligation` — השורה התפעולית: ממוינת ולא מסוננת, כך שרשומות מבוטלות נדחקות לסוף אבל אינן נעלמות, ותקופה שכל שורותיה מבוטלות עדיין מוצגת כמבוטלת. המיון נושא משקל: `.first()` בלי מיון בחר לפי תוכנית השאילתה — sequential scan החזיר את המבוטלת, index scan את החיה.
 
-יש להוסיף בדיקה לכל תחום: יצירה, ביטול, ואז יצירה מחדש לאותה תקופה.
+שני שערי היצירה בשלושת התחומים, שתי לולאות ה-onboarding sync ו-`_generate_year_for_client` הועברו לשאלת הסלוט. `AdvancePaymentRepository.exists_for_period` נמחקה במקום לתקן אותה — שני הקוראים שלה היו שערי יצירה, ולכן היא הפכה ל-`get_slot_occupant_for_period` ושלושת התחומים שואלים אותו דבר.
+
+אין שינוי סכימה ואין שינוי חוזה: האינדקסים היו נכונים מלכתחילה.
 
 ### מיקום בקוד
 
-- `backend/app/vat/services/vat_intake_service.py:63`
-- `backend/app/advance_payments/services/advance_payment_service.py:488`
-- `backend/app/annual_reports/services/annual_report_create_service.py:83`
+- `backend/app/common/obligation_chain.py` — `select_slot_occupant`, `select_current_obligation`
+- `backend/app/vat/services/vat_intake_service.py`
+- `backend/app/advance_payments/services/advance_payment_service.py`
+- `backend/app/annual_reports/services/annual_report_create_service.py`
+- `backend/tests/common/test_obligation_slot_occupancy.py`
 
-## 4. דוח הציות למע"מ מאבד את המידע שהדיווח המקורי היה באיחור
+## 4. האיחור של התקופה נמחק בהגשת התיקון, ודוח הציות מחשב אותו מחדש במקום לקרוא אותו
 
-**חומרה: גבוהה**
+**חומרה: גבוהה** — נחקר לעומק ב-30 ביולי 2026 ונמצא שהם **שני באגים**, לא אחד. התיקון שהומלץ כאן במקור (לקרוא את `chain_closed_late` בדוח) לא היה פותר את הבעיה בפני עצמו, כי הערך כבר NULL בשלב שבו הדוח קורא אותו.
 
-### מה קורה?
+### 4a. `chain_closed_late` נדרס ל-NULL כשהתיקון מוגש
 
-כאשר דיווח מקורי הוגש באיחור ולאחר מכן נוצר עבורו תיקון, האיחור המקורי צריך להישמר ברמת כל השרשרת.
+`link_amendment` מעביר את האיחור של התקופה אל התיקון בזמן הלידה, וזה עובד. אבל בהגשת התיקון, `record_closing_lateness` כותב את **שני** השדות ללא תנאי:
 
-לשם כך נוסף השדה `chain_closed_late`. אבל דוח הציות למע"מ לא קורא את השדה הזה. במקום זאת הוא מנסה לחשב מחדש את האיחור לפי תאריך היעד של הרשומה האחרונה.
+```python
+record.closed_late = closed_late
+record.chain_closed_late = closed_late
+```
 
-לתיקון אין תאריך יעד, ולכן הדוח מדלג עליו ולא סופר אותו לא כדיווח בזמן ולא כדיווח באיחור.
+לתיקון אין תאריך יעד (D-14), ולכן `compute_closed_late(closed_at, None)` מחזיר `None` — והשורה השנייה מוחקת את מה שהועבר בלידה.
+
+הבעיה בשלושת התחומים, ושניים מהם אפילו לא עוברים דרך ה-helper אלא בונים dict ידנית (`update_fields["chain_closed_late"]` בדוחות שנתיים, `fields["chain_closed_late"]` במקדמות) — ולכן תיקון ב-helper בלבד לא יסגור אותם.
+
+### 4b. הדוח משחזר את האיחור במקום לקרוא אותו
+
+שאילתת הדוח מביאה `closed_at` ו-`due_date_effective` ולא את שדות האיחור כלל, והדוח משווה ביניהם. `deadline is None` → `continue`, והתקופה אינה נספרת לא כדיווח בזמן ולא כדיווח באיחור.
+
+זו גם הפרה של D-20 עצמו, גם בלי תיקונים: האיחור הוא עובדה שנכתבת פעם אחת בסגירה, ואסור לגזור אותו מקריאה מאוחרת של תאריך יעד.
+
+### מה מוכיח את זה
+
+repro על תקופה `2026-01` (מע"מ), מול הענף כפי שהוא:
+
+```
+ORIGINAL       due=2026-02-16  closed_at=2026-07-30  closed_late=True  chain=True
+amend          201
+AT BIRTH       amendment due=None  closed_late=None  chain=True      ← הועבר נכון
+REPORT (open)  expected=1 filed=0 on_time=0 late=0 rate=0.00
+AFTER FILING   amendment closed_late=None  chain=None                ← ★ נמחק
+REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
+```
 
 ### מה המשמעות למשתמש?
 
-נתוני הציות יכולים להיות שגויים. דיווח שבוצע באיחור עשוי להיעלם מספירת האיחורים לאחר שהוגש לו תיקון.
+- דיווח שבוצע באיחור נעלם מספירת האיחורים אחרי שהוגש לו תיקון. `on_time_count + late_count` קטן מ-`periods_filed` ואף בדיקה לא נכשלת.
+- הנזק אינו בדוח בלבד. ב-Frontend `chain_closed_late` הוא הקורא היחיד של העובדה הזו, בכרטיסי המקדמות — badge "שולם באיחור" פשוט נעלם אחרי תיקון. הוא אינו הופך לירוק שקרי, כי `timing_status` יוצא `not_applicable` בהיעדר תאריך יעד, אבל המידע אבד גם ב-UI.
+- ב-Backend אין היום שום קורא של `chain_closed_late` מלבד ה-DTOs. הצרכן הלוגי היחיד הוא דוח הציות, והוא לא קורא אותו — כלומר העמודה שנוספה ב-W4 היא כרגע write-only.
 
 ### מה צריך לתקן?
 
-- להחזיר את `chain_closed_late` בשאילתת דוח הציות.
-- להשתמש בו כמקור האמת לגבי האיחור של התקופה.
-- עבור מידע ישן, אפשר להשתמש ב-`closed_late` כערך חלופי.
-- להוסיף בדיקה שמגישה דיווח באיחור, יוצרת ומגישה תיקון, ומוודאת שהתקופה עדיין נספרת באיחור.
+1. `record_closing_lateness` — לכתוב `chain_closed_late` רק כשלשורה יש תשובה משל עצמה; על תיקון לא לגעת בערך שהועבר בלידה. לנתב את הדוחות השנתיים והמקדמות דרך ה-helper במקום dict ידני, אחרת הגבול נשבר שוב.
+2. שאילתת הדוח — להביא `chain_closed_late` ו-`closed_late`, ולסווג `late = chain_closed_late if not None else closed_late`. להוציא את `due_date_effective` מהסיווג לחלוטין. `continue` רק כששניהם NULL, כלומר תקופה שמעולם לא היה לה תאריך יעד.
+3. seed — ה-builders כותבים `closed_late` בלבד ולא `chain_closed_late`, ולכן בכל נתוני ה-seed הערך NULL. ה-fallback ל-`closed_late` הוא חובה ולא נוחות, ועדיף שה-seed יקרא ל-helper המשותף.
+4. בדיקות — הגשה באיחור → יצירת תיקון → הגשת התיקון → התקופה עדיין נספרת באיחור. ובנוסף אינווריאנטה: `on_time_count + late_count == periods_filed`, למעט תקופות בלי תאריך יעד. היום אין ולו בדיקה אחת שמזכירה את `chain_closed_late`.
+
+### שאלה פתוחה — לא באג, חוסר החלטה
+
+כל עוד התיקון פתוח, `periods_filed` יורד מ-1 ל-0 ואחוז הציות מ-100% ל-0% (ראו את שורת `REPORT (open)` ב-repro): תקופה שהמשרד **כן** הגיש נקראת כלא-מוגשת. זה נובע מ-D-12 (השרשרת = שורה אחת = הראש) שפוגש `filed_case = status == SUBMITTED`. אין לזה D-number, וצריך להכריע: או שהראש קובע כפי שקורה היום, או ש"הוגש" נמדד ברמת השרשרת.
 
 ### מיקום בקוד
 
-- `backend/app/vat/repositories/vat_compliance_repository.py:52`
-- `backend/app/reports/vat_compliance_report.py:31`
+- `backend/app/common/obligation_chain.py` — `record_closing_lateness`, `link_amendment`
+- `backend/app/common/obligation_closing.py` — `compute_closed_late`
+- `backend/app/vat/repositories/vat_work_item_write_repository.py` — `mark_filed`
+- `backend/app/annual_reports/services/annual_report_status_service.py` · `backend/app/advance_payments/services/advance_payment_service.py` — שני העוקפים
+- `backend/app/vat/repositories/vat_compliance_repository.py` — `get_filed_items_for_clients`
+- `backend/app/reports/vat_compliance_report.py` — סיווג on-time/late
+- `backend/app/seed/builders/demo/{vat,reports,advance_payments}.py`
+- `frontend/src/features/advancedPayments/components/panel/AdvancePaymentContextCard.tsx` · `.../clientAdvancePayments/ClientAdvancePaymentsCards.tsx`
 
 ## 5. תהליך התיקון ב-Frontend הושלם רק עבור מע"מ
 
@@ -268,12 +311,18 @@
 - לא בוצע reset למסד הנתונים במסגרת review זה.
 - לא נמצאו בדיקות ייעודיות שמכסות את תהליך התיקון המלא בדוחות שנתיים ובמקדמות, או את ההשפעה של תיקונים על כל הסכומים המצטברים.
 
+עדכון 30 ביולי 2026, אחרי תיקוני 1 ו-3:
+
+- `pytest tests/annual_reports tests/common` — 205 עברו, כולל הבדיקה החדשה של העתקת החומר ובדיקות תפוסת הסלוט.
+- `ruff format` ו-`ruff check` על הקבצים שנגעו — נקי.
+- אין ולו בדיקה אחת בכל ה-Backend שמזכירה את `chain_closed_late` (ממצא 4).
+
 ## המלצת סדר תיקון
 
-1. לתקן את העתקת פרטי הדוח השנתי.
+1. ~~לתקן את העתקת פרטי הדוח השנתי.~~ תוקן — ה-detail מועתק לפי `report_id`, עם בדיקה שמכסה את כל טבלאות הילדים.
 2. ~~למנוע מחיקת תיקון פתוח או להחזיר נכון את הרשומה הקודמת.~~ תוקן — מחיקה נחסמה, ונוספה פעולת ביטול תיקון אטומית.
-3. לתקן יצירה מחדש אחרי ביטול.
-4. לתקן את חישוב האיחור בדוח הציות.
+3. ~~לתקן יצירה מחדש אחרי ביטול.~~ תוקן — שערי היצירה שואלים את `select_slot_occupant`, וקריאה תפעולית שואלת את `select_current_obligation`.
+4. לתקן את האיחור: קודם להפסיק למחוק את `chain_closed_late` בהגשת התיקון (4a), ורק אז להסב את דוח הציות לקרוא אותו (4b).
 5. להשלים את תהליך ה-Frontend בכל שלושת התחומים.
 6. להוסיף נעילה ליצירת תיקון מקדמה.
 7. להוסיף בדיקות רגרסיה ולעדכן את מסמכי מקור האמת וההתקדמות.
