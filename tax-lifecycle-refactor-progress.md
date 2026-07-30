@@ -569,6 +569,55 @@ D-22, D-10, D-23. A second index per table, unique on `amends_id`, makes a chain
 a **line rather than a tree** — two corrections of one record would give the
 period two tips and put every aggregate back where D-12 found it.
 
+### The index's rule is not the chain-tip rule, and the creation gates asked the wrong one
+
+Changing the three indexes was not enough to make D-23 true. The gates that decide
+whether a period may be created asked `select_obligations` — the **chain-tip** query
+— and the two predicates are not the same question:
+
+| | predicate |
+|---|---|
+| unique index — *who holds the slot* | `deleted_at IS NULL AND amends_id IS NULL AND status <> 'canceled'` |
+| `select_obligations` — *what a list shows* | `deleted_at IS NULL AND superseded_at IS NULL` |
+
+Both are correct for their own job; the defect was one standing in for the other, and
+it failed in both directions:
+
+- **Cancelled rows blocked creation.** Visible to the chain-tip query, excluded by the
+  index. So the gate returned 409 for a slot the database would have accepted — D-23's
+  returning client could never have the period created fresh. Verified against the dev
+  database: the service pre-check saw the cancelled row while a direct insert succeeded.
+- **Superseded originals were invisible to the gate.** Excluded by the chain-tip query,
+  counted by the index. Reachable only with the amendment also hidden, which
+  `assert_deletable` now prevents — but the gate no longer relies on that, because the
+  failure is an `IntegrityError` surfacing as a **500** rather than a conflict.
+
+Two named queries in `obligation_chain.py` replace the one:
+
+- `select_slot_occupant(...)` — the index predicate restated, and the only query a
+  creation gate may ask. Built with `include_superseded=True` deliberately: seeing the
+  superseded original hold its slot is the point.
+- `select_current_obligation(...)` — the period's operational row, **ordered** rather
+  than filtered: cancelled rows are de-preferred, never hidden, so a period whose only
+  row is cancelled still displays as cancelled.
+
+The ordering is not a tidiness fix. Once a period legitimately holds a cancelled row
+and a live one, an unordered `.first()` picks by query plan, and it genuinely differs —
+under a forced sequential scan the same lookup returned the **cancelled** row where an
+index scan returned the live one. `tests/common/test_obligation_slot_occupancy.py`
+forces both plans.
+
+Call sites moved to slot occupancy: the three creation gates, both onboarding sync
+loops, and `_generate_year_for_client`. `AdvancePaymentRepository.exists_for_period`
+was **deleted** rather than fixed — both its callers were creation gates, so it became
+`get_slot_occupant_for_period` and the three domains now ask the question the same way.
+The advance re-sync branch mattered most: finding a cancelled payment meant re-dating
+an obligation the office had deliberately stopped.
+
+**Cancelling an amendment is a related but separate case**, closed by `withdraw_amendment`
+in the same wave. Excluding cancelled rows from the gates alone would have converted that
+deadlock from a clean 409 into a 500.
+
 ### One way to write the query, and a test that enforces it
 
 `select_obligations(model, *entities, include_deleted=False, include_superseded=False)`
