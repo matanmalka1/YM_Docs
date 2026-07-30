@@ -9,12 +9,23 @@ Source of truth: mandatory
 
 # Frontend Testing
 
-- Choose test scope according to behavioral risk and the surface changed.
-- Batch routine verification at a stable checkpoint after a coherent set of edits. During iteration,
-  use a focused test when it provides useful feedback for the next decision.
-- Run the full suite when the change is broad, shared, risky, or explicitly requested.
+## Test scope
+
+- Default: run the smallest Vitest scope that covers the changed behavior. Escalate only by the rule
+  below — not because a change feels risky.
+- No Vitest run is required for changes that cannot alter tested behavior: copy and message strings,
+  `className` and styling, comments, docs, or a local rename that changes no exported signature.
+  Typecheck and lint cover those.
+- Run `npm run test` (full Vitest suite) only when the change alters the behavior or exported
+  signature of a module under `src/utils/`, `src/ui/`, routing, or auth — or when it is explicitly
+  requested. Importing or consuming one of those modules is not a trigger.
+- The verification checkpoint is the end of the task, not the gap between edits. During iteration run
+  a focused test only when its result changes the next decision.
 - Do not claim tests passed unless they were run in the current task.
 - See `docs/frontend/commands.md` for the canonical frontend test commands.
+
+## Writing tests
+
 - Frontend tests use Vitest and live beside the code as `*.test.ts`, `*.test.tsx`, `*.spec.ts`, or
   `*.spec.tsx`.
 - Add or update focused tests when changing pure business/display helpers, query-param serialization,
@@ -29,10 +40,12 @@ Source of truth: mandatory
   UI-to-API normalization.
 - Mutation tests should verify the narrow cache update or invalidation behavior when that logic is
   non-trivial.
-- A UI-only visual change does not require a synthetic unit test when browser verification proves the
-  change more directly. Report the browser states and widths checked.
-- Prefer the smallest relevant Vitest scope for focused behavior. Use `npm run test` at the completion
-  checkpoint when shared helpers, shared UI, routing, auth, or cross-feature behavior changed.
+- Those four coverage lists describe a new test for a new surface. When editing an existing surface,
+  cover the aspect that changed; do not expand a passing test into the full matrix because one field,
+  param, or branch moved.
+- A UI-only visual change does not require a synthetic unit test. Verify it in a browser and report
+  the states and widths checked. When no browser is available (see below), report that browser QA was
+  unavailable — do not substitute a unit test for it.
 - If frontend test coverage or required browser tooling is missing for an area, report that honestly
   instead of inventing test results.
 

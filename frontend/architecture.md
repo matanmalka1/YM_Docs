@@ -278,12 +278,11 @@ optimization.
 
 ## Verification
 
-- Select verification that matches the changed surface and batch routine checks at a stable
-  completion checkpoint. Frontend logic changes commonly require typecheck, lint, and the relevant
-  Vitest scope; narrow changes may use a smaller combination when it directly proves correctness.
+- Test scope is owned by `docs/frontend/testing.md`. Do not restate or widen it here.
 - Run `npm run arch:check` when imports, ownership boundaries, or shared components change.
 - Run `npm run build` for routing, build configuration, dependency, or production-bundle changes.
 - Check changed UI in a browser at relevant desktop and mobile widths.
-- Use `npm run check` for broad frontend changes. Use `npm run check:strict` for architecture cleanup
-  or when cross-feature boundaries are part of the task.
+- Use `npm run check:strict` for architecture cleanup or when cross-feature boundaries are part of
+  the task. `npm run check` runs every gate including the full Vitest suite and Knip — reach for it
+  only when the change actually spans those surfaces, not as a default finish move.
 - Do not duplicate UI logic behind wrappers with unclear ownership.
