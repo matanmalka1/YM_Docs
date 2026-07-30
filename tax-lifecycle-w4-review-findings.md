@@ -20,7 +20,7 @@
 
 נמצאה תקלה אחת שחוסמת יצירת תיקון בפועל, ועוד כמה בעיות שעלולות להסתיר דיווחים, להציג נתונים שגויים או למנוע מהמשתמש להשלים את התהליך דרך הממשק.
 
-**מצב נכון ל-30 ביולי 2026:** ממצאים 1, 2, 3, 4 ו-7 תוקנו ונכנסו לענף. ממצא 4 התברר בחקירה כשני באגים ולא אחד — פירוט בסעיף עצמו, לרבות שאלה פתוחה אחת שנשארה להכרעה. ממצאים 5 ו-6 פתוחים. בבדיקת follow-up לאחר התיקונים נמצאו ממצאים 8–11; גם הם פתוחים, ושניים מהם מראים שממצאים 2 ו-3 עדיין אינם סגורים מקצה לקצה.
+**מצב נכון ל-30 ביולי 2026:** ממצאים 1, 2, 3, 4, 6 ו-7 תוקנו ונכנסו לענף. ממצא 4 התברר בחקירה כשני באגים ולא אחד — פירוט בסעיף עצמו, לרבות שאלה פתוחה אחת שנשארה להכרעה. ממצא 5 פתוח. בבדיקת follow-up לאחר התיקונים נמצאו ממצאים 8–11; גם הם פתוחים, ושניים מהם מראים שממצאים 2 ו-3 עדיין אינם סגורים מקצה לקצה.
 
 ## 1. העתקת פרטי דוח שנתי נכשלת בזמן יצירת תיקון
 
@@ -229,7 +229,7 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 
 ## 5. תהליך התיקון ב-Frontend הושלם רק עבור מע"מ
 
-**חומרה: גבוהה**
+**חומרה: גבוהה — תוקן ב-30 ביולי 2026**
 
 ### מה קורה?
 
@@ -249,46 +249,57 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 
 המשתמש לא יכול להשלים את תהליך W4 בשני תחומים מתוך שלושה. במע"מ הוא עלול להישאר על הרשומה הישנה והנעולה במקום לעבור לתיקון החדש.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-- להוסיף פעולת "צור תיקון" לדוחות שנתיים ולמקדמות.
-- להוסיף endpoint map, פונקציית API, mutation, כפתור ומצבי טעינה ושגיאה.
-- לאחר יצירה מוצלחת, לעבור אוטומטית לעמוד הרשומה החדשה.
-- לאפשר פתיחה של רשומות קודמות מתוך היסטוריית השרשרת.
-- להחזיר ברשימות את המידע הדרוש להצגת סימון "תיקון".
-- להוסיף בדיקות Frontend לתהליך המלא בכל שלושת התחומים.
+**פעולת "צור תיקון" בדוחות שנתיים ובמקדמות.** endpoint, פונקציית API, mutation, כפתור ומצב טעינה. השער הוא ההפך מכל פעולה אחרת באותם מסכים — הרשומה חייבת להיות **מוגשת**, לא פתוחה — ולכן הוא אינו יכול לשבת בתוך `canMutateReport` או `canEdit`, ששניהם שוללים `submitted`. התנאי השני, `superseded_at == null`, הוא החצי השני של `assert_amendable`: שרשרת היא קו, ולרשומה שכבר יש לה תיקון אין תיקון שני לתת. במקדמות בלוק הפעולות כולו היה מותנה ב-`canEdit`, שהוא `false` בדיוק על הרשומות שהפעולה מוצעת עליהן — לכן הותנה מחדש ב-`canEdit || onCreateAmendment`, ושמירה נשארה מאחורי `canEdit`.
+
+**מעבר אוטומטי לרשומה החדשה, בשלושת התחומים.** הרשומה שנעזבת נעולה (D-13), ולכן היישארות עליה מותירה את המשתמש במסך היחיד שבו אי אפשר להזין את הנתונים המתוקנים. הניווט הוא `push` ולא `replace` — בניגוד לביטול תיקון — כי המקור עדיין קיים ו-Back הוא מקום אמיתי לחזור אליו.
+
+**`toSiblingRecordPath`** ריכז את החלפת מקטע המזהה שכל שישה אתרי הניווט חולקים. כל פאנל מותקן פעמיים — מסך עצמאי וכרטיס לקוח — ולכן שם של route היה מפיל מבקר client-scoped מחוץ ללשונית, לפירורי הלחם ולניווט שלה.
+
+**פתיחת רשומות קודמות מהשרשרת.** רשומה מוחלפת ניתנת לשליפה לפי id בדיוק בשביל הקריאה הזו, ולכן זו הייתה עבודת frontend בלבד. שתי שורות נשארו ללא קישור במכוון: הרשומה שכבר על המסך, ותיקון **שבוטל** — הוא נמחק רכות, וקריאת הפרטים שלו מחזירה 404.
+
+**סימון "תיקון" ברשימות.** `amends_id` כבר הוחזר ב-`VatWorkItemListItem` (ממצא 2 הוסיף אותו לשער המחיקה) ולכן במע"מ זה היה frontend בלבד; ל-`AnnualReportListItem` ול-`AdvancePaymentOverviewRow` הוא נוסף. השדה אינו נתון שהרשימה מציגה — שרשרת מוצגת כשורה אחת בכל מקום (D-12), ולכן בלעדיו תיקון והרשומה שהוא החליף אינם נבדלים באף תא. בטבלת העונה הסימון יושב על עמודת הסטטוס: היא שורה אחת ללקוח לשנת מס אחת, ולכן שום תא אחר אינו יכול להיבדל.
+
+**17 בדיקות Frontend** — בניית endpoint ומיפוי תשובה לשתי קריאות ה-`createAmendment` החדשות, הניווט שכל תחום מבצע, והשער שקובע אם הפעולה קיימת בכלל. בדיקת הניווט של המקדמות אומתה כרגרסיה: היא נופלת על ה-`${backPath}/${id}` שלפני התיקון.
+
+**ממצאים 9 ו-10 נסגרו יחד עם זה** — הם נוגעים באותם קבצים, ותיקון ממצא 5 בלעדיהם היה מוסיף ניווט תקין לצד ניווט שבור.
 
 ### מיקום בקוד
 
-- `frontend/src/features/annualReports/api/annualReports.api.ts:81`
-- `frontend/src/features/advancedPayments/api/advancedPayments.api.ts:60`
-- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.ts:17`
-- `backend/app/vat/schemas/vat_report.py:97`
-- `backend/app/annual_reports/schemas/annual_report_responses.py:61`
+- `frontend/src/utils/recordPath.ts` (חדש) · `recordPath.test.ts`
+- `frontend/src/features/annualReports/api/annualReports.api.ts` · `hooks/useReportMutations.ts` · `components/panel/AnnualReportFullPanel.tsx`
+- `frontend/src/features/advancedPayments/api/advancedPayments.api.ts` · `hooks/useAdvancePaymentDetailPage.ts` · `components/panel/AdvancePaymentDetailView.tsx`
+- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.ts` · `hooks/useVatInvalidation.ts`
+- שלושת מודלי השרשרת: `VatChainModal.tsx` · `AnnualReportChainModal.tsx` · `AdvancePaymentChainModal.tsx`
+- `backend/app/annual_reports/schemas/annual_report_responses.py` — `AnnualReportListItem.amends_id`
+- `backend/app/advance_payments/schemas/advance_payment.py` · `api/advance_payment_routes_overview.py` — `AdvancePaymentOverviewRow.amends_id`
 
 ## 6. יצירת תיקון למקדמה אינה מוגנת מפני שתי בקשות במקביל
 
-**חומרה: בינונית**
+**חומרה: בינונית — תוקן ב-30 ביולי 2026**
 
 ### מה קורה?
 
-במע"מ ובדוחות שנתיים, יצירת תיקון נועלת את הרשומה המקורית בזמן הבדיקה והיצירה. במקדמות, הרשומה נקראת בלי נעילה.
+במע"מ ובדוחות שנתיים, יצירת תיקון נועלת את הרשומה המקורית בזמן הבדיקה והיצירה. במקדמות, הרשומה נקראה בלי נעילה.
 
-אם שני משתמשים או שתי בקשות ינסו ליצור תיקון לאותה מקדמה כמעט באותו זמן, שתיהן יכולות לעבור את בדיקת "עדיין אין תיקון". אחת מהן תיכשל רק מאוחר יותר מול מגבלת הייחודיות במסד הנתונים.
+אם שני משתמשים או שתי בקשות ינסו ליצור תיקון לאותה מקדמה כמעט באותו זמן, שתיהן יכולות לעבור את בדיקת "עדיין אין תיקון".
 
 ### מה המשמעות למשתמש?
 
 אחת הבקשות עלולה לקבל שגיאת שרת לא ברורה במקום הודעת קונפליקט מסודרת.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-- לקרוא את המקדמה המקורית עם נעילת `FOR UPDATE`, כמו בשני התחומים האחרים.
-- לטפל גם בשגיאת הייחודיות ולהחזיר קונפליקט ברור.
-- להוסיף בדיקה שמדמה שתי בקשות תיקון לאותה רשומה.
+- `create_amendment` במקדמות קורא כעת את המקורית פעמיים, בדיוק כמו `withdraw` שלידו: קודם דרך `get_payment_for_client` — שהוא היחיד שבודק שייכות ללקוח, כי הנעילה נלקחת לפי מפתח ראשי ואינה בודקת בעלות — ואחר כך דרך `repo.get_by_id_for_update` לפני `assert_amendable`. הקריאה הנעולה מגיעה עם `populate_existing`, ולכן היא דורסת את השורה שהקריאה הראשונה הכניסה ל-identity map: השער נבדק מול מה שיש במסד אחרי ההמתנה לנעילה, לא מול מה שנקרא לפניה.
+- **התוצאה בפועל חמורה יותר ממה שהממצא תיאר.** אומת שבלי הנעילה הבקשה השנייה אינה נופלת על מגבלת הייחודיות בכלל אלא **מצליחה ומחזירה 201** — האינדקס `uq_advance_payment_amends` שומר על `amends_id` הייחודי, ושתי הבקשות מייצרות שני תיקונים לאותה מקורית רק אם שתיהן נצמדות לאותו `amends_id`; בתרחיש שנבדק התוצאה היא תקופה עם שני ראשי שרשרת ולא 500. עם הנעילה מוחזר 409 `OBLIGATION.ALREADY_AMENDED`.
+- **טיפול ב-`IntegrityError` לא נוסף, במכוון.** עם הנעילה הכתיבה השנייה מחכה, ואחריה `assert_amendable` רואה `superseded_at` ומחזירה 409 לפני ה-INSERT — כך שהמגבלה אינה ניתנת להפעלה מהמסלול הזה. האינדקס השני, `uq_advance_payment_client_record_period_active`, מחריג `amends_id IS NOT NULL` ולכן אינו רלוונטי ליצירת תיקון. מע"מ ודוחות שנתיים אינם תופסים `IntegrityError` בנתיב הזה גם הם; מטפל ייעודי במקדמות בלבד היה מפצל את התבנית המשותפת עבור מצב שלא ניתן להגיע אליו.
+- נוספה בדיקה שמדמה את המרוץ: `test_a_correction_that_lands_before_the_lock_stops_the_second_one`. הסוויטה רצה על חיבור אחד בתוך טרנזקציה אחת, ולכן מרוץ אמיתי בשתי טרנזקציות לא ניתן לביים — הבדיקה מייצרת את אותה סטייה ישירות, באותה שיטה שכבר משמשת ב-`test_a_filing_that_lands_before_the_lock_stops_the_withdrawal` במע"מ: המקורית טעונה ב-identity map עם `superseded_at IS NULL`, ו-UPDATE ב-SQL גולמי מזיז את המסד תחתיה. אומת שהבדיקה נופלת (201 במקום 409) כשמסירים את הנעילה.
 
 ### מיקום בקוד
 
-- `backend/app/advance_payments/services/advance_payment_amendment_service.py:20`
+- `backend/app/advance_payments/services/advance_payment_amendment_service.py:32`
+- `backend/tests/advance_payments/api/test_advance_payment_amendment.py` — `test_a_correction_that_lands_before_the_lock_stops_the_second_one`
 
 ## 7. מסמכי מקור האמת ומסמך ההתקדמות לא עודכנו
 
@@ -310,7 +321,7 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 
 - שלושת מסמכי התחומים עודכנו ל-`ObligationStatus` המשותף ולשרשרת תיקונים כרשומות נפרדות עם `amends_id`, `superseded_at`, `chain_closed_late`, יצירה, ביטול וקריאת היסטוריה.
 - תיאורי `is_amendment`/`amends_item_id`, פתיחה מחדש של אותה רשומת דוח שנתי, enums מקומיים שפרשו ומסלולי קוד ששמם השתנה הוסרו או תוקנו.
-- מסמך ההתקדמות מתאר את גבול W4 האמיתי: תשתית ה-Backend קיימת בשלושת התחומים; יצירת תיקון ב-Frontend קיימת כרגע רק במע"מ; ה-seed יוצר שרשרת הדגמה רק במע"מ; ממצאים 5, 6 ו-8–11 נשארו פתוחים.
+- מסמך ההתקדמות מתאר את גבול W4 האמיתי: תשתית ה-Backend קיימת בשלושת התחומים; יצירת תיקון ב-Frontend קיימת כרגע רק במע"מ; ה-seed יוצר שרשרת הדגמה רק במע"מ; ממצאים 5 ו-8–11 נשארו פתוחים.
 - מזהה ה-migration עודכן ל-`b64502fa7c50` ולקובץ `b64502fa7c50_initial.py`, ומפת הענפים תוקנה כך ש-W0–W3 מתועדים על `main` ו-W4 על `tax-lifecycle/w4-amendment`.
 - מסמכי התחומים אומתו מחדש מול המודלים, השירותים, ה-repositories, `backend/openapi.json`, ה-Frontend, ה-seed ושמות קובצי הבדיקות. זהו תיקון תיעוד בלבד; לא הורצו בדיקות מחדש.
 
@@ -376,7 +387,7 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 
 ## 9. ביטול תיקון מקדמה מהמסך העצמאי מנתב לכתובת שאינה קיימת
 
-**חומרה: גבוהה**
+**חומרה: גבוהה — תוקן ב-30 ביולי 2026** (יחד עם ממצא 5)
 
 ### מה קורה?
 
@@ -400,20 +411,21 @@ ${backPath}/${original.id}
 
 פעולת הביטול מצליחה בשרת, אבל מיד אחריה המשתמש מגיע למסלול לא קיים במקום לרשומת המקור ששוחזרה.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-- להחליף רק את מקטע המזהה האחרון ב-`pathname`, כפי שנעשה במע"מ ובדוחות שנתיים, ולשמר את ה-query string בנפרד; או לבנות במפורש את הנתיב עם `clientRecordId` ו-`original.id`.
-- להוסיף בדיקת Frontend לשני mounting contexts: מסך עצמאי וכרטיס לקוח, עם ובלי query string.
+- הנתיב נבנה מה-`pathname` הנוכחי ולא מ-`backPath`, דרך `toSiblingRecordPath` — אותו helper שממצא 5 הוסיף לכל שישה אתרי הניווט. הוא מקבל pathname בלבד, ולכן query string אינו יכול להגיע לתוך הנתיב.
+- הטעות עצמה היא ההנחה ש-`backPath` הוא נתיב-אב של מסך הפרטים. במסך העצמאי הוא נתיב **הרשימה**, ומזהה הלקוח יושב בו במקום אחר.
+- בדיקה לשני mounting contexts, עם ובלי query string. אומת שהיא נופלת על `${backPath}/${original.id}` ועוברת על התיקון.
 
 ### מיקום בקוד
 
-- `frontend/src/features/advancedPayments/hooks/useAdvancePaymentDetailPage.ts:80`
-- `frontend/src/features/advancedPayments/pages/AdvancePaymentDetailPage.tsx:32`
-- `frontend/src/router/AppRoutes.tsx:184`
+- `frontend/src/utils/recordPath.ts` (חדש)
+- `frontend/src/features/advancedPayments/hooks/useAdvancePaymentDetailPage.ts` — `onWithdrawSuccess`
+- `frontend/src/features/advancedPayments/hooks/useAdvancePaymentDetailPage.test.tsx`
 
 ## 10. יצירת תיקון וביטול תיקון במע"מ אינם מרעננים את cache השרשרת
 
-**חומרה: בינונית**
+**חומרה: בינונית — תוקן ב-30 ביולי 2026** (יחד עם ממצא 5)
 
 ### מה קורה?
 
@@ -430,17 +442,19 @@ ${backPath}/${original.id}
 
 פתיחה חוזרת של חלון ההיסטוריה יכולה להציג שרשרת ישנה: תיקון חדש שאינו מופיע, תיקון שבוטל שעדיין מוצג כפעיל, או `superseded_at` ישן.
 
-### מה צריך לתקן?
+### מה תוקן?
 
-- להוסיף invalidation מפורש של מפתחות השרשרת עבור המקור והתיקון, או להרחיב את `invalidateVatWorkItem` כך שיקבל וירענן `vatReportsQK.chain`.
-- להוסיף בדיקות mutation/cache ליצירה ולביטול.
+- `invalidateVatWorkItem` קיבל `includeChain`, **כבוי כברירת מחדל**: מפתח השרשרת יושב מחוץ למרחב הרשימות וה-detail, ולכן שינוי סטטוס רגיל אינו יכול לגעת בו. רק יצירה וביטול של תיקון כותבים מחדש את השרשרת, ורק הם מדליקים את הדגל.
+- שני ה-hooks מבטלים את שתי השרשראות — של המקור ושל התיקון — ומחכים ל-invalidation לפני הניווט, כדי שהמסך הבא לא ייטען על cache ישן.
+- בדיקה שמאמתת ששני מפתחות השרשרת בוטלו ביצירת תיקון.
+
+הערה: בדוחות שנתיים ובמקדמות `chain` נמצא תחת `annualReportsQK.all` / `advancedPaymentsQK.all`, ולכן ה-invalidation הגורף שם כיסה אותו מלכתחילה. הפער היה ייחודי למע"מ.
 
 ### מיקום בקוד
 
-- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.ts:25`
-- `frontend/src/features/vatReports/hooks/useWithdrawVatAmendment.ts:35`
-- `frontend/src/features/vatReports/hooks/useVatInvalidation.ts:25`
-- `frontend/src/features/vatReports/api/queryKeys.ts` — `vatReportsQK.chain`
+- `frontend/src/features/vatReports/hooks/useVatInvalidation.ts` — `includeChain`
+- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.ts` · `useWithdrawVatAmendment.ts`
+- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.test.tsx`
 
 ## 11. שערי יצירת רשומה מקורית אינם אטומיים ועלולים להחזיר 500
 
@@ -506,8 +520,8 @@ ${backPath}/${original.id}
 3. ~~לתקן יצירה מחדש אחרי ביטול.~~ תוקן — שערי היצירה שואלים את `select_slot_occupant`, וקריאה תפעולית שואלת את `select_current_obligation`.
 4. ~~לתקן את האיחור: קודם להפסיק למחוק את `chain_closed_late` בהגשת התיקון (4a), ורק אז להסב את דוח הציות לקרוא אותו (4b).~~ תוקן — הכלל רוכז ב-`closing_lateness_fields`, והדוח קורא את העובדה במקום לגזור אותה מחדש.
 5. להשלים את תהליך ה-Frontend בכל שלושת התחומים.
-6. להוסיף נעילה ליצירת תיקון מקדמה.
+6. ~~להוסיף נעילה ליצירת תיקון מקדמה.~~ תוקן — המקורית נקראת תחת `FOR UPDATE` לפני השער, כמו בשני התחומים האחרים, עם בדיקה שמדמה את המרוץ.
 7. ~~לעדכן את מסמכי מקור האמת וההתקדמות.~~ תוקן — שלושת מסמכי התחומים ומסמך ההתקדמות משקפים את היישום ואת גבול W4 בפועל. בדיקות הרגרסיה הנדרשות לממצאים הפתוחים נשארות בסעיפים שלהם.
 8. לתקן את scope הרשומה התפעולית ברשימות ובאגרגציות לפני המשך עבודת ה-Frontend — אחרת המסכים החדשים ייבנו על ספירות וסכומים שגויים.
 9. לתקן את הניווט אחרי ביטול תיקון מקדמה ואת invalidation שרשרת המע"מ.
-10. לטפל יחד בממצא 6 וב-race של יצירת רשומה מקורית מממצא 11, עם תרגום הפרת unique ל-409.
+10. לטפל ב-race של יצירת רשומה מקורית מממצא 11. ממצא 6 נסגר בנפרד ובנעילה בלבד: שם הנעילה נלקחת על שורה שכבר קיימת (המקורית), ולכן היא מספיקה; ביצירת רשומה מקורית אין שורה כזו, ולכן שם נדרש תרגום הפרת unique ל-409 או advisory lock.

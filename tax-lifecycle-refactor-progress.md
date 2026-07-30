@@ -555,7 +555,7 @@ the 2026-07-30 review and follow-up fixes:
 
 | Surface | Landed | Still open |
 |---|---|---|
-| Backend | Create, chain-history and withdraw endpoints in all three domains; chain-tip scopes; slot-occupancy gates; amendment-delete protection; full-copy fix for annual details; chain lateness preservation | Advance-amend concurrency (#6), canceled→fresh operational scoping (#8), and atomic original creation / unique-to-409 handling (#11) |
+| Backend | Create, chain-history and withdraw endpoints in all three domains; chain-tip scopes; slot-occupancy gates; amendment-delete protection; full-copy fix for annual details; chain lateness preservation; the advance amend gate now runs under `FOR UPDATE` like the other two domains (#6) | Canceled→fresh operational scoping (#8) and atomic original creation / unique-to-409 handling (#11) |
 | Frontend | Chain modals and withdrawal flows in all three domains; create-amendment action in VAT | Create-amendment actions in annual reports and advances, VAT post-create navigation/list marking (#5), advance withdrawal navigation (#9), and VAT chain-cache invalidation (#10) |
 | Seed | Chain integrity validation is present; the VAT demo builder creates amendment rows through the shared link/lateness helpers | The 11 seed-local `select()` sites remain explicitly outside the chain-convention test and unaudited one by one |
 | Tests and gates | Backend full suite: **2,362 passed, 1 skipped**; frontend: **51 files / 174 tests passed**; TypeScript, ESLint, architecture, Knip, Ruff, Pyright and OpenAPI sync passed | No regression coverage yet for the open #8–#11 scenarios; see the review findings document |
