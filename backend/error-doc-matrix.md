@@ -66,7 +66,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 |---|---|---|---|
 | POST /vat/work-items | ✓ | ✓ | |
 | PATCH /vat/work-items/{id} | ✓ | | |
-| DELETE /vat/work-items/{id} | ✓ | | |
+| DELETE /vat/work-items/{id} | ✓ | ✓ | |
+| POST /vat/work-items/{id}/withdraw | ✓ | ✓ | |
 | POST /vat/work-items/{id}/invoices | ✓ | ✓ | |
 | PATCH /vat/work-items/{id}/invoices/{invoice_id} | ✓ | ✓ | |
 | DELETE /vat/work-items/{id}/invoices/{invoice_id} | ✓ | | |
@@ -94,11 +95,12 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 |---|---|---|---|
 | POST /annual-reports | ✓ | ✓ | |
 | PATCH /annual-reports/{id} | ✓ | | |
-| DELETE /annual-reports/{id} | ✓ | | |
+| DELETE /annual-reports/{id} | ✓ | ✓ | |
 | POST /annual-reports/{id}/status | ✓ | ✓ | |
 | POST /annual-reports/{id}/transition | ✓ | ✓ | |
 | POST /annual-reports/{id}/submit | ✓ | ✓ | |
 | POST /annual-reports/{id}/amend | ✓ | ✓ | |
+| POST /annual-reports/{id}/withdraw | ✓ | ✓ | |
 | POST /annual-reports/{id}/auto-populate | ✓ | | |
 | POST /annual-reports/{id}/deadline | ✓ | | |
 | POST /annual-reports/{id}/expenses | ✓ | | |
@@ -154,7 +156,8 @@ Legend: ✓ = document this status on the endpoint. Blank = not applicable. `H` 
 | POST /clients/{id}/advance-payments | ✓ | ✓ | |
 | POST /clients/{id}/advance-payments/generate | ✓ | ✓ | |
 | PATCH /clients/{id}/advance-payments/{payment_id} | ✓ | ✓ | |
-| DELETE /clients/{id}/advance-payments/{payment_id} | ✓ | | |
+| DELETE /clients/{id}/advance-payments/{payment_id} | ✓ | ✓ | |
+| POST /clients/{id}/advance-payments/{payment_id}/withdraw | ✓ | ✓ | |
 | POST /clients/{id}/advance-payments/{payment_id}/status | ✓ | | |
 | POST /advance-payments/bulk-generate | ✓ | | |
 
