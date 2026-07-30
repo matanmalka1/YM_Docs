@@ -20,7 +20,7 @@
 
 נמצאה תקלה אחת שחוסמת יצירת תיקון בפועל, ועוד כמה בעיות שעלולות להסתיר דיווחים, להציג נתונים שגויים או למנוע מהמשתמש להשלים את התהליך דרך הממשק.
 
-**מצב נכון ל-30 ביולי 2026:** ממצאים 1, 2, 3 ו-4 תוקנו ונכנסו לענף. ממצא 4 התברר בחקירה כשני באגים ולא אחד — פירוט בסעיף עצמו, לרבות שאלה פתוחה אחת שנשארה להכרעה. ממצאים 5, 6 ו-7 פתוחים.
+**מצב נכון ל-30 ביולי 2026:** ממצאים 1, 2, 3 ו-4 תוקנו ונכנסו לענף. ממצא 4 התברר בחקירה כשני באגים ולא אחד — פירוט בסעיף עצמו, לרבות שאלה פתוחה אחת שנשארה להכרעה. ממצאים 5, 6 ו-7 פתוחים. בבדיקת follow-up לאחר התיקונים נמצאו ממצאים 8–11; גם הם פתוחים, ושניים מהם מראים שממצאים 2 ו-3 עדיין אינם סגורים מקצה לקצה.
 
 ## 1. העתקת פרטי דוח שנתי נכשלת בזמן יצירת תיקון
 
@@ -319,6 +319,159 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 - `docs/domains/annual-reports.md:145`
 - `docs/tax-lifecycle-refactor-progress.md:17`
 
+## 8. ביטול ויצירה מחדש משאירים שתי רשומות תפעוליות ברשימות ובאגרגציות
+
+**חומרה: גבוהה**
+
+### מה קורה?
+
+תיקון ממצא 3 מאפשר כעת מצב חוקי לפי D-23: רשומה ישנה באותה תקופה נמצאת ב-`canceled`, ולאחריה נוצרת רשומה מקורית חדשה ופעילה.
+
+`select_current_obligation` בוחר נכון את הרשומה הפעילה בקריאה נקודתית. אבל `select_obligations`, שעליו מבוססות הרשימות, הספירות והסכומים, מסנן רק:
+
+- `deleted_at IS NULL`
+- `superseded_at IS NULL`
+
+גם הרשומה המבוטלת וגם הרשומה החדשה עונות על שני התנאים. לכן שתיהן נכנסות לכל קריאה רחבה, אף שלתקופה אמורה להיות רשומה תפעולית אחת.
+
+התוצאה מופיעה בשלושת התחומים:
+
+- סיכומי מע"מ סוכמים את שתי הרשומות ומגדילים את `periods_count`.
+- KPI של מקדמות סוכמים את הסכום הצפוי והסכום ששולם של שתיהן.
+- סיכום עונת הדוחות השנתיים סופר את אותו לקוח ושנת מס פעמיים, בסטטוסים שונים.
+- דוח הציות במע"מ יכול לספור שתי תקופות צפויות עבור חודש אחד. אם החדשה הוגשה והישנה מבוטלת, הדוח עשוי להציג `1 מתוך 2` ו-50% במקום `1 מתוך 1` ו-100%.
+
+אותו פער קיים ב-Frontend: שלושת חלונות השרשרת מציגים badge של "נוכחי" לכל רשומה שאינה משוכה וש-`superseded_at` שלה NULL. לאחר `canceled → create fresh`, גם הרשומה המבוטלת וגם החדשה מסומנות כנוכחיות.
+
+### מה המשמעות למשתמש?
+
+- רשומות כפולות ברשימות עבור אותה תקופה או שנת מס.
+- סכומי מע"מ ומקדמות שגויים.
+- ספירות סטטוס ו-KPI שגויות.
+- שיעור ציות מע"מ שגוי.
+- שתי רשומות שמוצגות בו-זמנית כ"נוכחיות" בהיסטוריה.
+
+### מה צריך לתקן?
+
+- להגדיר scope משותף של "הרשומה התפעולית לכל תקופה": להעדיף רשומה שאינה מבוטלת; אם אין כזו, לבחור את הרשומה המבוטלת האחרונה.
+- להשתמש ב-scope הזה בכל הרשימות, הספירות והאגרגציות שמציגות מצב נוכחי.
+- להשאיר את `select_chain` כקריאת היסטוריה שמחזירה את כל הניסיונות; אסור לפתור את הבעיה באמצעות הסתרה גורפת של רשומות מבוטלות, כי תקופה שיש לה רק רשומה מבוטלת עדיין צריכה להיות מוצגת.
+- לקבוע את badge ה"נוכחי" לפי הרשומה התפעולית שנבחרה, ולא לפי `superseded_at == null` בלבד.
+- להוסיף בדיקות לכל שלושת התחומים עבור `canceled → create fresh`, כולל רשימה, ספירה, סכום ושרשרת.
+
+### מיקום בקוד
+
+- `backend/app/common/obligation_chain.py:95` — `chain_tip_clause`
+- `backend/app/common/obligation_chain.py:111` — `select_obligations`
+- `backend/app/common/obligation_chain.py:202` — `select_current_obligation`
+- `backend/app/vat/repositories/vat_client_summary_repository.py:120`
+- `backend/app/vat/repositories/vat_compliance_repository.py:19`
+- `backend/app/advance_payments/repositories/advance_payment_aggregation_repository.py:259`
+- `backend/app/annual_reports/repositories/annual_report_report_lifecycle_repository.py:117`
+- `frontend/src/features/vatReports/components/shared/VatChainModal.tsx:53`
+- `frontend/src/features/annualReports/components/shared/AnnualReportChainModal.tsx:54`
+- `frontend/src/features/advancedPayments/components/panel/AdvancePaymentChainModal.tsx:63`
+
+## 9. ביטול תיקון מקדמה מהמסך העצמאי מנתב לכתובת שאינה קיימת
+
+**חומרה: גבוהה**
+
+### מה קורה?
+
+לאחר ביטול תיקון מקדמה, `useAdvancePaymentDetailPage` מנווט אל:
+
+```text
+${backPath}/${original.id}
+```
+
+במסך העצמאי `backPath` הוא `/tax/advance-payments${location.search}`. אבל נתיב הפרטים הרשום ב-router הוא:
+
+```text
+/tax/advance-payments/:clientId/:paymentId
+```
+
+לכן, ללא query string, הניווט הוא אל `/tax/advance-payments/:originalId` וחסר בו `clientId`. עם query string, מזהה המקור אף משורשר אחרי ה-query ונוצרת כתובת משובשת.
+
+במסך המקדמות שבתוך כרטיס הלקוח ה-`backPath` שונה ולכן המסלול הזה עשוי לעבוד; הכשל הוא במסך העצמאי.
+
+### מה המשמעות למשתמש?
+
+פעולת הביטול מצליחה בשרת, אבל מיד אחריה המשתמש מגיע למסלול לא קיים במקום לרשומת המקור ששוחזרה.
+
+### מה צריך לתקן?
+
+- להחליף רק את מקטע המזהה האחרון ב-`pathname`, כפי שנעשה במע"מ ובדוחות שנתיים, ולשמר את ה-query string בנפרד; או לבנות במפורש את הנתיב עם `clientRecordId` ו-`original.id`.
+- להוסיף בדיקת Frontend לשני mounting contexts: מסך עצמאי וכרטיס לקוח, עם ובלי query string.
+
+### מיקום בקוד
+
+- `frontend/src/features/advancedPayments/hooks/useAdvancePaymentDetailPage.ts:80`
+- `frontend/src/features/advancedPayments/pages/AdvancePaymentDetailPage.tsx:32`
+- `frontend/src/router/AppRoutes.tsx:184`
+
+## 10. יצירת תיקון וביטול תיקון במע"מ אינם מרעננים את cache השרשרת
+
+**חומרה: בינונית**
+
+### מה קורה?
+
+`invalidateVatWorkItem` מרענן רשימות, detail, חשבוניות, audit וסיכומי לקוח, אבל אינו מרענן את `vatReportsQK.chain(id)`.
+
+גם `useCreateVatAmendment` וגם `useWithdrawVatAmendment` משתמשים ב-helper הזה בלבד. לכן שרשרת שכבר נטענה יכולה להישאר ב-cache אחרי:
+
+- יצירת תיקון חדש.
+- ביטול תיקון ושחזור המקור.
+
+בשני התחומים האחרים הביטול מרענן את כל מרחב המפתחות של התחום, ולכן השרשרת מכוסה.
+
+### מה המשמעות למשתמש?
+
+פתיחה חוזרת של חלון ההיסטוריה יכולה להציג שרשרת ישנה: תיקון חדש שאינו מופיע, תיקון שבוטל שעדיין מוצג כפעיל, או `superseded_at` ישן.
+
+### מה צריך לתקן?
+
+- להוסיף invalidation מפורש של מפתחות השרשרת עבור המקור והתיקון, או להרחיב את `invalidateVatWorkItem` כך שיקבל וירענן `vatReportsQK.chain`.
+- להוסיף בדיקות mutation/cache ליצירה ולביטול.
+
+### מיקום בקוד
+
+- `frontend/src/features/vatReports/hooks/useCreateVatAmendment.ts:25`
+- `frontend/src/features/vatReports/hooks/useWithdrawVatAmendment.ts:35`
+- `frontend/src/features/vatReports/hooks/useVatInvalidation.ts:25`
+- `frontend/src/features/vatReports/api/queryKeys.ts` — `vatReportsQK.chain`
+
+## 11. שערי יצירת רשומה מקורית אינם אטומיים ועלולים להחזיר 500
+
+**חומרה: בינונית**
+
+### מה קורה?
+
+ביצירת מע"מ, דוח שנתי או מקדמה השירות מבצע שתי פעולות נפרדות:
+
+1. `select_slot_occupant` כדי לבדוק שהתקופה פנויה.
+2. `INSERT` של הרשומה החדשה.
+
+אין נעילה או מנגנון אחר שמסדר שתי יצירות לאותה תקופה, ואין טיפול ב-`IntegrityError` של האינדקס הייחודי. שתי בקשות מקבילות יכולות לראות סלוט פנוי; אחת תצליח והשנייה תיכשל מול האינדקס ותגיע ל-`database_exception_handler`, שמחזיר 500.
+
+זה אינו ממצא 6: ממצא 6 עוסק ביצירת **תיקון מקדמה**. הממצא הזה עוסק ביצירת **רשומה מקורית** בשלושת התחומים.
+
+### מה המשמעות למשתמש?
+
+בקשה מתחרה מקבלת "שגיאה לא צפויה" במקום 409 ברור שמסביר שהתקופה כבר נתפסה.
+
+### מה צריך לתקן?
+
+- לתרגם הפרת unique רלוונטית ל-`ConflictError` בתוך savepoint, כך שה-session יישאר שמיש; או לסדר את היצירות באמצעות נעילת האב או advisory lock.
+- להשאיר את `select_slot_occupant` כהודעת conflict מוקדמת, אך לא לסמוך עליו כהגנה מפני race.
+- להוסיף בדיקות עם שני sessions לכל שלושת התחומים.
+
+### מיקום בקוד
+
+- `backend/app/vat/services/vat_intake_service.py:66`
+- `backend/app/annual_reports/services/annual_report_create_service.py:85`
+- `backend/app/advance_payments/services/advance_payment_service.py:497`
+- `backend/app/core/exception_handlers.py:76`
+
 ## בדיקות שבוצעו במהלך הבדיקה
 
 - שלושת הענפים היו נקיים לפני יצירת מסמך זה.
@@ -336,6 +489,14 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 - `ruff format` ו-`ruff check` על הקבצים שנגעו — נקי.
 - אין ולו בדיקה אחת בכל ה-Backend שמזכירה את `chain_closed_late` (ממצא 4).
 
+עדכון follow-up לאחר תיקוני 1–4:
+
+- סוויטת Backend מלאה — 2,362 עברו, 1 דולגה.
+- בדיקות הרגרסיה החדשות של ממצא 4 — 6 עברו.
+- Frontend — 51 קובצי בדיקה ו-174 בדיקות עברו.
+- TypeScript, ESLint, בדיקות הארכיטקטורה, Knip, Ruff, Pyright וסנכרון OpenAPI עברו.
+- ההצלחות אינן מכסות את ממצאים 8–11: אין בדיקה לרשימות ולאגרגציות אחרי `canceled → create fresh`, לניווט אחרי ביטול מקדמה, לרענון cache השרשרת במע"מ או לשתי יצירות מקור מקבילות.
+
 ## המלצת סדר תיקון
 
 1. ~~לתקן את העתקת פרטי הדוח השנתי.~~ תוקן — ה-detail מועתק לפי `report_id`, עם בדיקה שמכסה את כל טבלאות הילדים.
@@ -345,3 +506,6 @@ REPORT (filed) expected=1 filed=1 on_time=0 late=0 rate=100.00
 5. להשלים את תהליך ה-Frontend בכל שלושת התחומים.
 6. להוסיף נעילה ליצירת תיקון מקדמה.
 7. להוסיף בדיקות רגרסיה ולעדכן את מסמכי מקור האמת וההתקדמות.
+8. לתקן את scope הרשומה התפעולית ברשימות ובאגרגציות לפני המשך עבודת ה-Frontend — אחרת המסכים החדשים ייבנו על ספירות וסכומים שגויים.
+9. לתקן את הניווט אחרי ביטול תיקון מקדמה ואת invalidation שרשרת המע"מ.
+10. לטפל יחד בממצא 6 וב-race של יצירת רשומה מקורית מממצא 11, עם תרגום הפרת unique ל-409.
