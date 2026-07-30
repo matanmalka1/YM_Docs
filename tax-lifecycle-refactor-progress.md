@@ -14,7 +14,8 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-29 (W4 in progress — backend landed, frontend open).
+Last updated: 2026-07-30 (W4 in progress — backend landed, frontend open. W3's assignee gate was
+found to have no UX route; recorded as a W3 follow-up, planned, not started).
 
 # Tax Lifecycle Refactor — Progress
 
@@ -281,6 +282,137 @@ note · cancel); annual status panel gains the assignee selector.
 3. **`docs/domains/annual-reports.md` still describes pre-W2 statuses** in several
    lifecycle paragraphs (`pending_client`, `in_preparation`, `amend_report`). W3
    updated only the closing/locking content; the rest is recorded doc debt for W10.
+
+### W3 follow-up — the shared gate has no UX route in two of three domains
+
+**Status: found 2026-07-30 from a reported failure. Planned, not started. No code, DB or
+doc-behaviour change has been made.** Recorded here rather than in a new document because
+W3 is what introduced the gate and left two domains unable to satisfy it.
+
+**The report.** `POST /api/v1/vat/work-items/1/file` → 400 `VAT.ASSIGNEE_REQUIRED`. Not a
+defect in the gate: the record was `awaiting_verification` with `net_vat = 8318.75` and
+`assigned_to = NULL`, the actor was an advisor, and the rejection was the gate working. The
+failed request wrote nothing — status unchanged, no `closed_at` / `closed_by`, no
+`vat_work_item.filed` audit row.
+
+**What is actually wrong.** The gate is server-side only. The UI offers the action, the user
+fills the filing dialog, and the rejection arrives last. `available_actions` publishes
+`file_vat_return` on role + status alone (`app/actions/services/vat_report_actions.py`) — by
+design, since an action list answers *is this transition legal for this role and status*,
+while readiness answers *can it actually complete*. The two must not be merged; the UI has
+to consume both. It consumes only the first.
+
+**Per domain, as of 2026-07-30:**
+
+| Domain | Assign at create (UI) | Assign after create (UI) | Readiness in UI | Result |
+|---|---|---|---|---|
+| VAT | no | **no** | **no** | button offered, then 400 |
+| Annual reports | no | yes (status panel selector, W3) | manual toggle only | resolvable, but an early submit still 400s |
+| Advance payments | no | **no** | auto-loaded | close correctly blocked, with **no way to clear the block** |
+
+Two different dead ends: VAT lets the user act and fails; advances state the missing
+assignee and offer no control that can supply one.
+
+**The scale, from the dev database (seed data, pre-production).** 886 open rows, 866 of them
+unassigned:
+
+| Domain | Open rows | Unassigned | By status |
+|---|---|---|---|
+| VAT | 314 | **312** | 311 of 311 `awaiting_input`, 1 of 1 `awaiting_verification`, **0 of 2 `in_progress`** |
+| Annual reports | 60 | 60 | 59 `awaiting_input`, 1 `awaiting_verification` |
+| Advance payments | 414 | 414 | 295 `awaiting_input`, 38 `input_received`, 63 `in_progress`, 18 `awaiting_verification` |
+
+The two assigned VAT rows are the whole exception — every other open row in every domain has
+no assignee. Every submitted row has one (VAT 251, annual 132, advances
+1242) — but only because the demo seed force-writes `assigned_to = closed_by` at the close
+(`app/seed/builders/demo/{vat,reports,advance_payments}.py`). The seed hides the gap instead
+of exposing it; whether that backfill should be removed is part of this follow-up.
+
+**Backend already has what the fix needs — this is a UX gap, not a missing capability.**
+`PATCH /vat/work-items/{item_id}` accepts `assigned_to` (advisor **and** secretary) and has
+no frontend caller at all. `CreateVatWorkItemPayload` already carries the field; only the
+zod schema and form omit it. Advances accept `assigned_to` on both create and update; only
+the frontend write contracts omit it.
+
+**Assignment permissions are not aligned across the three domains** — a separate finding,
+not a consequence of the above:
+
+| Domain | Assignment route | Roles |
+|---|---|---|
+| VAT | `PATCH /vat/work-items/{id}` | advisor + secretary, explicit |
+| Annual | `PATCH /annual-reports/{id}` | **no `require_role`** — implicitly both |
+| Advances | `PATCH /clients/{cid}/advance-payments/{id}` | advisor only |
+
+`UserRole` holds only `advisor` and `secretary`, so annual is not a hole today; it is an
+implicit grant that any future role would inherit. Advances conflate *assign* with *amend
+financials* in one advisor-only PATCH, so a secretary cannot assign there at all. Decided
+2026-07-30: the near-term UI shows an advisor-only selector for advances rather than widening
+the financial PATCH; whether assignment is clerical work deserving its own command belongs
+with D-17 in W7.
+
+**Planned fix — the UX move (no response-contract change, plus one explicit role tightening).**
+To run **after W4's frontend closes**, not beside it: it touches the same VAT, advance and
+annual screens W4 is still editing, which is what "branch per wave" exists to prevent.
+
+- VAT — assignee selector via the existing PATCH; render "unassigned" instead of hiding the
+  row (`VatWorkItemMetaStrip` currently omits it entirely when null); disable filing on
+  `assigned_to == null`.
+- Advances — advisor-only assignee selector; make the close button fail-closed. Today
+  `closeBlocked` requires `readiness.data != null`, so while readiness is loading or after it
+  errors the close is enabled. Blocked must mean loading **or** errored **or**
+  `is_ready === false`, with a retry on error.
+- Annual reports — load readiness automatically once the chosen target is `submitted` instead
+  of only on the manual toggle, and block the confirm on not-ready / loading / errored;
+  refresh readiness after a reassignment. Add explicit
+  `require_role(ADVISOR, SECRETARY)` to `PATCH /annual-reports/{id}` — the one backend line in
+  this move, a permission tightening rather than a contract change.
+
+Deliberately **not** in this move: wiring VAT's `/readiness` endpoint into the UI. VAT
+readiness has exactly one reachable gate today (see below), so it would tell the screen
+nothing that `assigned_to` on the record does not already say.
+
+**Closing-contract normalisation — a separate track, and not W5.** W5 is removal and
+reconciliation; readiness changes do not belong in it. These are contract changes, cheap only
+while the system stays pre-production, and they have a mandatory order:
+
+1. **Structured `issues` first — everything else depends on it.** All three domains return
+   `issues: list[str]` of Hebrew prose. A UI can render that; it cannot decide on it, and it
+   must never branch on translated text. Needs a stable key per issue plus whether the issue
+   blocks the action or can be resolved inside the request itself (an override supplied at
+   filing time is the existing example).
+2. `ANNUAL_REPORT.NOT_READY`. Readiness failure currently raises
+   `ANNUAL_REPORT.INVALID_STATUS` — the same code as an illegal transition, so no client can
+   tell "you may not go there" from "you may, but it is not ready". Cost is smaller than it
+   looks: the status stays 400 on an endpoint that already documents 400, so
+   `docs/backend/error-doc-matrix.md`, its coverage test, `openapi.json` and `generated.ts`
+   are all untouched, and the frontend renders the server's Hebrew message rather than
+   mapping codes. What is needed: the enum member, the raise site, the tests that currently
+   assert `INVALID_STATUS`, a test pinning that the two causes differ, and the code list in
+   `docs/domains/annual-reports.md`. `docs/backend/error-codes.md` needs no row — by its own
+   rule the table registers *namespaces*, and `ANNUAL_REPORT` is already registered.
+3. **One readiness source in VAT.** `get_closing_readiness` builds the issue list and
+   `file_vat_return` re-checks the same conditions inline with its own codes — the docstring
+   calls it a mirror. Advances (`_closing_issues`) and annual reports
+   (`_assert_filing_readiness`) each have a single source; VAT is the only domain with two.
+   The fix is **not** for filing to call readiness as it stands: readiness does not receive
+   `override_amount`, so a legitimate override-backed filing would be rejected. It needs a
+   shared internal validator that takes the request context, e.g.
+   `closing_issues(item, override_amount)`.
+
+**The convergence model already exists in the repo — annual reports.** Two independent axes,
+and only one domain is right on both:
+
+| Domain | Closing act | Rule source |
+|---|---|---|
+| Annual reports | dedicated `POST /{id}/submit` (in `HEAD`; the frontend routes `submitted` to it and uses `/status` for every other stage) | single |
+| VAT | dedicated `POST /{id}/file` | **duplicated** |
+| Advances | generic `POST /{id}/status` | single |
+
+The shape is shared already — all three readiness responses subclass `ClosingReadiness`
+(`is_ready` + `issues`), annual adding `completion_pct`. Differing gate *content* is
+deliberate and stays: VAT assignee + amount; advances assignee + turnover + a computable
+expected amount (payment in full is not a gate, D-16); annual assignee + required schedules +
+income > 0 + a tax calculation.
 
 ### Mistakes made during execution, and their cost
 
@@ -764,6 +896,10 @@ Recorded because the same shapes will recur in later waves:
 | 11 `select()` sites under `app/seed` still bypass `select_obligations` — carved out of the arch test deliberately, but not audited | W4 (open) |
 | `input_received` is **empty for annual reports** — the gate needs "VAT periods all closed **and** documents received" | W7 |
 | `VAT.CLIENT_CLOSED` is a **fourth fork** of the client-eligibility rule, answering 400 where the shared guard answers 409 | W7 |
+| **W3's assignee gate has no UX route in VAT or advances** — the UI cannot assign, so the gate is unsatisfiable from the product; 866 of 886 open rows across the three domains have no assignee (dev seed data). See "W3 follow-up" above | a focused UX move **after** W4's frontend closes (open) |
+| **The closing contract is not normalised** — `issues` are untyped Hebrew prose, `ANNUAL_REPORT.NOT_READY` does not exist so readiness failure reuses `INVALID_STATUS`, and VAT computes its gate twice. See "W3 follow-up" above | a separate contract track, **not** W5 (open) |
+| **Assignment permissions differ per domain** — VAT advisor + secretary, annual has no `require_role` at all, advances advisor-only via the amend PATCH | explicit role on annual in the UX move; the advances question in W7/D-17 (open) |
+| **A VAT period with no invoices can be filed** — `net_vat` is `NOT NULL DEFAULT 0.00`, so the filing gate's null branch is unreachable and nothing counts invoices | O-10 in the plan — product decision first, no wave until then (open) |
 
 ## Remaining waves
 
@@ -823,3 +959,18 @@ opposite as though it were intended:
 `closed_by = NULL` as correct-by-design when D-5 had already condemned the path. Both
 times an interim state was written down as intent. The general rule: **when a wave
 leaves something unmigrated, name it as unmigrated in the artefact that asserts it.**
+
+**Two items added 2026-07-30, from the W3 follow-up above.** Both are advance-payments-only
+and belong here because they are the same split, reached from the closing side rather than the
+permission side:
+
+- **A dedicated closing command.** Advances are the only domain that closes through the
+  generic status endpoint; VAT has `/file` and annual reports have `/submit`, both in `HEAD`.
+  This is the same conclusion the paragraph above reaches from role expression ("VAT is the
+  model — separate routes per act"), so the split should carry the close, not only the
+  forward steps.
+- **Whether assignment is its own command.** `PATCH /{id}` is advisor-only and correctly so
+  as *amend*, but it is also the only way to set `assigned_to`, so assignment inherits
+  amend's permission. VAT lets a secretary assign; advances cannot. If assignment is clerical
+  work, it needs its own command with `require_role(ADVISOR, SECRETARY)` — the financial
+  PATCH must not be widened to achieve it. Undecided; decide it in W7 with the rest of D-17.

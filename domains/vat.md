@@ -199,6 +199,9 @@ query. `OBLIGATION_STATUS_LABELS` is the single Hebrew vocabulary.
 - `ready-for-review` only accepts `data_entry_in_progress`; `send-back` requires a non-empty correction note and transitions back to `data_entry_in_progress`. Cite: `backend/app/vat/services/data_entry_status.py:17-49`, `backend/app/vat/services/data_entry_status.py:52-90`.
 - Filing requires transition to be allowed by `VALID_TRANSITIONS`, permits optional override only with justification, and writes final filing fields plus generic `EntityAuditLog` entries. If an override amount is supplied, `vat_work_item.amount_overridden` is written before `vat_work_item.filed`; otherwise only `vat_work_item.filed` is written. Cite: `backend/app/vat/services/vat_filing_service.py`.
 - Filing requires `assigned_to` to be non-null; filing an unassigned item raises `VAT.ASSIGNEE_REQUIRED`. Cite: `backend/app/vat/services/filing.py:66-67`.
+- **`GET /work-items/{item_id}/readiness` has exactly one reachable gate: the assignee** (verified 2026-07-30). It checks `assigned_to is None` and `net_vat is None`, but `net_vat` is `Numeric(12,2) NOT NULL DEFAULT 0.00` (`backend/app/vat/models/vat_work_item.py:75`), so for any persisted row the second condition cannot hold. The final-amount branch is therefore unreachable in both paths — as a readiness issue and as the `VAT.MISSING_FINAL_AMOUNT` error at filing. Cite: `backend/app/vat/services/vat_filing_service.py:43-46,80-83`.
+- **A work item with no invoices can be filed** (verified 2026-07-30). Zero is a legitimate VAT figure, but there is no gate on having any data at all, and the state is reachable: adding the first invoice auto-advances to `in_progress`, invoice delete is permitted in every status except `submitted` (`assert_editable` tests only `SUBMITTED`), deleting recalculates the totals back to `0.00` without moving the status back, and neither `ready-for-review` nor `/file` counts invoices. The system cannot distinguish a deliberate no-activity period from an item emptied by mistake, from invoices that offset to zero, from a period nobody has entered yet — and `net_vat == 0` cannot tell them apart either, so any future gate must count invoices. Product decision open as **O-10** in `docs/tax-lifecycle-refactor-plan.md`. Cite: `backend/app/vat/vat_data_entry_common.py:32-35`, `backend/app/vat/services/vat_data_entry_invoices_service.py:153`, `backend/app/vat/services/vat_data_entry_invoice_delete_service.py:58`, `backend/app/vat/services/vat_data_entry_status_service.py:37`.
+- **After creation, `PATCH /work-items/{item_id}` (advisor or secretary) is the only route that sets `assigned_to` — and no frontend caller exists** (verified 2026-07-30). The create request accepts the field too, so a work item *can* be created assigned; the create form does not send it, and the detail screen hides the assignee row when it is null instead of showing "unassigned". The gate above is therefore server-enforced and unsatisfiable from the UI; the planned fix is recorded as the W3 follow-up in `docs/tax-lifecycle-refactor-progress.md`.
 - Generic work-item PATCH is limited to operational metadata: `assigned_to` and `pending_materials_note`. It uses partial-update semantics, so omitted fields are not changed and explicit `null` clears nullable metadata. It does not update status, period, client identity, VAT totals, filing fields, amendment fields, or calendar snapshot fields.
 - Filed work items reject generic metadata PATCH and DELETE with `VAT.FILED_IMMUTABLE`; filed VAT periods are records of filing and must not be hidden through delete.
 - Work-item DELETE is soft delete only for non-filed mistaken obligations: it sets `deleted_at`, `deleted_by`, and `updated_at`, preserves invoices and generic audit history, and writes `vat_work_item.deleted`. Soft-deleted items are excluded from list, lookup, detail, and client-summary query results through existing `deleted_at IS NULL` repository filters.
@@ -235,7 +238,7 @@ The `VAT.REASON` codes this domain raises. Registry: `docs/backend/error-codes.m
 | `VAT.AMENDED_ITEM_WRONG_CLIENT` | 400 via `AppError` | Amended item belongs to a different client record |
 | `VAT.AMENDED_ITEM_NOT_FILED` | 400 via `AppError` | Amended item is not in `filed` status |
 | `VAT.AMENDMENT_CYCLE` | 400 via `AppError` | Amendment chain would create a cycle |
-| `VAT.MISSING_FINAL_AMOUNT` | 400 via `AppError` | `net_vat` is null and no override amount supplied at filing |
+| `VAT.MISSING_FINAL_AMOUNT` | 400 via `AppError` | `net_vat` is null and no override amount supplied at filing. **Unreachable as of 2026-07-30** — the column is `NOT NULL DEFAULT 0.00`, so no persisted row can trigger it. Whether it is replaced by an invoice-count gate or retired is part of O-10 |
 
 Related codes raised from this module but owned by another namespace:
 - `BUSINESS_ACTIVITY.WRONG_CLIENT` — invoice create: activity does not belong to the work item's legal entity. Cite: `backend/app/vat/services/data_entry_invoices.py:88-94`.
@@ -243,7 +246,16 @@ Related codes raised from this module but owned by another namespace:
 
 ## Known issues
 
-No open known issues.
+Found 2026-07-30, all open and unstarted. Described as current behavior above; the planned work
+is tracked in `docs/tax-lifecycle-refactor-progress.md` (W3 follow-up) and `O-10` in
+`docs/tax-lifecycle-refactor-plan.md`.
+
+- **The assignee filing gate cannot be satisfied from the UI.** `available_actions` publishes
+  `file_vat_return` on role and status alone, so the button is offered, the filing dialog is
+  filled, and the 400 arrives last. There is no assignee control on any VAT screen.
+- **The final-amount gate is unreachable**, in readiness and at filing alike.
+- **A period with no invoices can be filed**, and the four ways a period can read as zero are
+  indistinguishable.
 
 ## Resolved issues
 

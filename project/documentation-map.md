@@ -108,6 +108,8 @@ ADRs are accepted architecture decisions. They have the highest precedence when 
 These are active working backlogs, not canonical product behavior. Do not treat them as source of truth for how the system behaves; canonical behavior lives in `docs/domains/*` and the architecture docs.
 
 - `docs/api-todo.md` — active backend/API alignment backlog; tracking only.
+- `docs/tax-lifecycle-refactor-plan.md` — the tax-lifecycle refactor specification (D-1 … D-44, O-1 …, phases P0–P9); tracking only. Current shared-lifecycle behavior lives in `docs/domains/{vat,advance-payments,annual-reports}.md` until D-41's `docs/domains/tax-lifecycle.md` is written in W10.
+- `docs/tax-lifecycle-refactor-progress.md` — what that refactor has shipped wave by wave (W0–W10), decisions taken while executing, defects found, and what is knowingly left open; tracking only, never a source of truth for current behavior.
 
 ## Performance (reference artifacts)
 

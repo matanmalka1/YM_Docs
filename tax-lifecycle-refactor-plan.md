@@ -886,6 +886,7 @@ nothing maintains is a liability, not a feature.
 | ~~O-6~~ | ~~Can a cancelled obligation be revived?~~ **Closed 2026-07-27 by D-23:** terminal, and excluded from the uniqueness rule so a returning client's period can be created fresh. | — | closed |
 | ~~O-8~~ | ~~The six stages have no canonical identifiers.~~ **Closed 2026-07-27 by D-39:** `ObligationStatus` in `app/common/enums.py`, values and migration mapping in §4.1.1. | — | closed |
 | ~~O-9~~ | ~~Does `ReportStage` + `POST /{id}/transition` survive?~~ **Closed 2026-07-27 by D-40:** it retires. Not a product judgement — the layer is dead and lossy. | — | closed |
+| O-10 | **May a VAT period with no invoices be filed, and if so under what record?** Found 2026-07-30: it can be, today, silently. `net_vat` is `NOT NULL DEFAULT 0.00`, so the filing gate's `net_vat is None` branch is unreachable, and neither `ready-for-review` nor `/file` counts invoices. A zero period is a legitimate business outcome, but the system cannot distinguish *a deliberate no-activity period* from *an item emptied by mistake*, *invoices that offset to zero*, and *a period nobody entered yet*. Three candidate answers: allow with an explicit "no activity in period" confirmation recorded in the audit trail (recommended); hard-block and require at least one invoice; leave as is and document. Detection must be invoice-count based — `net_vat == 0` cannot tell the four cases apart. Becomes **D-45** only once the product answer is given; until then it is a question, not a rule. | The gate's content differs per answer, and one answer needs a new request field, an audit action and a UI confirmation step. Also decides whether the unreachable `VAT.MISSING_FINAL_AMOUNT` code is replaced or retired. | unassigned — no wave until decided |
 | O-7 | Under D-24, what removes an obligation created for a span the client was not yet liable in — e.g. a VAT period for 2026-01 on a client registered in 2026-06? The frequency is correct, so reconciliation will not touch it, and the direct delete is gone. Either reconciliation must also consider the client's liability start date, or one narrow removal path must survive. | Leaves a class of wrong obligations with no removal route. | P4, P8 |
 | ~~O-4~~ | ~~Should advance payments keep a money-derived status or gain an explicit lifecycle?~~ **Closed 2026-07-27 by D-7 and D-8:** explicit lifecycle, explicit lock, `partial` retired as a status. | — | closed |
 
@@ -1173,14 +1174,17 @@ Recorded so they are not silently absorbed:
 Everything still outstanding, in one place. The detail lives in the sections referenced; this is the
 list to read when picking up the work.
 
-### 11.1 Open decisions — 2
+### 11.1 Open decisions — 3
 
 | # | Question | Blocks |
 |---|---|---|
+| **O-10** | **May a VAT period with no invoices be filed, and under what record?** Added 2026-07-30. It can be today, silently: `net_vat` is `NOT NULL DEFAULT 0.00`, so the filing gate's null branch is unreachable and nothing counts invoices. Recommended answer: allow, but require an explicit "no activity in period" confirmation written to the audit trail; detect by invoice count, never by `net_vat == 0`. Becomes D-45 when answered. See §6. | unassigned — no wave until decided |
 | **O-1** | **Rollover policy.** Scheduled job, advisor-triggered office-wide generate, or both? Today it is neither reliably: `generate_client_obligations` runs only on client creation and on an obligation-field edit, and there is no scheduler. | P8 |
 | **O-7** | **An obligation created for a span the client was not liable in** — a VAT period for 2026-01 on a client registered in 2026-06. The frequency is correct so reconciliation will not touch it, and D-24 removed the direct delete. Either reconciliation also reads a liability start date, or one narrow removal path survives. | P4, P8 |
 
 Nothing else is undecided. O-2 … O-6, O-8 and O-9 closed as D-39 … D-42, D-21, D-23, D-7/D-8.
+O-10 was opened after the register was first written; the closing-gate findings that surfaced it are
+recorded in the progress doc's W3 follow-up section.
 
 ### 11.2 The frontend — measured, not estimated
 
