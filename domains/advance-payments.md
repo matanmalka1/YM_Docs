@@ -10,11 +10,11 @@ Source of truth: mandatory
 
 # Advance Payments
 
-The advance-payments domain manages periodic tax prepayments (מקדמות מס הכנסה) that Israeli legal entities submit to the Tax Authority on a monthly or bi-monthly basis. Each `AdvancePayment` record belongs to one `ClientRecord`, covers one reporting period (`YYYY-MM`), and tracks expected vs. paid amounts, payment status, and turnover snapshots used for amount calculation.
+The advance-payments domain manages periodic tax prepayments (מקדמות מס הכנסה) that Israeli legal entities submit to the Tax Authority on a monthly or bi-monthly basis. Each `AdvancePayment` record belongs to one `ClientRecord`, covers one reporting period (`YYYY-MM`), tracks expected vs. paid amounts and turnover snapshots, and runs the shared obligation lifecycle independently of its payment balance.
 
 The expected amount formula is: `turnover_amount × advance_rate / 100 = calculated_amount`. An optional `override_amount` replaces `expected_amount` when set.
 
-Last verified against code + backend/openapi.json: 2026-07-26.
+Last verified against code + backend/openapi.json: 2026-07-30 (W4 amendment branch).
 
 ## Endpoints
 
@@ -27,6 +27,11 @@ All paths confirmed present in `backend/openapi.json`.
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments` | Create a single advance payment (ADVISOR only) |
 | `PATCH` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Update payment fields (ADVISOR only) |
 | `DELETE` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}` | Soft-delete a payment (ADVISOR only) |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/status` | Move one lifecycle step; current route is ADVISOR-only for every direction |
+| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/readiness` | Return closing readiness (`is_ready`, blocking `issues`) |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/amend` | Advisor creates a correction record from a submitted chain tip |
+| `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/withdraw` | Advisor withdraws an unsubmitted correction and restores its original |
+| `GET` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/chain` | List the period's correction chain, oldest first, including withdrawn corrections |
 | `GET` | `/api/v1/clients/{client_record_id}/advance-payments/kpi` | Annual KPI aggregates for a client |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/{payment_id}/refresh-turnover` | Snapshot the period's VAT turnover onto the payment and recompute amounts (ADVISOR only) |
 | `POST` | `/api/v1/clients/{client_record_id}/advance-payments/refresh-turnover` | Bulk snapshot for explicitly listed `payment_ids`; filed returns only, non-atomic (ADVISOR only) |
@@ -41,7 +46,7 @@ All paths confirmed present in `backend/openapi.json`.
 | `GET` | `/api/v1/reports/advance-payments` | Reporting export (owned by reports domain) |
 
 **Auth:** All advance-payments routes require `ADVISOR` or `SECRETARY` role; every write (POST, PATCH, DELETE, generate) requires `ADVISOR`. **This is the pre-D-17 state, not the target one** — see Known issues.
-Cite: `backend/app/advance_payments/api/advance_payment_routes.py`, `advance_payment_routes_overview.py`, `advance_payment_routes_generate.py`.
+Cite: `backend/app/advance_payments/api/advance_payment_routes.py`, `backend/app/advance_payments/api/advance_payment_routes_overview.py`, `backend/app/advance_payments/api/advance_payment_routes_generate.py`.
 
 ## Model & fields
 
@@ -54,7 +59,7 @@ Cite: `backend/app/advance_payments/models/advance_payment.py`
 | `client_record_id` | int FK → `client_records.id` | No | operational anchor — never `legal_entity_id` |
 | `period` | String(7) | No | `YYYY-MM` — first month of reporting period |
 | `period_months_count` | int | No | `1` = monthly, `2` = bi-monthly |
-| `due_date` | date | No | legacy compatibility field — usually 15th of month after period (see Future/planned) |
+| `due_date` | date | Yes | legacy deadline field; original obligations populate it, amendments deliberately leave it NULL |
 | `due_date_original` | date | Yes | immutable snapshot set on insert; once written, never changes |
 | `due_date_effective` | date | Yes | effective due date for overdue/reminder logic; source of truth for all overdue checks |
 | `due_date_override_reason` | String(500) | Yes | required when `due_date_effective ≠ due_date_original` |
@@ -62,38 +67,50 @@ Cite: `backend/app/advance_payments/models/advance_payment.py`
 | `paid_amount` | Numeric(10,2) | No | default 0.00 |
 | `turnover_amount` | Numeric(14,2) | Yes | snapshot of turnover at time of record; `NULL` = unknown, not zero |
 | `turnover_source` | `TurnoverSource` enum | Yes | provenance of `turnover_amount`; `NULL` exactly when `turnover_amount` is `NULL` |
-| `turnover_snapshot_at` | datetime | Yes | when `turnover_amount` was frozen; also `NULL` on rows backfilled by migration `8a1c47d0b3e2` |
+| `turnover_snapshot_at` | datetime | Yes | when `turnover_amount` was frozen; may be NULL when no snapshot exists |
 | `advance_rate` | Numeric(5,2) | Yes | snapshot of advance rate at creation; frozen — changes to `LegalEntity.advance_rate` do not affect existing records |
 | `calculated_amount` | Numeric(12,2) | No | `turnover_amount × advance_rate / 100`; derived display value |
 | `override_amount` | Numeric(12,2) | Yes | replaces `expected_amount` when set; wins even over `withheld_amount` |
 | `withheld_amount` | Numeric(12,2) | Yes | withheld-at-source credit (ניכוי במקור); subtracted from `calculated_amount` when deriving `expected_amount`. `NULL` = none entered, treated as zero |
-| `status` | `AdvancePaymentStatus` enum | No | `pending \| paid \| partial` |
+| `status` | shared `ObligationStatus` enum | No | lifecycle stage; not derived from money |
 | `paid_at` | datetime | Yes | actual payment timestamp |
 | `payment_method` | `PaymentMethod` enum | Yes | |
 | `payment_reference` | String(100) | Yes | bank/authority reference (אסמכתה) of the payment, as reported by the client |
 | `annual_report_id` | int FK → `annual_reports.id` | Yes | optional link to annual report |
 | `tax_calendar_entry_id` | int FK → `tax_calendar_entries.id` (RESTRICT) | No | required — links to shared regulatory deadline |
+| `closed_at` / `closed_by` / `closed_late` | datetime / user FK / bool | Yes | closing facts written at `submitted`; `closed_late` is this row's answer |
+| `amends_id` | self FK → `advance_payments.id` | Yes | backward link to the corrected row |
+| `superseded_at` | datetime | Yes | set on a row when its correction is created |
+| `chain_closed_late` | bool | Yes | the period's original lateness, carried across corrections |
 | `notes` | String(500) | Yes | |
 | `created_at` | datetime | No | set on insert |
 | `updated_at` | datetime | Yes | set on update |
 | `deleted_at` | datetime | Yes | soft-delete (via `SoftDeletableMixin`) |
 
-**Indexes:**
-- Partial unique index on `(client_record_id, period) WHERE deleted_at IS NULL` — prevents duplicate periods, allows soft-deleted re-creation.
-- `idx_advance_payment_status`, `idx_advance_payment_due_date`, `idx_advance_payment_period_active`, `idx_advance_payment_calendar_entry_active`.
+There is no stored `is_amendment` flag: `AmendableMixin.is_amendment` derives it from `amends_id`.
 
-Cite: `backend/app/advance_payments/models/advance_payment.py:83-171`.
+**Indexes:**
+- The slot index is unique on `(client_record_id, period)` only for rows that are not deleted, not amendments, and not canceled: `deleted_at IS NULL AND amends_id IS NULL AND status <> 'canceled'`.
+- A partial unique index on `amends_id` prevents a chain from forking.
+- The active-period index uses `deleted_at IS NULL AND superseded_at IS NULL`, matching normal chain-tip reads.
+- Other indexes cover status, due date, client/period, annual-report link, and tax-calendar link.
+
+Cite: `backend/app/advance_payments/models/advance_payment.py:105-239`, `backend/app/common/obligation_chain.py:49-92`.
 
 ## Enums / statuses
 
-**`AdvancePaymentStatus`** (`backend/app/advance_payments/models/advance_payment.py:58-63`):
-| Value | Meaning |
-|-------|---------|
-| `pending` | Not yet paid |
-| `paid` | Paid in full |
-| `partial` | Partially paid |
+Advance payments have no domain-local status enum. They use the shared `ObligationStatus` ladder:
 
-`overdue` is **not** an enum value. It is a computed response field `timing_status` derived from `due_date` and `status` at read time.
+| Stage | Value | Meaning for an advance |
+|---|---|---|
+| 1 | `awaiting_input` | no turnover/payment input yet |
+| 2 | `input_received` | input exists and work can start |
+| 3 | `in_progress` | payment work is under way; this includes part-paid periods |
+| 4 | `awaiting_verification` | ready for an advisor to verify and close |
+| 5 | `submitted` | reported and settled; fully locked |
+| — | `canceled` | terminal cancellation |
+
+`paid in full` is a computed money fact (`is_paid_in_full` / `paid_in_full_expr`), not a lifecycle status. `overdue`, `on_time`, and `not_applicable` are computed `timing_status` values, not enum members; an undated amendment is `not_applicable`.
 
 **`TurnoverSource`** (`backend/app/advance_payments/models/advance_payment.py`):
 | Value | Meaning |
@@ -129,13 +146,13 @@ status enum and one transition graph:
 | 5 | `submitted` | הוגש |
 | — | `canceled` | בוטל (off-ladder, reachable from any unlocked stage) |
 
-Rules, enforced once in `app/common/obligation_lifecycle.py`:
+Rules, enforced once in `backend/app/common/obligation_lifecycle.py`:
 
 - **Forward one stage at a time.** An event may perform consecutive transitions and
   records each; it never skips a stage's meaning.
 - **Backward one stage at a time, always with a reason** (`OBLIGATION.TRANSITION_REASON_REQUIRED`).
 - **`submitted` has no outgoing transition** (`OBLIGATION.LOCKED`). Correcting a
-  submitted obligation takes an amendment, which arrives in a later wave.
+  submitted obligation creates a separate amendment record through `POST /amend`.
 - **Cancel from any unlocked stage**, and `canceled` is terminal.
 
 `RESOLVED_OBLIGATION_STATUSES` = `{submitted, canceled}` is the single answer to
@@ -144,45 +161,45 @@ query. `OBLIGATION_STATUS_LABELS` is the single Hebrew vocabulary.
 
 ## Domain rules & invariants
 
-**Which periods are owed.** `app/common/obligation_plan.py` is the single answer. It is narrowed by the client's configured frequency **and** by that obligation type's liability range on `LegalEntity` — per type, because the types move independently. A period is owed when it *intersects* the range, so a period the client was liable for on any of its days is created in full. NULL on either side is unbounded. See `docs/domains/clients.md` § Liability ranges.
+**Which periods are owed.** `backend/app/common/obligation_plan.py` is the single answer. It is narrowed by the client's configured frequency **and** by that obligation type's liability range on `LegalEntity` — per type, because the types move independently. A period is owed when it *intersects* the range, so a period the client was liable for on any of its days is created in full. NULL on either side is unbounded. See `docs/domains/clients.md` § Liability ranges.
 
 Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 
 - **Client status gate:** Creating a payment goes through the shared client-eligibility guard `assert_client_record_is_active` (`backend/app/clients/guards/client_record_guards.py`), which raises `ConflictError` / `CLIENT_RECORD.CLOSED` (409) for any non-`ACTIVE` client. The guard is an allowlist, so a status added later fails closed. Its SQL twin, `eligible_client_status_expr` (`backend/app/clients/repositories/client_active_scope.py`), scopes office-wide generation and must change together with it. This domain previously re-derived the rule locally and raised 403 `CLIENT.CLOSED` / `CLIENT.FROZEN`.
-- **Frequency validation:** `period_months_count` must match the client's `LegalEntity.advance_payment_frequency`. Mismatch raises `ADVANCE_PAYMENT.FREQUENCY_MISMATCH`. (`advance_payment_service.py:130-135`)
+- **Frequency validation:** `period_months_count` must match the client's `LegalEntity.advance_payment_frequency`. Mismatch raises `ADVANCE_PAYMENT.FREQUENCY_MISMATCH`. (`backend/app/advance_payments/services/advance_payment_service.py`)
 - **Bi-monthly start month and supported frequency:** neither rule is this domain's. Both are enforced once by `TaxCalendarMaterializationService` during materialization — `_validate_period_alignment` raises `TAX_CALENDAR.INVALID_PERIOD_ALIGNMENT` for an even bi-monthly start month, and `_periodic_rule_type` raises `TAX_CALENDAR.INVALID_PERIOD_FREQUENCY` for a `period_months_count` outside `{1, 2}`. This domain's local copies and its `ADVANCE_PAYMENT.INVALID_PERIOD` code were retired, along with the duplicate Pydantic validator on `AdvancePaymentCreateRequest` that shadowed them with a 422. See `docs/domains/tax-calendar.md`.
-- **No duplicate active period:** `UNIQUE(client_record_id, period) WHERE deleted_at IS NULL`. Duplicate insert raises `ADVANCE_PAYMENT.CONFLICT`. (`advance_payment_service.py:137-141`)
-- **Frequency independence:** `advance_payment_frequency` must never be derived from `vat_reporting_frequency`. These are independent. (`domain_decisions_v3.md` §2, INV-07)
+- **Slot occupancy:** creation asks `get_slot_occupant_for_period`, whose predicate matches the partial unique index. A canceled original frees the period, an amendment never occupies it, and a superseded original continues to occupy it. A duplicate slot raises `ADVANCE_PAYMENT.CONFLICT`. (`backend/app/advance_payments/services/advance_payment_service.py`, `backend/app/advance_payments/repositories/advance_payment_repository.py`)
+- **Frequency independence:** `advance_payment_frequency` must never be derived from `vat_reporting_frequency`. These are independent. (`backend/docs/domain_decisions_v3.md` §2, INV-07)
 - **advance_rate snapshot frozen:** `advance_rate` is a snapshot at creation time. Changes to `LegalEntity.advance_rate` do not backfill existing records. (INV-06)
 - **turnover snapshot frozen:** `turnover_amount` never follows later amendments to the VAT return it came from. Filing or amending a `VatWorkItem` writes nothing to `AdvancePayment`; the only paths that set `turnover_amount` are create, PATCH, and the refresh command.
 - **turnover_source tracks the writer:** create and PATCH set `manual`; the refresh command sets `vat_filed` or `vat_pending`. A PATCH that overwrites a VAT-sourced turnover resets the source to `manual`, so the label never outlives the figure it described. Clearing `turnover_amount` clears both provenance columns.
 - **Refresh is all-or-nothing per period:** the command snapshots only when *every* month covered by `period_months_count` has a VAT work item, so a half-covered bi-monthly period cannot snapshot a silently halved turnover. The result is `vat_filed` only when every covered month is filed; a mixed filed/unfiled bi-monthly period is `vat_pending`.
-- **Unfiled VAT requires explicit confirmation:** refreshing from a `READY_FOR_REVIEW` return raises `ADVANCE_PAYMENT.VAT_NOT_FILED` unless the request passes `confirm_pending`. The chosen source is recorded on the row and in the audit entry.
+- **Unfiled VAT requires explicit confirmation:** refreshing from an `awaiting_verification` return raises `ADVANCE_PAYMENT.VAT_NOT_FILED` unless the request passes `confirm_pending`. The chosen source is recorded on the row and in the audit entry.
 - **Refresh does not override an override:** the command recomputes `calculated_amount`, but `expected_amount` still resolves to `override_amount` when one is set.
 - **Bulk refresh takes explicit ids, never a filter:** `payment_ids` is required (1..`MAX_BULK_REFRESH_PAYMENTS`). A filter-based form is deliberately absent — a filter can match rows the advisor never saw, and this command writes to every row it matches. Ownership of every id is checked before any write, so a foreign or unknown id fails the whole request with `ADVANCE_PAYMENT.NOT_FOUND`.
 - **Bulk refresh never snapshots unfiled returns:** there is no bulk `confirm_pending`. Confirming an unfiled figure is a judgement about one period and cannot be given meaningfully for a batch, so `vat_pending` periods are counted in `skipped_not_filed` instead.
-- **Bulk refresh never touches a settled payment:** rows with `status = paid` are counted in `skipped_paid`. Snapshotting recomputes `expected_amount` and can drop a PAID row to PARTIAL; recording a payment before its VAT return arrives is normal, so PAID rows with `turnover_amount IS NULL` are common. The single-payment command still allows it — that is the deliberate escape hatch for correcting one settled row.
+- **Bulk refresh never touches a paid-in-full payment:** rows whose money fact `is_paid_in_full` is true are counted in `skipped_paid`, independently of lifecycle status. Snapshotting recomputes `expected_amount` and can make a previously fully paid row underpaid; recording payment before its VAT return arrives is normal, so paid-in-full rows with `turnover_amount IS NULL` are common. The single-payment command still allows it — that is the deliberate escape hatch for correcting one such row.
 - **Bulk refresh is not atomic:** each period is an independent business fact, so a period that cannot be snapshotted is counted, not raised, and does not roll back its neighbours. Skips are split into `skipped_no_vat` and `skipped_not_filed` because the two demand different follow-ups (chase the return vs. wait for filing). Every refreshed payment gets its own `advance_payment.turnover_refreshed` audit entry — there is no grouped batch entry.
 - **One turnover rule, one implementation:** `TurnoverLookupRepository._resolve` is the only place that decides what a period can draw from VAT. `resolve_turnover` (one period), `resolve_turnover_for_client`, and `resolve_turnover_for_clients` differ only in how many periods they ask about. Never add a fourth path or re-derive the coverage/source rule at a call site.
 - **The mismatch filter is that same rule in SQL:** `vat_turnover_mismatch_expr` (same module) is the only SQL form of the coverage-plus-tolerance rule, and exists because a filter narrows a set the server never loads — the overview is paginated, so a Python check could not back it. It and `_resolve`/`VatTurnoverMismatch.from_comparison` must change together: a row the `vat_mismatch` filter keeps must be a row that carries the flag. It is used by the overview filter (both directions: `true` keeps mismatching rows, `false` keeps the rest) and by `MonthBatchSummary.vat_mismatch_count`. Bi-monthly months are compared within the period's own year, which is safe because a bi-monthly period starts on an odd month and therefore never crosses a year end.
-- **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP), and stays **gross** — `withheld_amount` is never folded into it. `expected_amount` resolves in order: `override_amount` when set (it is the final say, and wins over `withheld_amount`); otherwise `max(0, calculated_amount - withheld_amount)`, floored at zero. (`advance_payment_service.py:196-216`)
-- **Status is server-owned:** Clients cannot set `status` through the PATCH contract. The service derives it on create and whenever `paid_amount`, `expected_amount`, `turnover_amount`, or `override_amount` changes: `paid=0 → pending`, `paid ≥ expected → paid`, else `partial`.
-- **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`advance_payment_service.py:244`)
+- **Amount calculation:** `calculated_amount = turnover_amount × advance_rate / 100` (ROUND_HALF_UP), and stays **gross** — `withheld_amount` is never folded into it. `expected_amount` resolves in order: `override_amount` when set (it is the final say, and wins over `withheld_amount`); otherwise `max(0, calculated_amount - withheld_amount)`, floored at zero. (`backend/app/advance_payments/services/advance_payment_service.py`)
+- **Lifecycle status is server-owned:** Clients cannot set `status` through the PATCH contract. Money events may advance but never rewind or lock: a positive payment advances through `input_received` to `in_progress`; payment in full may continue to `awaiting_verification`; only a person closes to `submitted`. Each crossed stage is validated by the shared graph and audited separately. A changed expected amount never drags the lifecycle backward. (`backend/app/advance_payments/services/advance_payment_service.py`)
+- **Soft delete only:** Records are soft-deleted; hard deletes are not performed. (`backend/app/advance_payments/services/advance_payment_service.py`)
 - **Client-owned detail lookup:** Reading a single payment requires both `client_record_id` and `payment_id`. A missing, deleted, or differently owned payment returns `ADVANCE_PAYMENT.NOT_FOUND` instead of exposing another client's record. The lookup is independent of the list's active year, filters, and pagination.
 - **Detail period navigation is client/year scoped:** The detail screen's picker and previous/next controls list active payments for the current payment's `client_record_id` and calendar year only. Siblings are ordered chronologically by `period`; navigation preserves whether the user entered through the organization list or the client tab. The controls are disabled while the edit form has unsaved changes.
-- **Annual report invalidation hook:** When a payment is marked `paid`, the service invalidates any open annual report tax calculation for the same client+year. Failure is non-critical and does not fail the update. (`api/advance_payments.py:155-164`)
-- **TaxCalendarEntry required:** Every payment must link to a `TaxCalendarEntry` (NOT NULL FK). The service calls `TaxCalendarMaterializationService.ensure_periodic_entry` to create or reuse the entry at creation time. (`advance_payment_service.py:152-157`)
-- **due_date_original immutable:** Once set, `due_date_original` cannot change. Enforced by SQLAlchemy event listener. (`models/due_date_snapshot_events.py:24-31`)
-- **due_date_effective requires reason:** If `due_date_effective ≠ due_date_original`, `due_date_override_reason` must be non-empty. Enforced on insert and update. (`models/due_date_snapshot_events.py:16-21`)
+- **Annual report invalidation hook:** Every write path that can change `paid_amount`, `expected_amount`, or the resulting money contribution invalidates any open annual-report tax calculation for the same client and year. The invalidation is not gated on lifecycle status. (`backend/app/advance_payments/services/advance_payment_service.py`)
+- **TaxCalendarEntry required:** Every payment must link to a `TaxCalendarEntry` (NOT NULL FK). The service calls `TaxCalendarMaterializationService.ensure_periodic_entry` to create or reuse the entry at creation time. (`backend/app/advance_payments/services/advance_payment_service.py`)
+- **due_date_original immutable:** Once set, `due_date_original` cannot change. Enforced by SQLAlchemy event listener. (`backend/app/advance_payments/models/advance_payment_due_date_snapshot_events.py`)
+- **due_date_effective requires reason:** If `due_date_effective ≠ due_date_original`, `due_date_override_reason` must be non-empty. Enforced on insert and update. (`backend/app/advance_payments/models/advance_payment_due_date_snapshot_events.py`)
 - **due_date_effective is overdue source of truth:** All overdue checks, badges, and reminders must use `due_date_effective`. Using `due_date_original` or `TaxCalendarEntry.due_date` is a bug. (INV-05)
-- **anchor = client_record_id:** Workflow objects link to `ClientRecord`, never directly to `LegalEntity`. Joins to `LegalEntity` always go through `ClientRecord`. (INV per `domain_decisions_v3.md` §1)
+- **anchor = client_record_id:** Workflow objects link to `ClientRecord`, never directly to `LegalEntity`. Joins to `LegalEntity` always go through `ClientRecord`. (INV per `backend/docs/domain_decisions_v3.md` §1)
 - **Selected-client overview filters are exact:** The overview and overview batch endpoints accept `client_record_id` for exact `ClientRecord` matching. `client_search` remains a legacy fuzzy text filter for name, ID number, and office-client-number search.
-- **Schedule generation:** `generate_annual_schedule` skips periods where `entry.due_date < reference_date` (default today) and skips periods that already have an active payment. (`advance_payment_service.py:269-287`)
+- **Schedule generation:** `generate_annual_schedule` uses `advance_payment_obligation_plan` with the advance-specific liability range. It does not drop an owed period because its deadline already passed; late periods are debts. It skips only occupied slots after resolving any confirmed stale-cadence cleanup. (`backend/app/advance_payments/services/advance_payment_service.py`)
 - **Office-wide generation is chunked, and the server owns the chunking:** `bulk_generate_annual_schedules` walks eligible clients by keyset on `ClientRecord.id` and returns `next_cursor`; the caller repeats until it is `null`. Batch size (`BULK_GENERATE_CLIENT_CHUNK_SIZE`) and ordering are server decisions — a caller-chosen batch could silently omit clients. Keyset, not offset: a run spans several requests, and an offset would skip or repeat clients if the eligible set changed underneath it. Each chunk needs its own idempotency key so retrying one chunk cannot double-create.
 - **Office-wide eligibility is `ACTIVE` + a configured frequency:** closed and frozen clients are excluded by the query, not skipped later — creating an advance for them is already forbidden. Active clients with no `advance_payment_frequency` are excluded from generation but *reported* by the preview endpoint: unlike a closed client or an already-generated period, a missing frequency leaves the client with no schedule at all and is a data gap the advisor has to close.
 - **Office-wide generation is not atomic across clients:** a client whose own generation raises an `AppError` is collected into `failed` and the chunk continues — one misconfigured client must not cost the chunk its other clients. A database error still fails the whole chunk, because the transaction is no longer trustworthy; the caller retries that chunk under the same idempotency key.
 - **A cadence change blocks generation until it is confirmed:** `exists_for_period` matches on the `YYYY-MM` key alone, so rows created under the client's previous `advance_payment_frequency` occupy the periods the new schedule needs. When such rows exist and `cleanup_stale_cadence` is not set, the generator creates **nothing** — generating only the periods the stale rows do not occupy is what leaves a month covered by both cadences at once. The response reports the counts and the caller repeats with the flag. A client whose only stale rows are settled is not blocked, since no cleanup could free those periods.
-- **The cleanup sweep is future-only and PENDING-only:** it covers rows in the generated year whose `period_months_count` differs from the configured one and whose effective due date is still ahead. Past-due unpaid rows are never removed — an overdue period is a debt, not a leftover. Paid and part-paid rows are never removed either, and are reported as `stale_cadence.settled`: that period keeps the old shape until someone resolves it by hand. Deletions are soft and audited as `advance_payment.deleted` with a system-written `reason`.
+- **The cleanup sweep is future-only and `awaiting_input`-only:** it covers rows in the generated year whose `period_months_count` differs from the configured one and whose effective due date is still ahead. Past-due rows are never removed — an overdue period is a debt, not a leftover. Any row that has advanced beyond `awaiting_input` is also preserved and reported as `stale_cadence.settled`; that period keeps the old shape until someone resolves it by hand. Deletions are soft and audited as `advance_payment.deleted` with a system-written `reason`.
 - **Bulk-created schedules are marked in the audit trail:** rows created by the office-wide run carry `source = "bulk_generate"` in the `advance_payment.created` audit metadata, reusing the existing action rather than adding a new one.
 
 **Closing facts** (stored, written once when an advisor closes the period — W3, D-13/D-15/D-20/D-32):
@@ -192,12 +209,17 @@ Cite: `backend/app/advance_payments/services/advance_payment_service.py`.
 - The close is advisor-only via `POST /clients/{client_record_id}/advance-payments/{payment_id}/status` (single-step transition through the shared graph: forward one stage, back one with a required note, cancel, or close). **The close being advisor-only is D-17's rule; the *forward step* being advisor-only is not** — that endpoint currently guards all four acts with one role check, and W7 splits it. Closing asserts the shared readiness gate first. `GET .../{payment_id}/readiness` publishes the same gate as `{is_ready, issues}` — assignee set, turnover known, expected amount computable. **Payment in full is not a gate** (D-16).
 - A submitted advance is fully locked (D-13): PATCH, delete, turnover refresh, and transitions out are rejected with `OBLIGATION.LOCKED`; bulk mark-paid and bulk refresh skip closed rows (`reason: "closed"` / `skipped_closed`).
 
-**Computed response fields** (not stored; derived at serialization in `schemas/advance_payment.py`):
-- `timing_status`: `"overdue"` if `status != submitted AND today > due_date_effective`, else `"on_time"`. Falls back to `due_date` when `due_date_effective` is NULL (legacy rows).
+**Amendment chain** (W4, D-10/D-12/D-14/D-21/D-34):
+- `POST .../{payment_id}/amend` is advisor-only and accepts only a submitted chain tip. It creates a second row at `in_progress`, copies the payment's turnover, rate, expected/paid amounts, payment date/method/reference and other material, clears identity, soft-delete state, closing facts and all due dates, links it with `amends_id`, stamps the original's `superseded_at`, and carries the period's `chain_closed_late`. The advance has no child rows, so the copy is shallow by design. Cite: `backend/app/advance_payments/services/advance_payment_amendment_service.py`.
+- Normal lists, counts, sums, turnover reads, and KPIs use the chain-tip scope (`deleted_at IS NULL AND superseded_at IS NULL`); `GET .../chain` is the explicit history read.
+- Plain DELETE of an amendment returns 409 `OBLIGATION.AMENDMENT_NOT_DELETABLE`. `POST .../withdraw` accepts an amendment that is not submitted and is still the chain tip, soft-deletes it, clears the original's `superseded_at`, returns the restored original, and leaves the withdrawn row visible only in the chain response with `is_withdrawn=true`. A submitted correction is corrected by another amendment, not withdrawn.
+
+**Computed response fields** (not stored; derived at serialization in `backend/app/advance_payments/schemas/advance_payment.py`):
+- `timing_status`: `"not_applicable"` when neither deadline exists; otherwise `"overdue"` if the lifecycle is not `submitted` and today is past `due_date_effective or due_date`, else `"on_time"`.
 - `delta`: `expected_amount - paid_amount`.
 - `available_turnover`: `{amount, source}` or `null`. Populated by the router from `TurnoverLookupRepository` only when `turnover_amount is None`. It is what the period *could* be snapshotted from — never the payment's turnover — and feeds no amount on the record. `source` is `vat_filed | vat_pending`; `manual` cannot appear. Clients must not render it in the same slot as `turnover_amount`.
 - `missing_turnover`: `True` when `turnover_amount is None AND available_turnover is None`.
-- `MonthBatchSummary.due_this_month_count`: count of non-paid payments whose effective due date falls in the current Israeli calendar month. The frontend must not infer this count from the reporting period month.
+- `MonthBatchSummary.due_this_month_count`: count of payments not paid in full whose effective due date falls in the current Israeli calendar month. The frontend must not infer this count from the reporting period month.
 - `MonthBatchSummary.vat_mismatch_count`: count of the batch's payments whose stored turnover disagrees with their period's current VAT figure. Always returned (not conditional on the filter) — it is what lets a client hide the batches the `vat_mismatch` filter would empty, without fetching their rows first.
 
 ## Error codes
@@ -211,12 +233,19 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 | `ADVANCE_PAYMENT.FREQUENCY_MISMATCH` | 409 | Request `period_months_count` does not match client's configured frequency |
 | `ADVANCE_PAYMENT.CONFLICT` | 409 | Active payment already exists for `(client_record_id, period)` |
 | `ADVANCE_PAYMENT.NOT_FOUND` | 404 | Payment ID not found for the given client |
-| `ADVANCE_PAYMENT.RATE_INVALID` | 400 | VAT rate is zero when attempting reverse calculation (`advance_payment_calculator.py`) |
+| `ADVANCE_PAYMENT.RATE_INVALID` | 400 | VAT rate is zero when attempting reverse calculation (`backend/app/advance_payments/advance_payment_calculator.py`) |
 | `ADVANCE_PAYMENT.VAT_TURNOVER_NOT_FOUND` | 404 | Refresh found no VAT work item covering every month of the period |
 | `ADVANCE_PAYMENT.VAT_NOT_FILED` | 409 | Refresh found only unfiled VAT returns and the request did not pass `confirm_pending` |
 | `ADVANCE_PAYMENT.NOT_READY` | 400 | Close attempted while the readiness gate lists blocking issues |
 | `OBLIGATION.LOCKED` | 400 | Any mutation on a submitted (closed) advance |
 | `CLIENT_RECORD.CLOSED` | 409 | Client record is closed or frozen — cannot create payment. Raised by the shared client-eligibility guard; the message distinguishes closed from frozen, the code does not |
+
+Amendment operations also raise shared lifecycle codes:
+
+- `OBLIGATION.NOT_CLOSED` — amendment requested from a record that is not submitted.
+- `OBLIGATION.ALREADY_AMENDED` — the record already has a correction, or withdrawal targets a non-tip link.
+- `OBLIGATION.AMENDMENT_NOT_DELETABLE` — plain DELETE requested for an amendment.
+- `OBLIGATION.NOT_AN_AMENDMENT` — withdrawal requested for a standalone record.
 
 ## Known issues
 
@@ -252,15 +281,15 @@ Codes follow `ADVANCE_PAYMENT.REASON` format. Registry: `docs/backend/error-code
 
 From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived legacy spec at `docs/archive/advance-payments-legacy.md`:
 
-1. **`overdue` is computed, not stored.** Removed from the status enum. `timing_status` (`overdue | on_time`) is derived at read time from `due_date_effective or due_date` and `status`. ~~`paid_late` is similarly computed~~ — superseded in W3: lateness of the *close* is the stored `closed_late` fact, written once at the close (D-20); the computed `paid_late` field was removed from the contract.
+1. **Timing is computed, not stored.** `timing_status` (`overdue | on_time | not_applicable`) is derived at read time from `due_date_effective or due_date` and the lifecycle status. `not_applicable` is the answer for an undated amendment. The old computed `paid_late` field was removed in W3: lateness of the close is the stored `closed_late` fact, while the period's historical answer is `chain_closed_late`.
 
-2. **Turnover snapshot vs. live.** `turnover_amount` is a snapshot frozen on write. For pending/partial payments, `live_turnover` is fetched from `VatWorkItem` at read time via `TurnoverLookupRepository` when `turnover_amount is None`. No hard dependency on VAT report existing before advance payment.
+2. **Turnover snapshot vs. available source.** `turnover_amount` is a snapshot frozen on write. For any open payment whose snapshot is missing, the available VAT figure is fetched at read time through `TurnoverLookupRepository`. No hard dependency on a VAT return existing before the advance payment.
 
-   `available_turnover` is a *discovery* signal, not a second source of truth for the money: `calculated_amount`, `expected_amount`, and `status` are derived only from the stored `turnover_amount`. The advance payment is created before its period's VAT return exists, so a window where `turnover_amount is NULL` is unavoidable; `available_turnover` exists to show that the window can now be closed. Turning it into a snapshot is an explicit advisor action (the refresh command), never an automatic consequence of VAT filing.
+   `available_turnover` is a *discovery* signal, not a second source of truth for the money: `calculated_amount` and `expected_amount` are derived only from the stored `turnover_amount`; lifecycle status follows the shared transition graph, not those values. The advance payment is created before its period's VAT return exists, so a window where `turnover_amount is NULL` is unavoidable. Turning the available figure into a snapshot is an explicit advisor action (the refresh command), never an automatic consequence of VAT filing.
 
    It was named `live_turnover` until 2026-07-20 and was rendered in the same UI slot as `turnover_amount`, which made a screen show one turnover while the entity held another. The rename to `available_turnover` plus the added `source` is what lets the UI render it as a pending action instead of a value.
 
-   **Behaviour change in the same revision:** the read path now surfaces unfiled (`READY_FOR_REVIEW`) returns too, where it previously considered only `FILED` ones. A period whose VAT is still in review therefore stops counting as `missing_turnover` and starts advertising a `vat_pending` candidate. `missing_turnover` now means "nothing stored and nothing to snapshot", which is a different question from "nothing filed".
+   **Behaviour change in the same revision:** the read path surfaces unsubmitted (`awaiting_verification`) returns too, where it previously considered only `submitted` ones. A period whose VAT is still in review therefore stops counting as `missing_turnover` and starts advertising a `vat_pending` candidate. `missing_turnover` means "nothing stored and nothing available to snapshot", which is a different question from "nothing submitted".
 
 3. **Edit via drawer, not inline.** UI uses a drawer component for editing payments (UI decision, not enforced in backend).
 
@@ -270,11 +299,11 @@ From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived leg
 
 6. **`due_date_original` immutable; `due_date_effective` is overdue source of truth.** Architectural invariants INV-04 and INV-05. Enforced by SQLAlchemy event listeners.
 
-7. **Workflow objects anchor on `client_record_id`, not `legal_entity_id`.** Invariant from `domain_decisions_v3.md` §1.
+7. **Workflow objects anchor on `client_record_id`, not `legal_entity_id`.** Invariant from `backend/docs/domain_decisions_v3.md` §1.
 
 8. **Frequency independence.** `advance_payment_frequency` never derived from `vat_reporting_frequency`. Enforced in service and documented as INV-07.
 
-9. **`TaxDeadline` removed.** All deadline lookups go through `TaxCalendarEntry`. New code must not use the `TaxDeadline` name or concept. (`domain_decisions_v3.md` §3.6)
+9. **`TaxDeadline` removed.** All deadline lookups go through `TaxCalendarEntry`. New code must not use the `TaxDeadline` name or concept. (`backend/docs/domain_decisions_v3.md` §3.6)
 
 10. **2216 rate-reduction requests are tracked as tasks, not as an advance-payments workflow** (2026-07-23). The request is submitted in שע"מ, outside the system; the system only follows it up. Model it as a regular task in the tasks module ("הגשת 2216 ללקוח X" + due date). When the authority approves, the advisor applies the new rate with the bulk `POST /clients/{id}/advance-payments/bulk-rate-update` action ("from period X onward"), which reprices pending rows and updates the legal entity's default — not by editing periods one by one. There is no 2216 entity, status, or endpoint.
 
@@ -286,8 +315,8 @@ From `backend/docs/domain_decisions_v3.md` (v3.1, May 2026) and the archived leg
 
 These items are explicitly **not yet implemented**. Do not describe as current behavior.
 
-- **Remove legacy `AdvancePayment.due_date`.** The old `due_date` column coexists with `due_date_original` and `due_date_effective`. Plan: audit all consumers to use `due_date_effective`, then drop `due_date`. (`domain_decisions_v3.md` §3.3, §9)
-- **Explicit due-date override endpoint.** No dedicated endpoint for updating `due_date_effective` exists yet. If added, it must enforce `due_date_override_reason`, permission checks, and must block updates to terminal-state records. (`domain_decisions_v3.md` §9, INV-09)
+- **Remove legacy `AdvancePayment.due_date`.** The old `due_date` column coexists with `due_date_original` and `due_date_effective`. Plan: audit all consumers to use `due_date_effective`, then drop `due_date`. (`backend/docs/domain_decisions_v3.md` §3.3, §9)
+- **Explicit due-date override endpoint.** No dedicated endpoint for updating `due_date_effective` exists yet. If added, it must enforce `due_date_override_reason`, permission checks, and must block updates to terminal-state records. (`backend/docs/domain_decisions_v3.md` §9, INV-09)
 - **`turnover_source_vat_report_id` FK.** The legacy spec proposed storing the source VAT-report ID on the payment (`advance_payments_spec.md` §שינויים נדרשים). Partially addressed: `turnover_source` and `turnover_snapshot_at` now record *what kind* of source and *when*, but the specific `vat_work_item_ids` live only in the `advance_payment.turnover_refreshed` audit entry, not as a column.
 - **Turnover drift warning.** Legacy spec proposed a ⚠ alert when the VAT report's turnover changed after the advance payment was recorded. Not implemented; `turnover_snapshot_at` is the field a drift check would compare against.
 - **Bulk refresh from the cross-client overview.** The bulk endpoint is id-based and therefore screen-agnostic, but only the client tab calls it today. Wiring it to the overview needs a decision about what "all ready" means when a filter matches far more rows than the page shows.

@@ -14,15 +14,17 @@ This file must not contain:
 
 Source of truth: tracking only — not source of truth for current behaviour.
 
-Last updated: 2026-07-30 (W4 in progress — backend landed, frontend open. W3's assignee gate was
-found to have no UX route; recorded as a W3 follow-up, planned, not started).
+Last updated: 2026-07-30 (W4 in progress — backend create/chain/withdraw support and review fixes
+1–4 have landed; frontend chain/withdraw support is partial and create-amendment is complete only
+for VAT. W3's assignee-gate UX follow-up remains planned, not started).
 
 # Tax Lifecycle Refactor — Progress
 
 Executes `docs/tax-lifecycle-refactor-plan.md` (decisions D-1 … D-44). The plan was
 re-cut into eleven waves W0–W10; **W0, W1, W2 and W3 have shipped, plus W4-pre —
- an out-of-order slice pulled forward from W7 (see its section for why). W4's backend
- has landed; its frontend is open.**
+an out-of-order slice pulled forward from W7 (see its section for why). W4 is not a
+completed wave: its backend amendment foundation has landed, while its frontend and
+the follow-up defects recorded in `docs/tax-lifecycle-w4-review-findings.md` remain open.**
 
 Each wave is a vertical slice: backend + `openapi.json` + `generated.ts` + frontend +
 seed + tests land together, so the app runs at every wave boundary. Schema changes
@@ -31,7 +33,9 @@ are squashed rather than chained — `scripts/dev/reset_dev_db.py` regenerates o
 
 ## Branches
 
-One branch per wave, stacked, in each of the three repos. **Nothing is pushed.**
+The stack was built one wave per branch in each repository. W0–W3 are now on `main`;
+the remaining live refs are `tax-lifecycle/w4-pre-signature-removal` and
+`tax-lifecycle/w4-amendment`, both present locally and on `origin` in all three repos.
 
 ```
 main → tax-lifecycle/w0-delete-duplication
@@ -44,11 +48,11 @@ main → tax-lifecycle/w0-delete-duplication
 
 | Repo | W0 | W1 | W2 | W3 | W4-pre | W4 |
 |---|---|---|---|---|---|---|
-| `backend` | 6 commits | 3 | 8 | 1 | 1 | in progress |
-| `frontend` | 1 | 1 | 4 | 1 | 1 | in progress |
-| `docs` | 1 | 1 | 1 | 1 | 1 | in progress |
+| `backend` | shipped on `main` | shipped on `main` | shipped on `main` | `main` tip | shipped branch | in progress |
+| `frontend` | shipped on `main` | shipped on `main` | shipped on `main` | `main` tip | shipped branch | in progress |
+| `docs` | shipped on `main` | shipped on `main` | shipped on `main` | `main` tip | shipped branch | in progress |
 
-Current migration: `40acbddf6584_initial` (re-squashed in W4).
+Current migration revision: `b64502fa7c50` (`backend/alembic/versions/b64502fa7c50_initial.py`, re-squashed in W4).
 
 ## Verification at the W2 boundary
 
@@ -281,7 +285,8 @@ note · cancel); annual status panel gains the assignee selector.
    seeds now always name one.
 3. **`docs/domains/annual-reports.md` still describes pre-W2 statuses** in several
    lifecycle paragraphs (`pending_client`, `in_preparation`, `amend_report`). W3
-   updated only the closing/locking content; the rest is recorded doc debt for W10.
+   updated only the closing/locking content. **Closed 2026-07-30 by W4 review
+   Finding 7:** the canonical doc now uses `ObligationStatus` and separate amendment records.
 
 ### W3 follow-up — the shared gate has no UX route in two of three domains
 
@@ -528,8 +533,8 @@ signature-creation and missing-client-record pair, and the background-job reconc
 `POST /transition` endpoint and `ReportStage` (both retired in W2 by D-40) and the pre-W2
 status names. Rewritten against the shared graph. `docs/domains/annual-reports.md` had the
 same pre-W2 staleness flagged in the W3 record; the closing/locking and signature paragraphs
-are now correct, but **the remaining pre-W2 status names elsewhere in that file are still
-open, still for W10.**
+were corrected first. **Closed 2026-07-30 by W4 review Finding 7:** the remaining enum,
+transition and same-row amendment descriptions now match the W4 code.
 
 ---
 
@@ -542,6 +547,22 @@ every other wave's failure mode is an error. This one's is a **wrong number**. A
 aggregate that forgets a chain sums the original *and* its correction, reports a
 total that is too large, and raises nothing. No test goes red on a number merely
 being wrong.
+
+### Current W4 boundary status
+
+W4 has not reached its vertical-slice exit criterion. This is the actual state after
+the 2026-07-30 review and follow-up fixes:
+
+| Surface | Landed | Still open |
+|---|---|---|
+| Backend | Create, chain-history and withdraw endpoints in all three domains; chain-tip scopes; slot-occupancy gates; amendment-delete protection; full-copy fix for annual details; chain lateness preservation | Advance-amend concurrency (#6), canceled→fresh operational scoping (#8), and atomic original creation / unique-to-409 handling (#11) |
+| Frontend | Chain modals and withdrawal flows in all three domains; create-amendment action in VAT | Create-amendment actions in annual reports and advances, VAT post-create navigation/list marking (#5), advance withdrawal navigation (#9), and VAT chain-cache invalidation (#10) |
+| Seed | Chain integrity validation is present; the VAT demo builder creates amendment rows through the shared link/lateness helpers | The 11 seed-local `select()` sites remain explicitly outside the chain-convention test and unaudited one by one |
+| Tests and gates | Backend full suite: **2,362 passed, 1 skipped**; frontend: **51 files / 174 tests passed**; TypeScript, ESLint, architecture, Knip, Ruff, Pyright and OpenAPI sync passed | No regression coverage yet for the open #8–#11 scenarios; see the review findings document |
+
+The canonical domain docs now describe the implemented W0–W4 behavior. This progress
+document remains the owner of incomplete-wave state; none of the rows above turns the
+open W4 frontend or review findings into shipped behavior.
 
 ### The model — two facts, deliberately not one
 
@@ -842,10 +863,9 @@ three feature `contracts.ts` files it names.
 Chasing it also found `docs/domains/vat.md` a wave and a half stale: it still documented a
 `VatWorkItemStatus` enum in `vat_enums.py` that W2 deleted. Its "Enums / statuses" section was
 rewritten against the shared ladder and now carries the action-key table above — the fact the
-doc could have prevented the defect and didn't. **The rest of that file is unfixed**: pre-W2
-status names in the business-rules and error-code sections, pre-W4 amendment fields
-(`is_amendment`, `amends_item_id`), and citations to backend files since renamed. Recorded doc
-debt for W10, same as `docs/domains/annual-reports.md`, and flagged in the file itself.
+doc could have prevented the defect and didn't. **Closed 2026-07-30 by W4 review Finding 7:**
+the remaining business-rule, error-code, amendment-model and renamed-file citations now match
+the W4 implementation; the stale warning block was removed.
 
 ### Mistakes made during execution, and their cost
 
