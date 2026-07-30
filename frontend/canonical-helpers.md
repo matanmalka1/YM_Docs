@@ -50,6 +50,17 @@ A new display pattern none of these cover → add a named formatter routed throu
 Never `new URLSearchParams(searchParams)` + mutate + `setSearchParams` inline. Enum-backed params are
 untrusted strings — parse with a feature guard, never `as SomeEnum`.
 
+## Sibling-record navigation — `src/utils/recordPath.ts`
+
+| Need | Helper | Never instead |
+|------|--------|---------------|
+| Move a detail screen to another record of the same kind | `toSiblingRecordPath(pathname, id)` | `navigate('/tax/vat/' + id)`, `` `${backPath}/${id}` ``, an inline `pathname.replace` |
+
+Every obligation detail panel is mounted twice — standalone and inside the client tab — so naming a
+route drops a client-scoped visitor out of the tab, its breadcrumbs and its navigation. Building the
+path from a feature's `backPath` is also wrong: on the standalone advance-payments screen that is the
+*list* path, which carries the client id in a different position and may carry a query string.
+
 ## Pagination — `src/utils/paginationUtils.ts`
 
 | Need | Helper | Never instead |
